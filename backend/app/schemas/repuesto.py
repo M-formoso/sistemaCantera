@@ -1,0 +1,69 @@
+from pydantic import BaseModel, Field
+from uuid import UUID
+from typing import Optional
+from decimal import Decimal
+
+from app.schemas.common import ResponseBase
+
+
+class RepuestoBase(BaseModel):
+    """Schema base de Repuesto"""
+
+    codigo: Optional[str] = Field(None, max_length=50)
+    nombre: str = Field(..., min_length=1, max_length=255)
+    categoria: Optional[str] = Field(None, max_length=100)
+    unidad: str = Field(default="unidades", max_length=20)
+    precio_unitario: Optional[Decimal] = Field(None, ge=0)
+    proveedor: Optional[str] = Field(None, max_length=255)
+    ubicacion_deposito: Optional[str] = Field(None, max_length=100)
+
+
+class RepuestoCreate(RepuestoBase):
+    """Schema para crear Repuesto"""
+
+    stock_actual: Decimal = Field(default=Decimal("0"), ge=0)
+    stock_minimo: Decimal = Field(default=Decimal("0"), ge=0)
+
+
+class RepuestoUpdate(BaseModel):
+    """Schema para actualizar Repuesto"""
+
+    codigo: Optional[str] = Field(None, max_length=50)
+    nombre: Optional[str] = Field(None, min_length=1, max_length=255)
+    categoria: Optional[str] = Field(None, max_length=100)
+    stock_actual: Optional[Decimal] = Field(None, ge=0)
+    stock_minimo: Optional[Decimal] = Field(None, ge=0)
+    unidad: Optional[str] = Field(None, max_length=20)
+    precio_unitario: Optional[Decimal] = Field(None, ge=0)
+    proveedor: Optional[str] = Field(None, max_length=255)
+    ubicacion_deposito: Optional[str] = Field(None, max_length=100)
+    activo: Optional[bool] = None
+
+
+class RepuestoSchema(ResponseBase, RepuestoBase):
+    """Schema de respuesta de Repuesto"""
+
+    stock_actual: Decimal
+    stock_minimo: Decimal
+    activo: bool
+
+
+class RepuestoStockBajo(BaseModel):
+    """Schema para repuestos con stock bajo"""
+
+    id: UUID
+    codigo: Optional[str]
+    nombre: str
+    stock_actual: Decimal
+    stock_minimo: Decimal
+    unidad: str
+    diferencia: Decimal
+
+
+class RepuestoMovimiento(BaseModel):
+    """Schema para movimiento de stock"""
+
+    repuesto_id: UUID
+    cantidad: Decimal = Field(..., gt=0)
+    tipo_movimiento: str  # 'ingreso' o 'egreso'
+    observaciones: Optional[str] = None
