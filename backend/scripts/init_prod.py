@@ -46,7 +46,7 @@ def run_migrations():
 
 
 def create_admin_user():
-    """Crear usuario administrador si no existe"""
+    """Crear o actualizar usuario administrador"""
     print("Verificando usuario administrador...")
 
     engine = create_engine(settings.DATABASE_URL)
@@ -56,11 +56,10 @@ def create_admin_user():
     try:
         # Verificar si ya existe un admin
         admin = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
+        admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
 
         if not admin:
             # Crear admin con contraseña del entorno o por defecto
-            admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123!")
-
             admin = Usuario(
                 email="admin@canteralarufina.com.ar",
                 nombre="Administrador",
@@ -71,9 +70,14 @@ def create_admin_user():
             db.add(admin)
             db.commit()
             print(f"Usuario administrador creado: admin@canteralarufina.com.ar")
-            print(f"IMPORTANTE: Cambia la contraseña después del primer login!")
         else:
-            print("Usuario administrador ya existe")
+            # Actualizar contraseña si ADMIN_PASSWORD está definida
+            if os.environ.get("ADMIN_PASSWORD"):
+                admin.password_hash = get_password_hash(admin_password)
+                db.commit()
+                print(f"Contraseña del administrador actualizada")
+            else:
+                print("Usuario administrador ya existe")
 
     except Exception as e:
         print(f"Error creando admin: {e}")
