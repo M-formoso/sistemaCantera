@@ -3,4 +3,4 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile.prod"
 
 [deploy]
-startCommand = "serve -s dist -l tcp://0.0.0.0:${PORT:-3000}"
+startCommand = "serve -s dist -p $PORT"
