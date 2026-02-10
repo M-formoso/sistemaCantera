@@ -12,6 +12,22 @@ from app.core.security import get_password_hash
 router = APIRouter()
 
 
+@router.get("/debug-admin")
+async def debug_admin(db: Session = Depends(get_db)):
+    """Debug endpoint - REMOVER EN PRODUCCION"""
+    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
+    if not usuario:
+        return {"error": "Usuario admin no existe"}
+    return {
+        "email": usuario.email,
+        "nombre": usuario.nombre,
+        "activo": usuario.activo,
+        "rol": usuario.rol,
+        "tiene_password": bool(usuario.password_hash),
+        "password_hash_prefix": usuario.password_hash[:20] if usuario.password_hash else None
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     credentials: LoginRequest,
