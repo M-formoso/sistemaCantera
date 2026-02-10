@@ -35,3 +35,4 @@ EXPOSE 3000
 
 # Start serve with shell to expand $PORT
 CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"]
+
