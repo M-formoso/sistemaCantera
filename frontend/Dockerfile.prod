@@ -30,9 +30,12 @@ RUN npm install -g serve
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
-# Expose port (Railway will override with $PORT)
+# Default port
+ENV PORT=3000
+
+# Expose port
 EXPOSE 3000
 
-# Start serve with shell to expand $PORT
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"]
+# Start serve - PORT will be overridden by Railway
+CMD ["sh", "-c", "exec serve -s dist -l tcp://0.0.0.0:$PORT"]
 
