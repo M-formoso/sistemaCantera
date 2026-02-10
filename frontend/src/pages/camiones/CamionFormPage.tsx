@@ -67,7 +67,14 @@ export default function CamionFormPage() {
   }, [camion, reset])
 
   const createMutation = useMutation({
-    mutationFn: (data: CamionFormData) => camionesService.create(data),
+    mutationFn: (data: CamionFormData) => {
+      const cleanData = {
+        ...data,
+        proximo_servicio_km: data.proximo_servicio_km ?? undefined,
+        intervalo_servicio_km: data.intervalo_servicio_km ?? undefined,
+      }
+      return camionesService.create(cleanData)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['camiones'] })
       navigate('/camiones')
@@ -75,7 +82,14 @@ export default function CamionFormPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: CamionFormData) => camionesService.update(id!, data),
+    mutationFn: (data: CamionFormData) => {
+      const cleanData = {
+        ...data,
+        proximo_servicio_km: data.proximo_servicio_km ?? undefined,
+        intervalo_servicio_km: data.intervalo_servicio_km ?? undefined,
+      }
+      return camionesService.update(id!, cleanData)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['camiones'] })
       queryClient.invalidateQueries({ queryKey: ['camion', id] })

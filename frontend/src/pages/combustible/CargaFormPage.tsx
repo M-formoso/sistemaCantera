@@ -66,7 +66,13 @@ export default function CargaFormPage() {
   }, [searchParams, reset])
 
   const createMutation = useMutation({
-    mutationFn: (data: CargaFormData) => combustibleService.registrarCarga(data),
+    mutationFn: (data: CargaFormData) => {
+      const cleanData = {
+        ...data,
+        precio_por_litro: data.precio_por_litro ?? undefined,
+      }
+      return combustibleService.registrarCarga(cleanData)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cargas'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
@@ -298,7 +304,7 @@ export default function CargaFormPage() {
                     </div>
                   )}
 
-                  {precioPorLitro > 0 && (
+                  {(precioPorLitro ?? 0) > 0 && (
                     <div className="pt-3 border-t">
                       <div className="flex justify-between">
                         <span className="font-semibold">Costo Total:</span>

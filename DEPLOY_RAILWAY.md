@@ -1,197 +1,216 @@
 # Despliegue en Railway - Sistema Cantera La Rufina
 
-## Dominio Final
-- **Frontend**: `https://sistema.canteralarufina.com.ar`
-- **API Backend**: `https://api-sistema.canteralarufina.com.ar`
+## Requisitos Previos
+- Cuenta en [Railway](https://railway.app)
+- Repositorio en GitHub con el codigo actualizado
+- (Opcional) Dominio personalizado
 
 ---
 
-## Paso 1: Crear Proyecto en Railway
+## PASO 1: Crear Proyecto en Railway
 
-1. Ve a [railway.app](https://railway.app) e inicia sesión
-2. Crea un nuevo proyecto: **New Project** → **Empty Project**
-3. Nombra el proyecto: `cantera-la-rufina`
-
----
-
-## Paso 2: Agregar Base de Datos PostgreSQL
-
-1. En el proyecto, click en **+ New** → **Database** → **Add PostgreSQL**
-2. Railway creará automáticamente la base de datos
-3. Click en el servicio PostgreSQL y ve a **Variables**
-4. Copia el valor de `DATABASE_URL` (lo necesitarás después)
+1. Ve a [railway.app](https://railway.app) e inicia sesion
+2. Click en **New Project** > **Empty Project**
+3. Dale un nombre al proyecto (ej: `cantera-la-rufina`)
 
 ---
 
-## Paso 3: Agregar Redis
+## PASO 2: Agregar PostgreSQL
 
-1. Click en **+ New** → **Database** → **Add Redis**
-2. Railway creará automáticamente Redis
-3. Click en el servicio Redis y ve a **Variables**
-4. Copia el valor de `REDIS_URL` (lo necesitarás después)
+1. En el proyecto, click en **+ New** > **Database** > **Add PostgreSQL**
+2. Railway crea automaticamente la base de datos
+3. La variable `DATABASE_URL` estara disponible automaticamente
 
 ---
 
-## Paso 4: Desplegar Backend
+## PASO 3: Agregar Redis
 
-1. Click en **+ New** → **GitHub Repo**
-2. Selecciona tu repositorio `sistemaCantera`
-3. En la configuración del servicio:
+1. Click en **+ New** > **Database** > **Add Redis**
+2. Railway crea automaticamente Redis
+3. La variable `REDIS_URL` estara disponible automaticamente
+
+---
+
+## PASO 4: Desplegar Backend
+
+1. Click en **+ New** > **GitHub Repo**
+2. Conecta tu cuenta de GitHub si no lo has hecho
+3. Selecciona tu repositorio `sistemaCantera`
+4. En la configuracion del servicio, configura:
    - **Root Directory**: `backend`
-   - Railway detectará automáticamente el `railway.toml`
+   - Railway detectara automaticamente el `railway.toml`
 
-4. Ve a **Variables** y agrega las siguientes:
+5. Ve a la pestana **Variables** y agrega:
 
 ```env
-DATABASE_URL=<pegar URL de PostgreSQL>
-REDIS_URL=<pegar URL de Redis>
-CELERY_BROKER_URL=<pegar URL de Redis>
-CELERY_RESULT_BACKEND=<pegar URL de Redis>
-SECRET_KEY=<generar con: openssl rand -hex 32>
+# Referencias automaticas (Railway las resuelve)
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+CELERY_BROKER_URL=${{Redis.REDIS_URL}}
+CELERY_RESULT_BACKEND=${{Redis.REDIS_URL}}
+
+# Generar con: openssl rand -hex 32
+SECRET_KEY=<tu-clave-secreta-de-32-caracteres>
+
+# Password del admin inicial
+ADMIN_PASSWORD=<password-seguro>
+
+# JWT
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 REFRESH_TOKEN_EXPIRE_DAYS=7
-BACKEND_CORS_ORIGINS=["https://sistema.canteralarufina.com.ar"]
-ADMIN_PASSWORD=<contraseña-segura-para-admin>
+
+# CORS - Actualizar despues con URL del frontend
+BACKEND_CORS_ORIGINS=["https://cantera-frontend.up.railway.app"]
+
+# Entorno
+ENVIRONMENT=production
 ```
 
-5. Ve a **Settings** → **Networking** → **Generate Domain**
-   - Anota el dominio generado (ej: `cantera-backend-xxx.up.railway.app`)
-
-6. Para usar dominio personalizado:
-   - Ve a **Settings** → **Networking** → **Custom Domain**
-   - Agrega: `api-sistema.canteralarufina.com.ar`
-   - Railway te dará un registro CNAME para configurar en tu DNS
+6. Click en **Deploy** para iniciar el despliegue
+7. Espera a que termine (las migraciones se ejecutan automaticamente)
+8. Ve a **Settings** > **Networking** > **Generate Domain**
+9. Anota el dominio generado (ej: `cantera-backend-xxx.up.railway.app`)
 
 ---
 
-## Paso 5: Inicializar Base de Datos
+## PASO 5: Desplegar Frontend
 
-Después de que el backend esté desplegado:
-
-1. En Railway, click en el servicio backend
-2. Ve a **Settings** → **Deploy** → **Start Command**
-3. Temporalmente cambia el comando a:
-```bash
-python scripts/init_prod.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
-```
-4. Click en **Deploy** para redesplegar
-5. Una vez inicializado, vuelve al comando normal:
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
-```
-
----
-
-## Paso 6: Desplegar Frontend
-
-1. Click en **+ New** → **GitHub Repo**
-2. Selecciona el mismo repositorio
-3. En la configuración:
+1. Click en **+ New** > **GitHub Repo**
+2. Selecciona el mismo repositorio `sistemaCantera`
+3. En la configuracion:
    - **Root Directory**: `frontend`
 
 4. Ve a **Variables** y agrega:
 
 ```env
-VITE_API_URL=https://api-sistema.canteralarufina.com.ar/api/v1
+# URL del backend (la que anotaste en el paso anterior)
+VITE_API_URL=https://cantera-backend-xxx.up.railway.app/api/v1
 ```
 
-5. Ve a **Settings** → **Networking** → **Custom Domain**
-   - Agrega: `sistema.canteralarufina.com.ar`
-   - Railway te dará un registro CNAME para configurar en tu DNS
+5. Click en **Deploy**
+6. Ve a **Settings** > **Networking** > **Generate Domain**
+7. Anota el dominio del frontend
 
 ---
 
-## Paso 7: Configurar DNS en tu Dominio
+## PASO 6: Actualizar CORS del Backend
 
-En el panel de control de tu dominio `canteralarufina.com.ar`, agrega estos registros CNAME:
+1. Vuelve al servicio **backend**
+2. Ve a **Variables**
+3. Actualiza `BACKEND_CORS_ORIGINS` con la URL exacta del frontend:
 
-| Tipo  | Nombre       | Valor                              |
-|-------|--------------|-------------------------------------|
-| CNAME | sistema      | <valor-dado-por-railway-frontend>  |
-| CNAME | api-sistema  | <valor-dado-por-railway-backend>   |
+```env
+BACKEND_CORS_ORIGINS=["https://cantera-frontend-xxx.up.railway.app"]
+```
 
-**Nota**: Los cambios de DNS pueden tardar hasta 48 horas en propagarse.
+4. El backend se redesplegara automaticamente
 
 ---
 
-## Paso 8: (Opcional) Desplegar Celery Worker
+## PASO 7: Verificar Despliegue
 
-Si necesitas tareas asíncronas:
+1. Accede a la URL del frontend
+2. Inicia sesion con:
+   - **Email**: `admin@canteralarufina.com.ar`
+   - **Password**: El que configuraste en `ADMIN_PASSWORD`
+3. **IMPORTANTE**: Cambia la password despues del primer login
 
-1. Click en **+ New** → **GitHub Repo**
+---
+
+## (Opcional) Dominio Personalizado
+
+### Para el Backend:
+1. Ve al servicio backend > **Settings** > **Networking** > **Custom Domain**
+2. Agrega: `api-sistema.canteralarufina.com.ar`
+3. Railway te dara un CNAME para configurar en tu DNS
+
+### Para el Frontend:
+1. Ve al servicio frontend > **Settings** > **Networking** > **Custom Domain**
+2. Agrega: `sistema.canteralarufina.com.ar`
+3. Configura el CNAME en tu DNS
+
+### En tu proveedor de DNS:
+| Tipo  | Nombre      | Valor                           |
+|-------|-------------|---------------------------------|
+| CNAME | sistema     | <cname-dado-por-railway>        |
+| CNAME | api-sistema | <cname-dado-por-railway>        |
+
+---
+
+## (Opcional) Celery Worker
+
+Si necesitas tareas en segundo plano:
+
+1. Click en **+ New** > **GitHub Repo**
 2. Selecciona el mismo repositorio
 3. **Root Directory**: `backend`
-4. Ve a **Settings** → **Deploy** → **Start Command**:
+4. Ve a **Settings** > **Deploy** y cambia el **Start Command**:
+
 ```bash
 celery -A app.core.celery_app worker --loglevel=info
 ```
-5. Agrega las mismas variables de entorno que el backend
 
----
-
-## Verificación Final
-
-1. Accede a `https://sistema.canteralarufina.com.ar`
-2. Inicia sesión con:
-   - **Email**: `admin@canteralarufina.com.ar`
-   - **Contraseña**: La que configuraste en `ADMIN_PASSWORD`
-3. **¡IMPORTANTE!**: Cambia la contraseña inmediatamente después del primer login
-
----
-
-## Comandos Útiles de Railway CLI
-
-Instalar Railway CLI:
-```bash
-npm install -g @railway/cli
-```
-
-Comandos:
-```bash
-# Login
-railway login
-
-# Ver logs del backend
-railway logs -s cantera-backend
-
-# Conectar a la base de datos
-railway connect postgres
-
-# Ejecutar comando en el servicio
-railway run python scripts/init_prod.py
-```
-
----
-
-## Costos Estimados en Railway
-
-Railway cobra por uso. Estimación mensual para este proyecto:
-- **PostgreSQL**: ~$5-10/mes
-- **Redis**: ~$5/mes
-- **Backend**: ~$5-10/mes
-- **Frontend**: ~$5/mes
-- **Celery Worker** (opcional): ~$5/mes
-
-**Total estimado**: ~$20-35/mes
-
-Railway ofrece $5 de crédito gratis mensual.
+5. Agrega las mismas variables que el backend
 
 ---
 
 ## Troubleshooting
 
 ### Error de CORS
-- Verifica que `BACKEND_CORS_ORIGINS` incluya el dominio del frontend
-- El formato debe ser: `["https://sistema.canteralarufina.com.ar"]`
+- Verifica que `BACKEND_CORS_ORIGINS` tenga la URL exacta del frontend
+- Formato correcto: `["https://tu-frontend.railway.app"]`
+- Sin trailing slash al final
 
-### Error de conexión a base de datos
-- Verifica que `DATABASE_URL` esté configurado correctamente
-- Railway usa el formato: `postgresql://user:pass@host:port/db`
+### Error de conexion a base de datos
+- Verifica que `DATABASE_URL` este referenciando correctamente: `${{Postgres.DATABASE_URL}}`
+- Revisa los logs del backend en Railway
 
-### Frontend no carga
-- Verifica que `VITE_API_URL` apunte al backend correcto
-- Incluye `/api/v1` al final de la URL
+### Frontend muestra error de API
+- Verifica que `VITE_API_URL` termine en `/api/v1`
+- Si cambias esta variable, debes **redesplegar** el frontend (no solo restart)
 
 ### Migraciones no ejecutan
-- Ejecuta manualmente: `railway run alembic upgrade head`
+- Revisa los logs del backend
+- El `start.sh` ejecuta las migraciones automaticamente
+
+### El backend no inicia
+- Verifica que todas las variables obligatorias esten configuradas
+- `DATABASE_URL`, `SECRET_KEY` son obligatorias
+- Revisa los logs en Railway
+
+---
+
+## Comandos Utiles (Railway CLI)
+
+```bash
+# Instalar Railway CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Ver logs
+railway logs
+
+# Conectar a PostgreSQL
+railway connect postgres
+
+# Ejecutar comando en el backend
+railway run python scripts/init_prod.py
+```
+
+---
+
+## Costos Estimados
+
+Railway cobra por uso. Estimacion mensual:
+- **PostgreSQL**: ~$5-10/mes
+- **Redis**: ~$5/mes
+- **Backend**: ~$5-10/mes
+- **Frontend**: ~$5/mes
+- **Celery** (opcional): ~$5/mes
+
+**Total**: ~$20-35/mes
+
+Railway ofrece $5 de credito gratis mensual.

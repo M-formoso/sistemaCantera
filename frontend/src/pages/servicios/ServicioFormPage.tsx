@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { serviciosService } from '@/services/serviciosService'
 import { camionesService } from '@/services/camionesService'
 import { repuestosService } from '@/services/repuestosService'
-import { formatCurrency, formatNumber } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 
 const servicioSchema = z.object({
   camion_id: z.string().min(1, 'Debe seleccionar un camión'),
@@ -109,9 +109,9 @@ export default function ServicioFormPage() {
       })
 
       // Cargar repuestos del servicio
-      if (servicio.repuestos && servicio.repuestos.length > 0) {
+      if (servicio.repuestos_utilizados && servicio.repuestos_utilizados.length > 0) {
         setRepuestosSeleccionados(
-          servicio.repuestos.map((r: any) => ({
+          servicio.repuestos_utilizados.map((r: any) => ({
             repuesto_id: r.id,
             cantidad: r.cantidad || 1,
             nombre: r.nombre,

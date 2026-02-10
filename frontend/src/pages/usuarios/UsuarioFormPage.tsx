@@ -35,7 +35,6 @@ export default function UsuarioFormPage() {
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm<UsuarioFormData>({
     resolver: zodResolver(
       isEditing

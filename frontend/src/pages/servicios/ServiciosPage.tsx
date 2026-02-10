@@ -103,7 +103,7 @@ export default function ServiciosPage() {
       header: 'Repuestos',
       cell: ({ row }) => {
         const servicio = row.original
-        const cantidadRepuestos = servicio.repuestos?.length || 0
+        const cantidadRepuestos = servicio.repuestos_utilizados?.length || 0
         return (
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Package className="h-3 w-3" />
@@ -138,7 +138,7 @@ export default function ServiciosPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleDelete(servicio.id, servicio.camion_patente)}
+              onClick={() => handleDelete(servicio.id, servicio.camion_patente || 'N/A')}
               disabled={deleteMutation.isPending}
               title="Eliminar"
             >

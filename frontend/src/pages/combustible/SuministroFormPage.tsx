@@ -74,7 +74,13 @@ export default function SuministroFormPage() {
   }, [searchParams, reset])
 
   const createMutation = useMutation({
-    mutationFn: (data: SuministroFormData) => combustibleService.registrarSuministro(data),
+    mutationFn: (data: SuministroFormData) => {
+      const cleanData = {
+        ...data,
+        kilometraje_actual: data.kilometraje_actual ?? undefined,
+      }
+      return combustibleService.registrarSuministro(cleanData)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
@@ -208,11 +214,11 @@ export default function SuministroFormPage() {
                       id="kilometraje_actual"
                       type="number"
                       {...register('kilometraje_actual', { valueAsNumber: true })}
-                      placeholder={camionSeleccionado ? `Actual: ${camionSeleccionado.kilometraje}` : '50000'}
+                      placeholder={camionSeleccionado ? `Actual: ${camionSeleccionado.kilometraje_actual}` : '50000'}
                     />
                     {camionSeleccionado && (
                       <p className="text-xs text-muted-foreground">
-                        Último registrado: {formatNumber(camionSeleccionado.kilometraje)} km
+                        Último registrado: {formatNumber(camionSeleccionado.kilometraje_actual)} km
                       </p>
                     )}
                   </div>
