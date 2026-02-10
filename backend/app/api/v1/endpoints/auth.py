@@ -28,6 +28,20 @@ async def debug_admin(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/test-password/{password}")
+async def test_password(password: str, db: Session = Depends(get_db)):
+    """Test password - REMOVER EN PRODUCCION"""
+    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
+    if not usuario:
+        return {"error": "Usuario no existe"}
+
+    is_valid = verify_password(password, usuario.password_hash)
+    return {
+        "password_recibido": password,
+        "es_valido": is_valid
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     credentials: LoginRequest,
