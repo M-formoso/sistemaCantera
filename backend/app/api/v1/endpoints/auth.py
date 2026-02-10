@@ -12,54 +12,6 @@ from app.core.security import get_password_hash
 router = APIRouter()
 
 
-@router.get("/debug-admin")
-async def debug_admin(db: Session = Depends(get_db)):
-    """Debug endpoint - REMOVER EN PRODUCCION"""
-    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
-    if not usuario:
-        return {"error": "Usuario admin no existe"}
-    return {
-        "email": usuario.email,
-        "nombre": usuario.nombre,
-        "activo": usuario.activo,
-        "rol": usuario.rol,
-        "tiene_password": bool(usuario.password_hash),
-        "password_hash_prefix": usuario.password_hash[:20] if usuario.password_hash else None
-    }
-
-
-@router.get("/test-password/{password}")
-async def test_password(password: str, db: Session = Depends(get_db)):
-    """Test password - REMOVER EN PRODUCCION"""
-    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
-    if not usuario:
-        return {"error": "Usuario no existe"}
-
-    is_valid = verify_password(password, usuario.password_hash)
-    return {
-        "password_recibido": password,
-        "es_valido": is_valid
-    }
-
-
-@router.get("/reset-admin-password")
-async def reset_admin_password(db: Session = Depends(get_db)):
-    """Reset admin password - REMOVER EN PRODUCCION"""
-    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
-    if not usuario:
-        return {"error": "Usuario no existe"}
-
-    new_password = "Cantera2024!"
-    usuario.password_hash = get_password_hash(new_password)
-    db.commit()
-
-    return {
-        "mensaje": "Contraseña reseteada",
-        "email": "admin@canteralarufina.com.ar",
-        "nueva_password": new_password
-    }
-
-
 @router.post("/login", response_model=TokenResponse)
 async def login(
     credentials: LoginRequest,
