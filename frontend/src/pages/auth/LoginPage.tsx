@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/authStore'
 import { getErrorMessage } from '@/services/api'
+import logo from '@/assets/logo.png'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -60,9 +61,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">LR</span>
-            </div>
+            <img
+              src={logo}
+              alt="Logo Cantera La Rufina"
+              className="h-24 w-auto object-contain"
+            />
           </div>
           <CardTitle className="text-2xl text-center">Cantera La Rufina</CardTitle>
           <CardDescription className="text-center">

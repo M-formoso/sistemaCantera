@@ -19,6 +19,28 @@ export interface User {
   activo: boolean
   created_at: string
   updated_at: string
+  ultimo_acceso?: string
+}
+
+export interface UsuarioCreate {
+  email: string
+  nombre: string
+  rol: 'administrador' | 'operador' | 'solo_lectura'
+  password: string
+}
+
+export interface UsuarioUpdate {
+  email?: string
+  nombre?: string
+  rol?: 'administrador' | 'operador' | 'solo_lectura'
+  activo?: boolean
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  skip: number
+  limit: number
 }
 
 // ==================== CAMION ====================
@@ -29,13 +51,21 @@ export interface Camion {
   marca: string
   modelo: string
   año: number
-  kilometraje: number
-  estado: 'operativo' | 'en_servicio' | 'fuera_de_servicio'
+  kilometraje_actual: number
+  estado: 'operativo' | 'en_servicio' | 'fuera_servicio'
   observaciones?: string
-  ultimo_servicio?: string
   activo: boolean
   created_at: string
   updated_at: string
+  // Campos de servicio
+  ultimo_servicio?: string
+  ultimo_servicio_km?: number
+  proximo_servicio_km?: number
+  proximo_servicio_fecha?: string
+  intervalo_servicio_km?: number
+  // Campos calculados
+  km_para_proximo_servicio?: number
+  requiere_servicio?: boolean
 }
 
 export interface CamionCreate {
@@ -43,9 +73,12 @@ export interface CamionCreate {
   marca: string
   modelo: string
   año: number
-  kilometraje: number
-  estado: 'operativo' | 'en_servicio' | 'fuera_de_servicio'
+  kilometraje_actual: number
+  estado: 'operativo' | 'en_servicio' | 'fuera_servicio'
   observaciones?: string
+  proximo_servicio_km?: number
+  proximo_servicio_fecha?: string
+  intervalo_servicio_km?: number
 }
 
 // ==================== REPUESTO ====================
@@ -78,14 +111,16 @@ export interface RepuestoCreate {
 
 export interface MovimientoStock {
   id: string
-  repuesto_id: string
-  tipo: 'entrada' | 'salida' | 'ajuste'
+  repuesto_id?: string
+  tipo: 'ingreso' | 'egreso' | 'ajuste'
   cantidad: number
-  stock_anterior: number
-  stock_nuevo: number
+  stock_anterior?: number
+  stock_nuevo?: number
   motivo?: string
   observaciones?: string
-  created_by: string
+  referencia_tipo?: string
+  usuario_id: string
+  usuario_nombre: string
   created_at: string
 }
 
@@ -94,16 +129,17 @@ export interface MovimientoStock {
 export interface Servicio {
   id: string
   camion_id: string
-  camion_patente: string
+  camion_patente?: string
   fecha: string
-  tipo: 'preventivo' | 'correctivo' | 'reparacion'
+  tipo: 'preventivo' | 'correctivo' | 'emergencia'
   descripcion: string
-  kilometraje_actual?: number
-  proximo_servicio_km?: number
+  kilometraje_servicio?: number
+  mecanico?: string
   costo_mano_obra: number
   costo_total: number
+  estado: 'programado' | 'en_proceso' | 'completado'
   observaciones?: string
-  repuestos?: ServicioRepuesto[]
+  repuestos_utilizados?: ServicioRepuesto[]
   created_by: string
   created_at: string
   updated_at: string
@@ -127,10 +163,10 @@ export interface RepuestoAsignado {
 export interface ServicioCreate {
   camion_id: string
   fecha: string
-  tipo: 'preventivo' | 'correctivo' | 'reparacion'
+  tipo: 'preventivo' | 'correctivo' | 'emergencia'
   descripcion: string
-  kilometraje_actual?: number | null
-  proximo_servicio_km?: number | null
+  kilometraje_servicio?: number | null
+  mecanico?: string | null
   costo_mano_obra: number
   observaciones?: string
   repuestos: RepuestoAsignado[]
@@ -144,11 +180,23 @@ export interface Pesaje {
   fecha: string
   camion_id: string
   camion_patente: string
+  // Datos del transporte
+  acoplado?: string
+  transportista?: string
+  remitente: string
+  chofer?: string
+  // Datos del producto
+  producto?: string
+  numero_guia?: string
+  // Pesos
   peso_tara: number
   peso_bruto: number
   peso_neto: number
-  material: string
-  cliente_destino: string
+  // Destino
+  material?: string
+  cliente_destino?: string
+  // Operación
+  operario?: string
   observaciones?: string
   remito_generado: boolean
   created_by: string
@@ -159,10 +207,22 @@ export interface Pesaje {
 export interface PesajeCreate {
   camion_id: string
   fecha: string
+  // Datos del transporte
+  acoplado?: string
+  transportista?: string
+  remitente?: string
+  chofer?: string
+  // Datos del producto
+  producto?: string
+  numero_guia?: string
+  // Pesos
   peso_tara: number
   peso_bruto: number
-  material: string
-  cliente_destino: string
+  // Destino
+  material?: string
+  cliente_destino?: string
+  // Operación
+  operario?: string
   observaciones?: string
 }
 
@@ -193,7 +253,8 @@ export interface CisternaCombustible {
   capacidad_total: number
   nivel_actual: number
   nivel_minimo: number
-  activo: boolean
+  porcentaje_actual?: number
+  esta_bajo?: boolean
   created_at: string
   updated_at: string
 }
@@ -230,6 +291,15 @@ export interface SuministroCombustible {
 
 // ==================== DASHBOARD ====================
 
+export interface CamionRequiereServicio {
+  id: string
+  patente: string
+  km_actual: number
+  proximo_servicio_km: number
+  km_restantes: number
+  ultimo_servicio?: string
+}
+
 export interface DashboardResumen {
   pesajes: {
     cantidad: number
@@ -251,9 +321,11 @@ export interface DashboardResumen {
     repuestos_bajo_stock: number
     servicios_proximos: number
     nivel_combustible_bajo: boolean
+    camiones_requieren_servicio: number
   }
   servicios_proximos: ServicioProximo[]
   ultimos_pesajes: UltimoPesaje[]
+  camiones_requieren_servicio: CamionRequiereServicio[]
 }
 
 export interface ServicioProximo {

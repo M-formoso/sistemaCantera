@@ -6,10 +6,18 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin
+from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
 from app.models.usuario import Usuario
+from app.models.movimiento_stock import TipoMovimientoEnum
 from app.schemas.repuesto import RepuestoSchema, RepuestoCreate, RepuestoUpdate
 from app.services import repuesto_service
+from pydantic import BaseModel
+from decimal import Decimal
+
+
+class AjusteStockRequest(BaseModel):
+    cantidad: Decimal
+    observaciones: str | None = None
 
 router = APIRouter()
 
@@ -93,3 +101,47 @@ async def obtener_movimientos_repuesto(
 ):
     """Obtiene el historial de movimientos de un repuesto"""
     return repuesto_service.obtener_movimientos(db, repuesto_id)
+
+
+@router.post("/{repuesto_id}/entrada")
+async def registrar_entrada_stock(
+    repuesto_id: UUID,
+    data: AjusteStockRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Registra una entrada de stock (ingreso)
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return repuesto_service.ajustar_stock(
+        db=db,
+        repuesto_id=repuesto_id,
+        cantidad=data.cantidad,
+        tipo=TipoMovimientoEnum.INGRESO,
+        usuario_id=current_user.id,
+        observaciones=data.observaciones
+    )
+
+
+@router.post("/{repuesto_id}/salida")
+async def registrar_salida_stock(
+    repuesto_id: UUID,
+    data: AjusteStockRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Registra una salida de stock (egreso)
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return repuesto_service.ajustar_stock(
+        db=db,
+        repuesto_id=repuesto_id,
+        cantidad=data.cantidad,
+        tipo=TipoMovimientoEnum.EGRESO,
+        usuario_id=current_user.id,
+        observaciones=data.observaciones
+    )

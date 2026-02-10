@@ -47,7 +47,7 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         nivel_actual = cisterna.nivel_actual
         capacidad_total = cisterna.capacidad_total
         porcentaje = (nivel_actual / capacidad_total * 100) if capacidad_total > 0 else Decimal("0")
-        esta_bajo = nivel_actual <= cisterna.nivel_alerta
+        esta_bajo = nivel_actual <= cisterna.nivel_minimo
     else:
         nivel_actual = Decimal("0")
         capacidad_total = Decimal("0")
@@ -75,6 +75,10 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         Servicio.fecha >= hoy,
         Servicio.fecha <= proximos_7_dias
     ).count()
+
+    # Camiones que requieren servicio por kilometraje
+    from app.services import camion_service
+    camiones_requieren_servicio = camion_service.obtener_camiones_requieren_servicio(db)
 
     # ===== SERVICIOS PRÓXIMOS (lista detallada) =====
     servicios_proximos = db.query(Servicio).filter(
@@ -131,10 +135,25 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         "alertas": {
             "repuestos_bajo_stock": repuestos_bajos,
             "servicios_proximos": servicios_proximos_count,
-            "nivel_combustible_bajo": esta_bajo
+            "nivel_combustible_bajo": esta_bajo,
+            "camiones_requieren_servicio": len(camiones_requieren_servicio)
         },
         "servicios_proximos": servicios_proximos_lista,
-        "ultimos_pesajes": ultimos_pesajes_lista
+        "ultimos_pesajes": ultimos_pesajes_lista,
+        "camiones_requieren_servicio": [
+            {
+                "id": str(c.id),
+                "patente": c.patente,
+                "km_actual": c.kilometraje_actual,
+                "proximo_servicio_km": c.proximo_servicio_km,
+                "proximo_servicio_fecha": c.proximo_servicio_fecha.isoformat() if c.proximo_servicio_fecha else None,
+                "km_restantes": (c.proximo_servicio_km - c.kilometraje_actual) if c.proximo_servicio_km and c.kilometraje_actual else None,
+                "dias_restantes": (c.proximo_servicio_fecha - hoy).days if c.proximo_servicio_fecha else None,
+                "ultimo_servicio": c.ultimo_servicio.isoformat() if c.ultimo_servicio else None,
+                **camion_service.calcular_estado_servicio(c)
+            }
+            for c in camiones_requieren_servicio
+        ]
     }
 
 

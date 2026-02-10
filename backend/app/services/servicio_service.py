@@ -179,8 +179,24 @@ def crear_con_repuestos(
     # 4. Calcular costo total
     db_servicio.costo_total = servicio_data.costo_mano_obra + costo_repuestos
 
+    # 5. Actualizar datos del camión
+    camion.ultimo_servicio = servicio_data.fecha
+    if servicio_data.kilometraje_servicio:
+        camion.ultimo_servicio_km = servicio_data.kilometraje_servicio
+        camion.kilometraje_actual = servicio_data.kilometraje_servicio
+        # Calcular próximo servicio basado en intervalo
+        if camion.intervalo_servicio_km:
+            camion.proximo_servicio_km = servicio_data.kilometraje_servicio + camion.intervalo_servicio_km
+
     db.commit()
     db.refresh(db_servicio)
+
+    # Verificar si hay alertas de próximo servicio para otros camiones
+    try:
+        from app.tasks.alertas import verificar_proximos_servicios
+        verificar_proximos_servicios.delay()
+    except ImportError:
+        pass
 
     return db_servicio
 

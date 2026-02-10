@@ -7,10 +7,13 @@ import {
   FileText,
   Fuel,
   BarChart3,
+  Users,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import logo from '@/assets/logo.png'
+import { useAuthStore } from '@/stores/authStore'
 
 interface SidebarProps {
   isOpen: boolean
@@ -49,6 +52,12 @@ const menuItems = [
     path: '/combustible',
   },
   {
+    title: 'Usuarios',
+    icon: Users,
+    path: '/usuarios',
+    adminOnly: true,
+  },
+  {
     title: 'Reportes',
     icon: BarChart3,
     path: '/reportes',
@@ -56,6 +65,17 @@ const menuItems = [
 ]
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { user } = useAuthStore()
+  const isAdmin = user?.rol === 'administrador'
+
+  // Filtrar items según el rol del usuario
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.adminOnly && !isAdmin) {
+      return false
+    }
+    return true
+  })
+
   return (
     <>
       {/* Overlay para mobile */}
@@ -74,17 +94,26 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header del sidebar (solo mobile) */}
-          <div className="flex items-center justify-between p-4 border-b lg:hidden">
-            <span className="font-semibold text-gray-900">Menú</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
+          {/* Logo y header del sidebar */}
+          <div className="p-4 border-b">
+            <div className="hidden lg:flex items-center justify-center mb-2">
+              <img
+                src={logo}
+                alt="Logo Cantera La Rufina"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+            <div className="flex items-center justify-between lg:hidden">
+              <span className="font-semibold text-gray-900">Menú</span>
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Navegación */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {menuItems.map((item) => (
+            {filteredMenuItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}

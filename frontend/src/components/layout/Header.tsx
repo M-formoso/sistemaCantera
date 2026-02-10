@@ -2,6 +2,7 @@ import { LogOut, User, Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/authStore'
+import logo from '@/assets/logo.png'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -30,9 +31,11 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </Button>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center">
-              <span className="text-lg font-bold text-white">LR</span>
-            </div>
+            <img
+              src={logo}
+              alt="Logo Cantera La Rufina"
+              className="h-10 w-auto object-contain"
+            />
             <div>
               <h1 className="text-lg font-bold text-gray-900">Cantera La Rufina</h1>
               <p className="text-xs text-gray-500">Sistema de Gestión</p>

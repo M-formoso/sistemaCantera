@@ -11,54 +11,120 @@ from fastapi import HTTPException, status
 
 from app.models.combustible import CisternaCombustible, CargaCisterna, SuministroCombustible
 from app.schemas.combustible import (
-    CisternaConfig, CisternaUpdate,
+    CisternaConfig, CisternaUpdate, CisternaCreate,
     CargaCisternaCreate, SuministroCombustibleCreate
 )
 from app.services import camion_service
 
 
-# ==================== CISTERNA ====================
+# ==================== CISTERNAS ====================
+
+def obtener_todas_cisternas(db: Session) -> List[CisternaCombustible]:
+    """Obtiene todas las cisternas"""
+    cisternas = db.query(CisternaCombustible).all()
+
+    # Agregar campos calculados
+    for cisterna in cisternas:
+        if cisterna.capacidad_total > 0:
+            cisterna.porcentaje_actual = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
+        else:
+            cisterna.porcentaje_actual = Decimal("0")
+        cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
+
+    return cisternas
+
+
+def obtener_cisterna_por_id(db: Session, cisterna_id: UUID) -> Optional[CisternaCombustible]:
+    """Obtiene una cisterna por ID"""
+    cisterna = db.query(CisternaCombustible).filter(
+        CisternaCombustible.id == cisterna_id
+    ).first()
+
+    if cisterna:
+        if cisterna.capacidad_total > 0:
+            cisterna.porcentaje_actual = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
+        else:
+            cisterna.porcentaje_actual = Decimal("0")
+        cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
+
+    return cisterna
+
+
+def crear_cisterna(db: Session, cisterna_data: CisternaCreate) -> CisternaCombustible:
+    """Crea una nueva cisterna"""
+    cisterna = CisternaCombustible(
+        nombre=cisterna_data.nombre,
+        capacidad_total=cisterna_data.capacidad_total,
+        nivel_actual=Decimal("0"),
+        nivel_minimo=cisterna_data.nivel_minimo
+    )
+
+    db.add(cisterna)
+    db.commit()
+    db.refresh(cisterna)
+
+    # Agregar campos calculados
+    cisterna.porcentaje_actual = Decimal("0")
+    cisterna.esta_bajo = True
+
+    return cisterna
+
 
 def obtener_cisterna(db: Session) -> Optional[CisternaCombustible]:
-    """Obtiene la configuración de la cisterna"""
-    return db.query(CisternaCombustible).first()
+    """Obtiene la primera cisterna (legacy, compatibilidad)"""
+    cisterna = db.query(CisternaCombustible).first()
+
+    if cisterna:
+        if cisterna.capacidad_total > 0:
+            cisterna.porcentaje_actual = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
+        else:
+            cisterna.porcentaje_actual = Decimal("0")
+        cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
+
+    return cisterna
 
 
 def configurar_cisterna(db: Session, config: CisternaConfig) -> CisternaCombustible:
     """
-    Crea o actualiza la configuración de la cisterna
-
-    Solo debe haber UNA cisterna en el sistema
+    Crea o actualiza la configuración de la cisterna principal (legacy)
     """
     cisterna = obtener_cisterna(db)
 
     if cisterna:
         # Actualizar existente
         cisterna.capacidad_total = config.capacidad_total
-        cisterna.nivel_alerta = config.nivel_alerta
+        cisterna.nivel_minimo = config.nivel_minimo
     else:
         # Crear nueva
         cisterna = CisternaCombustible(
+            nombre="Cisterna Principal",
             capacidad_total=config.capacidad_total,
             nivel_actual=Decimal("0"),
-            nivel_alerta=config.nivel_alerta
+            nivel_minimo=config.nivel_minimo
         )
         db.add(cisterna)
 
     db.commit()
     db.refresh(cisterna)
 
+    # Agregar campos calculados
+    if cisterna.capacidad_total > 0:
+        cisterna.porcentaje_actual = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
+    else:
+        cisterna.porcentaje_actual = Decimal("0")
+    cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
+
     return cisterna
 
 
-def actualizar_cisterna(db: Session, update_data: CisternaUpdate) -> CisternaCombustible:
-    """Actualiza la cisterna (solo admin)"""
-    cisterna = obtener_cisterna(db)
+def actualizar_cisterna(db: Session, cisterna_id: UUID, update_data: CisternaUpdate) -> CisternaCombustible:
+    """Actualiza una cisterna específica"""
+    cisterna = obtener_cisterna_por_id(db, cisterna_id)
 
     if not cisterna:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cisterna no configurada"
+            detail="Cisterna no encontrada"
         )
 
     update_dict = update_data.model_dump(exclude_unset=True)
@@ -67,6 +133,13 @@ def actualizar_cisterna(db: Session, update_data: CisternaUpdate) -> CisternaCom
 
     db.commit()
     db.refresh(cisterna)
+
+    # Agregar campos calculados
+    if cisterna.capacidad_total > 0:
+        cisterna.porcentaje_actual = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
+    else:
+        cisterna.porcentaje_actual = Decimal("0")
+    cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
 
     return cisterna
 
@@ -97,12 +170,13 @@ def crear_carga_cisterna(
 
     Actualiza automáticamente el nivel de la cisterna
     """
-    cisterna = obtener_cisterna(db)
+    # Obtener la cisterna especificada
+    cisterna = obtener_cisterna_por_id(db, carga_data.cisterna_id)
 
     if not cisterna:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cisterna no configurada. Configure la cisterna primero."
+            detail="Cisterna no encontrada"
         )
 
     # Calcular costo por litro
@@ -110,9 +184,18 @@ def crear_carga_cisterna(
     if carga_data.costo_total:
         costo_por_litro = carga_data.costo_total / carga_data.litros
 
+    # Preparar datos y convertir fecha si es string
+    carga_dict = carga_data.model_dump()
+    if isinstance(carga_dict.get('fecha'), str):
+        from datetime import datetime as dt
+        try:
+            carga_dict['fecha'] = dt.fromisoformat(carga_dict['fecha'])
+        except ValueError:
+            carga_dict['fecha'] = dt.strptime(carga_dict['fecha'], '%Y-%m-%d')
+
     # Crear carga
     db_carga = CargaCisterna(
-        **carga_data.model_dump(),
+        **carga_dict,
         costo_por_litro=costo_por_litro,
         created_by=usuario_id
     )
@@ -135,6 +218,9 @@ def crear_carga_cisterna(
     db.commit()
     db.refresh(db_carga)
 
+    # Agregar nombre de cisterna para respuesta
+    db_carga.cisterna_nombre = cisterna.nombre
+
     return db_carga
 
 
@@ -152,14 +238,19 @@ def eliminar_carga(db: Session, carga_id: UUID) -> dict:
             detail="Carga no encontrada"
         )
 
-    cisterna = obtener_cisterna(db)
+    # Obtener la cisterna asociada
+    if db_carga.cisterna_id:
+        cisterna = obtener_cisterna_por_id(db, db_carga.cisterna_id)
+    else:
+        cisterna = obtener_cisterna(db)
 
-    # Descontar litros del nivel actual
-    cisterna.nivel_actual -= db_carga.litros
+    if cisterna:
+        # Descontar litros del nivel actual
+        cisterna.nivel_actual -= db_carga.litros
 
-    # No permitir nivel negativo
-    if cisterna.nivel_actual < 0:
-        cisterna.nivel_actual = Decimal("0")
+        # No permitir nivel negativo
+        if cisterna.nivel_actual < 0:
+            cisterna.nivel_actual = Decimal("0")
 
     db.delete(db_carga)
     db.commit()
@@ -209,11 +300,11 @@ def crear_suministro(
         )
 
     # Verificar cisterna
-    cisterna = obtener_cisterna(db)
+    cisterna = obtener_cisterna_por_id(db, suministro_data.cisterna_id)
     if not cisterna:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cisterna no configurada"
+            detail="Cisterna no encontrada"
         )
 
     # Verificar que haya combustible suficiente
@@ -223,9 +314,21 @@ def crear_suministro(
             detail=f"No hay combustible suficiente en la cisterna. Nivel actual: {cisterna.nivel_actual}L, requerido: {suministro_data.litros}L"
         )
 
-    # Crear suministro
+    # Crear suministro - mapear kilometraje_actual a kilometraje y convertir fecha
+    suministro_dict = suministro_data.model_dump()
+    if 'kilometraje_actual' in suministro_dict:
+        suministro_dict['kilometraje'] = suministro_dict.pop('kilometraje_actual')
+
+    # Convertir fecha string a datetime
+    if isinstance(suministro_dict.get('fecha'), str):
+        from datetime import datetime as dt
+        try:
+            suministro_dict['fecha'] = dt.fromisoformat(suministro_dict['fecha'])
+        except ValueError:
+            suministro_dict['fecha'] = dt.strptime(suministro_dict['fecha'], '%Y-%m-%d')
+
     db_suministro = SuministroCombustible(
-        **suministro_data.model_dump(),
+        **suministro_dict,
         created_by=usuario_id
     )
 
@@ -235,7 +338,7 @@ def crear_suministro(
     cisterna.nivel_actual -= suministro_data.litros
 
     # Verificar si quedó bajo nivel de alerta
-    if cisterna.nivel_actual <= cisterna.nivel_alerta:
+    if cisterna.nivel_actual <= cisterna.nivel_minimo:
         # Crear alerta con Celery
         try:
             from app.tasks.alertas import verificar_nivel_cisterna
@@ -245,6 +348,10 @@ def crear_suministro(
 
     db.commit()
     db.refresh(db_suministro)
+
+    # Agregar info para respuesta
+    db_suministro.cisterna_nombre = cisterna.nombre
+    db_suministro.camion_patente = camion.patente
 
     return db_suministro
 
@@ -263,14 +370,19 @@ def eliminar_suministro(db: Session, suministro_id: UUID) -> dict:
             detail="Suministro no encontrado"
         )
 
-    cisterna = obtener_cisterna(db)
+    # Obtener la cisterna asociada
+    if db_suministro.cisterna_id:
+        cisterna = obtener_cisterna_por_id(db, db_suministro.cisterna_id)
+    else:
+        cisterna = obtener_cisterna(db)
 
-    # Devolver litros a la cisterna
-    cisterna.nivel_actual += db_suministro.litros
+    if cisterna:
+        # Devolver litros a la cisterna
+        cisterna.nivel_actual += db_suministro.litros
 
-    # No exceder capacidad
-    if cisterna.nivel_actual > cisterna.capacidad_total:
-        cisterna.nivel_actual = cisterna.capacidad_total
+        # No exceder capacidad
+        if cisterna.nivel_actual > cisterna.capacidad_total:
+            cisterna.nivel_actual = cisterna.capacidad_total
 
     db.delete(db_suministro)
     db.commit()

@@ -37,9 +37,10 @@ def init_db(db: Session) -> None:
     if not cisterna:
         # Crear configuración de cisterna por defecto
         cisterna = CisternaCombustible(
+            nombre="Cisterna Principal",
             capacidad_total=10000,  # 10000 litros
             nivel_actual=5000,  # 5000 litros inicial
-            nivel_alerta=1000  # Alerta cuando queda menos de 1000L
+            nivel_minimo=1000  # Alerta cuando queda menos de 1000L
         )
         db.add(cisterna)
         print("✓ Cisterna de combustible configurada")

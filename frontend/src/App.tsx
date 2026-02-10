@@ -29,6 +29,10 @@ import SuministroFormPage from '@/pages/combustible/SuministroFormPage'
 // Remitos
 import RemitosPage from '@/pages/remitos/RemitosPage'
 
+// Usuarios
+import UsuariosPage from '@/pages/usuarios/UsuariosPage'
+import UsuarioFormPage from '@/pages/usuarios/UsuarioFormPage'
+
 function App() {
   return (
     <Router>
@@ -76,6 +80,11 @@ function App() {
           <Route path="combustible" element={<CombustiblePage />} />
           <Route path="combustible/carga-nueva" element={<CargaFormPage />} />
           <Route path="combustible/suministro-nuevo" element={<SuministroFormPage />} />
+
+          {/* Usuarios */}
+          <Route path="usuarios" element={<UsuariosPage />} />
+          <Route path="usuarios/nuevo" element={<UsuarioFormPage />} />
+          <Route path="usuarios/:id/editar" element={<UsuarioFormPage />} />
 
           {/* Pendientes */}
           <Route path="reportes" element={<div className="p-4">Módulo de Reportes (en desarrollo)</div>} />

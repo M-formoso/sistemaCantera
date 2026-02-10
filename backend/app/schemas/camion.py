@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional
 from decimal import Decimal
+from datetime import date
 
 from app.models.camion import TipoCamionEnum, EstadoCamionEnum
 from app.schemas.common import ResponseBase
@@ -26,6 +27,9 @@ class CamionCreate(CamionBase):
     kilometraje_actual: int = Field(default=0, ge=0)
     horometro_actual: Decimal = Field(default=Decimal("0"), ge=0)
     foto: Optional[str] = Field(None, max_length=500)
+    proximo_servicio_km: Optional[int] = Field(None, ge=0)
+    proximo_servicio_fecha: Optional[date] = None
+    intervalo_servicio_km: int = Field(default=10000, ge=1000)
 
 
 class CamionUpdate(BaseModel):
@@ -43,6 +47,9 @@ class CamionUpdate(BaseModel):
     foto: Optional[str] = Field(None, max_length=500)
     observaciones: Optional[str] = None
     activo: Optional[bool] = None
+    proximo_servicio_km: Optional[int] = Field(None, ge=0)
+    proximo_servicio_fecha: Optional[date] = None
+    intervalo_servicio_km: Optional[int] = Field(None, ge=1000)
 
 
 class CamionSchema(ResponseBase, CamionBase):
@@ -52,6 +59,15 @@ class CamionSchema(ResponseBase, CamionBase):
     horometro_actual: Decimal
     foto: Optional[str]
     activo: bool
+    # Campos de servicio
+    ultimo_servicio: Optional[date] = None
+    ultimo_servicio_km: Optional[int] = None
+    proximo_servicio_km: Optional[int] = None
+    proximo_servicio_fecha: Optional[date] = None
+    intervalo_servicio_km: Optional[int] = None
+    # Campo calculado para alertas
+    km_para_proximo_servicio: Optional[int] = None
+    requiere_servicio: bool = False
 
 
 class CamionConsumoStats(BaseModel):

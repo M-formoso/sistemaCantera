@@ -1,7 +1,8 @@
 """
 Endpoints API para Pesajes
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -135,3 +136,62 @@ async def obtener_estadisticas_periodo(
 ):
     """Obtiene estadísticas de pesajes para un período"""
     return pesaje_service.obtener_estadisticas_periodo(db, fecha_desde, fecha_hasta)
+
+
+@router.get("/{pesaje_id}/ticket-pdf")
+async def descargar_ticket_pdf(
+    pesaje_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Genera y descarga el ticket de pesaje en PDF
+
+    El PDF incluye todos los datos del control de pesada:
+    - Datos del camión y transporte
+    - Pesos (bruto, tara, neto)
+    - Datos del producto y destino
+    - Fecha, hora y operario
+    """
+    pesaje = pesaje_service.obtener_por_id(db, pesaje_id)
+
+    if not pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado"
+        )
+
+    # Preparar datos para el PDF
+    pesaje_data = {
+        "numero_pesaje": pesaje.numero_pesaje,
+        "fecha": pesaje.fecha,
+        "camion_patente": pesaje.camion.patente if pesaje.camion else None,
+        "acoplado": pesaje.acoplado,
+        "transportista": pesaje.transportista,
+        "remitente": pesaje.remitente,
+        "cliente_destino": pesaje.cliente_destino,
+        "producto": pesaje.producto,
+        "material": pesaje.material,
+        "numero_guia": pesaje.numero_guia,
+        "chofer": pesaje.chofer,
+        "peso_bruto": float(pesaje.peso_bruto),
+        "peso_tara": float(pesaje.peso_tara),
+        "peso_neto": float(pesaje.peso_neto),
+        "operario": pesaje.operario,
+        "observaciones": pesaje.observaciones,
+    }
+
+    # Generar PDF
+    from app.tasks.reportes import generar_ticket_pesaje_pdf
+    pdf_buffer = generar_ticket_pesaje_pdf(pesaje_data)
+
+    # Nombre del archivo
+    filename = f"ticket_pesaje_{pesaje.numero_pesaje}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )

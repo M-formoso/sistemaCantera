@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Fuel, Plus, TrendingUp, TrendingDown, Truck, AlertTriangle } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
+import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/data-table'
 import { combustibleService } from '@/services/combustibleService'
+import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
 
 export default function CombustiblePage() {
@@ -39,6 +42,107 @@ export default function CombustiblePage() {
   const totalCargado = cargas.reduce((sum, c) => sum + c.litros, 0)
   const totalSuministrado = suministros.reduce((sum, s) => sum + s.litros, 0)
   const nivelActualTotal = cisternas.reduce((sum, c) => sum + c.nivel_actual, 0)
+
+  // Columnas para tabla de cargas
+  const cargasColumns: ColumnDef<CargaCisterna>[] = [
+    {
+      accessorKey: 'fecha',
+      header: 'Fecha',
+      cell: ({ row }) => <div className="text-sm">{formatDate(row.getValue('fecha'))}</div>,
+    },
+    {
+      accessorKey: 'cisterna_nombre',
+      header: 'Cisterna',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-green-600" />
+          <span className="font-medium">{row.getValue('cisterna_nombre') || 'Cisterna'}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'proveedor',
+      header: 'Proveedor',
+      cell: ({ row }) => <div className="text-sm">{row.getValue('proveedor')}</div>,
+    },
+    {
+      accessorKey: 'numero_remito',
+      header: 'Remito',
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">{row.getValue('numero_remito') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'litros',
+      header: 'Litros',
+      cell: ({ row }) => (
+        <div className="text-lg font-bold text-green-600 text-right">
+          +{formatNumber(row.getValue('litros'), 0)} L
+        </div>
+      ),
+    },
+    {
+      id: 'costo',
+      header: 'Costo',
+      cell: ({ row }) => {
+        const carga = row.original
+        return carga.precio_por_litro ? (
+          <div className="text-sm text-right text-muted-foreground">
+            {formatCurrency(carga.litros * carga.precio_por_litro)}
+          </div>
+        ) : (
+          <div className="text-sm text-right text-muted-foreground">-</div>
+        )
+      },
+    },
+  ]
+
+  // Columnas para tabla de suministros
+  const suministrosColumns: ColumnDef<SuministroCombustible>[] = [
+    {
+      accessorKey: 'fecha',
+      header: 'Fecha',
+      cell: ({ row }) => <div className="text-sm">{formatDate(row.getValue('fecha'))}</div>,
+    },
+    {
+      accessorKey: 'camion_patente',
+      header: 'Camión',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 text-blue-600" />
+          <span className="font-medium">{row.getValue('camion_patente')}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'cisterna_nombre',
+      header: 'Cisterna',
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">{row.getValue('cisterna_nombre') || 'Cisterna'}</div>
+      ),
+    },
+    {
+      accessorKey: 'kilometraje_actual',
+      header: 'Kilometraje',
+      cell: ({ row }) => {
+        const km = row.getValue('kilometraje_actual') as number
+        return km ? (
+          <div className="text-sm text-muted-foreground">{formatNumber(km)} km</div>
+        ) : (
+          <div className="text-sm text-muted-foreground">-</div>
+        )
+      },
+    },
+    {
+      accessorKey: 'litros',
+      header: 'Litros',
+      cell: ({ row }) => (
+        <div className="text-lg font-bold text-orange-600 text-right">
+          -{formatNumber(row.getValue('litros'), 0)} L
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -223,42 +327,12 @@ export default function CombustiblePage() {
             <CardDescription>Registros de carga de combustible a cisternas</CardDescription>
           </CardHeader>
           <CardContent>
-            {cargas.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay cargas registradas
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {cargas.map((carga) => (
-                  <div
-                    key={carga.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">{carga.cisterna_nombre || 'Cisterna'}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {carga.proveedor}
-                        {carga.numero_remito && ` • Remito: ${carga.numero_remito}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{formatDate(carga.fecha)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">
-                        +{formatNumber(carga.litros, 0)} L
-                      </p>
-                      {carga.precio_por_litro && (
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(carga.litros * carga.precio_por_litro)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <DataTable
+              columns={cargasColumns}
+              data={cargas}
+              searchPlaceholder="Buscar por proveedor, cisterna..."
+              defaultPageSize={10}
+            />
           </CardContent>
         </Card>
       )}
@@ -270,44 +344,12 @@ export default function CombustiblePage() {
             <CardDescription>Registros de suministro de combustible a camiones</CardDescription>
           </CardHeader>
           <CardContent>
-            {suministros.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay suministros registrados
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {suministros.map((suministro) => (
-                  <div
-                    key={suministro.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Truck className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">{suministro.camion_patente}</span>
-                        <TrendingDown className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {suministro.cisterna_nombre || 'Cisterna'}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <p className="text-xs text-muted-foreground">{formatDate(suministro.fecha)}</p>
-                        {suministro.kilometraje_actual && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatNumber(suministro.kilometraje_actual)} km
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-orange-600">
-                        -{formatNumber(suministro.litros, 0)} L
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <DataTable
+              columns={suministrosColumns}
+              data={suministros}
+              searchPlaceholder="Buscar por patente, cisterna..."
+              defaultPageSize={10}
+            />
           </CardContent>
         </Card>
       )}

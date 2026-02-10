@@ -1,20 +1,10 @@
-import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  SortingState,
-  getFilteredRowModel,
-  ColumnFiltersState,
-} from '@tanstack/react-table'
-import { Scale, Plus, Pencil, Trash2, FileText } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
+import { Scale, Plus, Pencil, Trash2, FileText, Printer } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
 import { Pesaje } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
@@ -22,12 +12,10 @@ import { formatDate, formatNumber } from '@/lib/utils'
 export default function PesajesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   const { data: pesajes = [], isLoading } = useQuery({
     queryKey: ['pesajes'],
-    queryFn: () => pesajesService.getAll(0, 500),
+    queryFn: () => pesajesService.getAll(0, 1000),
   })
 
   const deleteMutation = useMutation({
@@ -44,6 +32,14 @@ export default function PesajesPage() {
       } catch (error) {
         alert('Error al eliminar el pesaje')
       }
+    }
+  }
+
+  const handleDownloadPDF = async (id: string, numeroPesaje: number) => {
+    try {
+      await pesajesService.downloadTicketPDF(id, numeroPesaje)
+    } catch (error) {
+      alert('Error al descargar el ticket PDF')
     }
   }
 
@@ -127,6 +123,14 @@ export default function PesajesPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => handleDownloadPDF(pesaje.id, pesaje.numero_pesaje)}
+              title="Descargar Ticket PDF"
+            >
+              <Printer className="h-4 w-4 text-green-600" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => navigate(`/remitos/generar?pesaje=${pesaje.id}`)}
               title="Generar remito"
             >
@@ -154,20 +158,6 @@ export default function PesajesPage() {
       },
     },
   ]
-
-  const table = useReactTable({
-    data: pesajes,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    state: {
-      sorting,
-      columnFilters,
-    },
-  })
 
   if (isLoading) {
     return (
@@ -223,75 +213,15 @@ export default function PesajesPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Lista de Pesajes</CardTitle>
-            <div className="flex items-center gap-4">
-              <Input
-                placeholder="Buscar por patente..."
-                value={(table.getColumn('camion_patente')?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn('camion_patente')?.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
-          </div>
+          <CardTitle>Lista de Pesajes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b bg-gray-50">
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="px-4 py-3 text-left text-sm font-medium text-gray-700"
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-4 py-3 text-sm">
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      No hay pesajes registrados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 text-sm text-muted-foreground">
-            Total: {pesajes.length} pesajes • {formatNumber(totalToneladas, 2)} toneladas
-          </div>
+          <DataTable
+            columns={columns}
+            data={pesajes}
+            searchPlaceholder="Buscar por patente, material, cliente..."
+            defaultPageSize={10}
+          />
         </CardContent>
       </Card>
     </div>

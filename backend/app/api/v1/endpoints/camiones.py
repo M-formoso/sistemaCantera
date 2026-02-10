@@ -9,6 +9,7 @@ from uuid import UUID
 from app.core.deps import get_db, get_current_active_user, require_admin
 from app.models.usuario import Usuario
 from app.schemas.camion import CamionSchema, CamionCreate, CamionUpdate
+from app.schemas.servicio import ServicioSchema
 from app.services import camion_service
 
 router = APIRouter()
@@ -35,7 +36,8 @@ async def listar_camiones(
         limit=limit,
         solo_activos=solo_activos
     )
-    return camiones
+    # Enriquecer cada camión con campos calculados
+    return [camion_service.enriquecer_camion(c) for c in camiones]
 
 
 @router.post("/", response_model=CamionSchema, status_code=201)
@@ -71,7 +73,7 @@ async def obtener_camion(
             detail="Camión no encontrado"
         )
 
-    return camion
+    return camion_service.enriquecer_camion(camion)
 
 
 @router.put("/{camion_id}", response_model=CamionSchema)
@@ -105,7 +107,7 @@ async def eliminar_camion(
     return camion_service.eliminar(db, camion_id)
 
 
-@router.get("/{camion_id}/servicios")
+@router.get("/{camion_id}/servicios", response_model=List[ServicioSchema])
 async def obtener_servicios_camion(
     camion_id: UUID,
     db: Session = Depends(get_db),

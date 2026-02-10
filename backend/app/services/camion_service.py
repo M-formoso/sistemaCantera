@@ -5,10 +5,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from uuid import UUID
 from typing import List, Optional
+from datetime import date, timedelta
 from fastapi import HTTPException, status
 
 from app.models.camion import Camion
-from app.schemas.camion import CamionCreate, CamionUpdate
+from app.schemas.camion import CamionCreate, CamionUpdate, CamionSchema
+
+# Umbral de alerta: avisar cuando falten menos de estos km para el servicio
+UMBRAL_ALERTA_KM = 1000
 
 
 def obtener_todos(
@@ -188,3 +192,87 @@ def obtener_servicios(db: Session, camion_id: UUID):
         )
 
     return db_camion.servicios
+
+
+def calcular_estado_servicio(camion: Camion) -> dict:
+    """
+    Calcula el estado del servicio de un camión
+
+    Returns:
+        dict con km_para_proximo_servicio, dias_para_proximo_servicio y requiere_servicio
+    """
+    km_para_proximo = None
+    dias_para_proximo = None
+    requiere_servicio = False
+    motivo_alerta = None
+
+    # Verificar por kilometraje
+    if camion.proximo_servicio_km and camion.kilometraje_actual:
+        km_para_proximo = camion.proximo_servicio_km - camion.kilometraje_actual
+        # Requiere servicio si faltan menos del umbral o ya pasó
+        if km_para_proximo <= UMBRAL_ALERTA_KM:
+            requiere_servicio = True
+            if km_para_proximo <= 0:
+                motivo_alerta = f"Pasado por {abs(km_para_proximo)} km"
+            else:
+                motivo_alerta = f"Faltan {km_para_proximo} km"
+
+    # Verificar por fecha (alertar 7 días antes)
+    if camion.proximo_servicio_fecha:
+        dias_para_proximo = (camion.proximo_servicio_fecha - date.today()).days
+        if dias_para_proximo <= 7:  # Alertar si faltan 7 días o menos
+            requiere_servicio = True
+            if dias_para_proximo <= 0:
+                motivo_alerta = f"Vencido hace {abs(dias_para_proximo)} días"
+            else:
+                motivo_alerta = f"Faltan {dias_para_proximo} días"
+
+    return {
+        "km_para_proximo_servicio": km_para_proximo,
+        "dias_para_proximo_servicio": dias_para_proximo,
+        "requiere_servicio": requiere_servicio,
+        "motivo_alerta": motivo_alerta
+    }
+
+
+def enriquecer_camion(camion: Camion) -> dict:
+    """
+    Convierte un camión a dict y agrega campos calculados
+    """
+    camion_dict = {
+        "id": camion.id,
+        "patente": camion.patente,
+        "marca": camion.marca,
+        "modelo": camion.modelo,
+        "año": camion.año,
+        "tipo": camion.tipo,
+        "estado": camion.estado,
+        "kilometraje_actual": camion.kilometraje_actual,
+        "horometro_actual": camion.horometro_actual,
+        "chofer_habitual": camion.chofer_habitual,
+        "foto": camion.foto,
+        "observaciones": camion.observaciones,
+        "activo": camion.activo,
+        "ultimo_servicio": camion.ultimo_servicio,
+        "ultimo_servicio_km": camion.ultimo_servicio_km,
+        "proximo_servicio_km": camion.proximo_servicio_km,
+        "proximo_servicio_fecha": camion.proximo_servicio_fecha,
+        "intervalo_servicio_km": camion.intervalo_servicio_km,
+        "created_at": camion.created_at,
+        "updated_at": camion.updated_at,
+    }
+
+    # Agregar campos calculados
+    estado_servicio = calcular_estado_servicio(camion)
+    camion_dict.update(estado_servicio)
+
+    return camion_dict
+
+
+def obtener_camiones_requieren_servicio(db: Session) -> List[Camion]:
+    """
+    Obtiene camiones que requieren servicio pronto
+    """
+    camiones = db.query(Camion).filter(Camion.activo == True).all()
+
+    return [c for c in camiones if calcular_estado_servicio(c)["requiere_servicio"]]

@@ -187,8 +187,8 @@ def ajustar_stock(
     return db_repuesto
 
 
-def obtener_movimientos(db: Session, repuesto_id: UUID) -> List[MovimientoStock]:
-    """Obtiene el historial de movimientos de un repuesto"""
+def obtener_movimientos(db: Session, repuesto_id: UUID) -> List[dict]:
+    """Obtiene el historial de movimientos de un repuesto con info del usuario"""
     db_repuesto = obtener_por_id(db, repuesto_id)
 
     if not db_repuesto:
@@ -197,6 +197,22 @@ def obtener_movimientos(db: Session, repuesto_id: UUID) -> List[MovimientoStock]
             detail="Repuesto no encontrado"
         )
 
-    return db.query(MovimientoStock).filter(
+    movimientos = db.query(MovimientoStock).filter(
         MovimientoStock.repuesto_id == repuesto_id
     ).order_by(desc(MovimientoStock.created_at)).all()
+
+    # Agregar nombre de usuario a cada movimiento
+    resultado = []
+    for mov in movimientos:
+        resultado.append({
+            "id": str(mov.id),
+            "tipo": mov.tipo.value,
+            "cantidad": float(mov.cantidad),
+            "observaciones": mov.observaciones,
+            "referencia_tipo": mov.referencia_tipo,
+            "created_at": mov.created_at.isoformat(),
+            "usuario_id": str(mov.usuario_id),
+            "usuario_nombre": mov.usuario.nombre if mov.usuario else "Sistema"
+        })
+
+    return resultado

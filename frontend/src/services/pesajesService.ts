@@ -70,4 +70,24 @@ export const pesajesService = {
     })
     return response.data
   },
+
+  /**
+   * Descarga el ticket PDF de un pesaje
+   */
+  async downloadTicketPDF(id: string, numeroPesaje: number): Promise<void> {
+    const response = await api.get(`/pesajes/${id}/ticket-pdf`, {
+      responseType: 'blob',
+    })
+
+    // Crear blob y descargar
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ticket_pesaje_${numeroPesaje}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  },
 }

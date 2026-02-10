@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Union
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 
 from app.schemas.common import ResponseBase
 
@@ -11,11 +11,28 @@ class PesajeBase(BaseModel):
     """Schema base de Pesaje"""
 
     camion_id: UUID
+
+    # Datos del transporte
+    acoplado: Optional[str] = Field(None, max_length=20)
+    transportista: Optional[str] = Field(None, max_length=100)
+    remitente: str = Field(default="LA RUFINA", max_length=100)
     chofer: Optional[str] = Field(None, max_length=100)
+
+    # Datos del producto
+    producto: Optional[str] = Field(None, max_length=100)
+    numero_guia: Optional[str] = Field(None, max_length=50)
+
+    # Pesos
     peso_tara: Decimal = Field(..., gt=0)
     peso_bruto: Decimal = Field(..., gt=0)
+
+    # Destino
     material: Optional[str] = Field(None, max_length=100)
     cliente_destino: Optional[str] = Field(None, max_length=255)
+
+    # Operación
+    operario: Optional[str] = Field(None, max_length=100)
+
     observaciones: Optional[str] = None
 
     @field_validator('peso_bruto')
@@ -30,7 +47,23 @@ class PesajeBase(BaseModel):
 class PesajeCreate(PesajeBase):
     """Schema para crear Pesaje"""
 
-    fecha: datetime = Field(default_factory=datetime.utcnow)
+    fecha: Union[datetime, date, str] = Field(default_factory=datetime.utcnow)
+
+    @field_validator('fecha', mode='before')
+    @classmethod
+    def parse_fecha(cls, v):
+        """Convertir string a datetime si es necesario"""
+        if isinstance(v, str):
+            try:
+                # Intentar parsear como datetime completo
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    # Intentar parsear como fecha simple (YYYY-MM-DD)
+                    return datetime.strptime(v, '%Y-%m-%d')
+                except ValueError:
+                    raise ValueError('Formato de fecha inválido')
+        return v
 
 
 class PesajeUpdate(BaseModel):
@@ -45,16 +78,42 @@ class PesajeUpdate(BaseModel):
     observaciones: Optional[str] = None
 
 
-class PesajeSchema(ResponseBase, PesajeBase):
+class PesajeSchema(ResponseBase):
     """Schema de respuesta de Pesaje"""
 
+    camion_id: UUID
     numero_pesaje: int
     fecha: datetime
     peso_neto: Decimal
     remito_generado: bool
     created_by: UUID
+
+    # Datos del transporte (todos opcionales en respuesta para compatibilidad)
+    acoplado: Optional[str] = None
+    transportista: Optional[str] = None
+    remitente: Optional[str] = "LA RUFINA"
+    chofer: Optional[str] = None
+
+    # Datos del producto
+    producto: Optional[str] = None
+    numero_guia: Optional[str] = None
+
+    # Pesos
+    peso_tara: Decimal
+    peso_bruto: Decimal
+
+    # Destino
+    material: Optional[str] = None
+    cliente_destino: Optional[str] = None
+
+    # Operación
+    operario: Optional[str] = None
+    observaciones: Optional[str] = None
+
     # Información del camión (opcional)
     camion_patente: Optional[str] = None
+    # Información del creador (opcional)
+    operario_nombre: Optional[str] = None
 
 
 class PesajeStats(BaseModel):

@@ -9,19 +9,28 @@ from app.schemas.common import ResponseBase
 
 # ==================== CISTERNA ====================
 
+class CisternaCreate(BaseModel):
+    """Schema para crear cisterna"""
+
+    nombre: str = Field(..., max_length=100)
+    capacidad_total: Decimal = Field(..., gt=0)
+    nivel_minimo: Decimal = Field(..., gt=0)
+
+
 class CisternaConfig(BaseModel):
-    """Schema para configuración de cisterna"""
+    """Schema para configuración de cisterna (legacy)"""
 
     capacidad_total: Decimal = Field(..., gt=0)
-    nivel_alerta: Decimal = Field(..., gt=0)
+    nivel_minimo: Decimal = Field(..., gt=0)
 
 
 class CisternaSchema(ResponseBase):
     """Schema de respuesta de Cisterna"""
 
+    nombre: str
     capacidad_total: Decimal
     nivel_actual: Decimal
-    nivel_alerta: Decimal
+    nivel_minimo: Decimal
     porcentaje_actual: Optional[Decimal] = None
     esta_bajo: bool = False
 
@@ -29,9 +38,10 @@ class CisternaSchema(ResponseBase):
 class CisternaUpdate(BaseModel):
     """Schema para actualizar configuración de cisterna"""
 
+    nombre: Optional[str] = Field(None, max_length=100)
     capacidad_total: Optional[Decimal] = Field(None, gt=0)
     nivel_actual: Optional[Decimal] = Field(None, ge=0)
-    nivel_alerta: Optional[Decimal] = Field(None, gt=0)
+    nivel_minimo: Optional[Decimal] = Field(None, gt=0)
 
 
 # ==================== CARGAS DE CISTERNA ====================
@@ -49,7 +59,8 @@ class CargaCisternaBase(BaseModel):
 class CargaCisternaCreate(CargaCisternaBase):
     """Schema para crear Carga de Cisterna"""
 
-    fecha: datetime = Field(default_factory=datetime.utcnow)
+    cisterna_id: UUID
+    fecha: str  # Acepta fecha como string, se convierte en el servicio
 
 
 class CargaCisternaUpdate(BaseModel):
@@ -65,6 +76,8 @@ class CargaCisternaUpdate(BaseModel):
 class CargaCisternaSchema(ResponseBase, CargaCisternaBase):
     """Schema de respuesta de Carga de Cisterna"""
 
+    cisterna_id: Optional[UUID] = None
+    cisterna_nombre: Optional[str] = None
     fecha: datetime
     costo_por_litro: Optional[Decimal]
     created_by: UUID
@@ -78,7 +91,7 @@ class SuministroCombustibleBase(BaseModel):
     camion_id: UUID
     litros: Decimal = Field(..., gt=0)
     chofer: Optional[str] = Field(None, max_length=100)
-    kilometraje: Optional[int] = Field(None, ge=0)
+    kilometraje_actual: Optional[int] = Field(None, ge=0)
     horometro: Optional[Decimal] = Field(None, ge=0)
     observaciones: Optional[str] = None
 
@@ -86,7 +99,8 @@ class SuministroCombustibleBase(BaseModel):
 class SuministroCombustibleCreate(SuministroCombustibleBase):
     """Schema para crear Suministro de Combustible"""
 
-    fecha: datetime = Field(default_factory=datetime.utcnow)
+    cisterna_id: UUID
+    fecha: str  # Acepta fecha como string, se convierte en el servicio
 
 
 class SuministroCombustibleUpdate(BaseModel):
@@ -99,13 +113,23 @@ class SuministroCombustibleUpdate(BaseModel):
     observaciones: Optional[str] = None
 
 
-class SuministroCombustibleSchema(ResponseBase, SuministroCombustibleBase):
+class SuministroCombustibleSchema(ResponseBase):
     """Schema de respuesta de Suministro de Combustible"""
 
+    camion_id: UUID
+    litros: Decimal
+    chofer: Optional[str] = None
+    kilometraje_actual: Optional[int] = Field(None, validation_alias="kilometraje")
+    horometro: Optional[Decimal] = None
+    observaciones: Optional[str] = None
+    cisterna_id: Optional[UUID] = None
+    cisterna_nombre: Optional[str] = None
     fecha: datetime
     created_by: UUID
     # Información del camión (opcional)
     camion_patente: Optional[str] = None
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 # ==================== ESTADÍSTICAS ====================

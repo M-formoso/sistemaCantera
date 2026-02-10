@@ -10,7 +10,7 @@ from datetime import date
 from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
 from app.models.usuario import Usuario
 from app.schemas.combustible import (
-    CisternaSchema, CisternaConfig, CisternaUpdate,
+    CisternaSchema, CisternaConfig, CisternaUpdate, CisternaCreate,
     CargaCisternaSchema, CargaCisternaCreate,
     SuministroCombustibleSchema, SuministroCombustibleCreate
 )
@@ -19,14 +19,73 @@ from app.services import combustible_service
 router = APIRouter()
 
 
-# ==================== CISTERNA ====================
+# ==================== CISTERNAS ====================
+
+@router.get("/cisternas", response_model=List[CisternaSchema])
+async def listar_cisternas(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """Lista todas las cisternas"""
+    return combustible_service.obtener_todas_cisternas(db)
+
+
+@router.get("/cisternas/{cisterna_id}", response_model=CisternaSchema)
+async def obtener_cisterna_por_id(
+    cisterna_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """Obtiene una cisterna por ID"""
+    from fastapi import HTTPException, status
+    cisterna = combustible_service.obtener_cisterna_por_id(db, cisterna_id)
+
+    if not cisterna:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cisterna no encontrada"
+        )
+
+    return cisterna
+
+
+@router.post("/cisternas", response_model=CisternaSchema, status_code=201)
+async def crear_cisterna(
+    cisterna: CisternaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Crea una nueva cisterna
+
+    **Requiere rol:** Administrador
+    """
+    return combustible_service.crear_cisterna(db, cisterna)
+
+
+@router.put("/cisternas/{cisterna_id}", response_model=CisternaSchema)
+async def actualizar_cisterna(
+    cisterna_id: UUID,
+    update_data: CisternaUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Actualiza la configuración de una cisterna
+
+    **Requiere rol:** Administrador
+    """
+    return combustible_service.actualizar_cisterna(db, cisterna_id, update_data)
+
+
+# ==================== CISTERNA LEGACY (single cisterna) ====================
 
 @router.get("/cisterna", response_model=CisternaSchema)
 async def obtener_cisterna(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    """Obtiene el estado actual de la cisterna"""
+    """Obtiene el estado actual de la cisterna principal (legacy)"""
     cisterna = combustible_service.obtener_cisterna(db)
 
     if not cisterna:
@@ -46,25 +105,11 @@ async def configurar_cisterna(
     current_user: Usuario = Depends(require_admin)
 ):
     """
-    Configura o crea la cisterna
+    Configura o crea la cisterna principal (legacy)
 
     **Requiere rol:** Administrador
     """
     return combustible_service.configurar_cisterna(db, config)
-
-
-@router.put("/cisterna", response_model=CisternaSchema)
-async def actualizar_cisterna(
-    update_data: CisternaUpdate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
-):
-    """
-    Actualiza la configuración de la cisterna
-
-    **Requiere rol:** Administrador
-    """
-    return combustible_service.actualizar_cisterna(db, update_data)
 
 
 # ==================== CARGAS DE CISTERNA ====================

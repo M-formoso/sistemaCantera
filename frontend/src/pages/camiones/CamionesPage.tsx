@@ -11,7 +11,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Truck, Plus, Pencil, Trash2, Wrench } from 'lucide-react'
+import { Truck, Plus, Pencil, Trash2, Wrench, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,11 +87,11 @@ export default function CamionesPage() {
       },
     },
     {
-      accessorKey: 'kilometraje',
+      accessorKey: 'kilometraje_actual',
       header: 'Kilometraje',
       cell: ({ row }) => {
-        const km = row.getValue('kilometraje') as number
-        return <div>{km.toLocaleString('es-AR')} km</div>
+        const km = row.getValue('kilometraje_actual') as number | null
+        return <div>{km != null ? `${km.toLocaleString('es-AR')} km` : '-'}</div>
       },
     },
     {
@@ -102,6 +102,35 @@ export default function CamionesPage() {
         return <div className="text-sm text-muted-foreground">
           {fecha ? formatDate(fecha) : 'Sin servicios'}
         </div>
+      },
+    },
+    {
+      id: 'proximo_servicio',
+      header: 'Próximo Servicio',
+      cell: ({ row }) => {
+        const camion = row.original
+        const requiere = camion.requiere_servicio
+        const kmRestantes = camion.km_para_proximo_servicio
+
+        if (!camion.proximo_servicio_km) {
+          return <span className="text-sm text-muted-foreground">No definido</span>
+        }
+
+        return (
+          <div className="flex items-center gap-2">
+            {requiere && <AlertTriangle className="h-4 w-4 text-orange-500" />}
+            <div>
+              <div className={`text-sm font-medium ${requiere ? 'text-orange-600' : ''}`}>
+                {camion.proximo_servicio_km?.toLocaleString('es-AR')} km
+              </div>
+              {kmRestantes != null && (
+                <div className={`text-xs ${kmRestantes <= 0 ? 'text-red-600 font-semibold' : kmRestantes <= 500 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                  {kmRestantes <= 0 ? `¡Pasado por ${Math.abs(kmRestantes).toLocaleString('es-AR')} km!` : `Faltan ${kmRestantes.toLocaleString('es-AR')} km`}
+                </div>
+              )}
+            </div>
+          </div>
+        )
       },
     },
     {

@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import field_validator
+from typing import Optional, Union
+import json
 
 
 class Settings(BaseSettings):
@@ -36,11 +38,27 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     EMAIL_FROM: Optional[str] = None
 
-    # CORS
+    # CORS - acepta string JSON o lista
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
+        "http://localhost:5180",
         "http://localhost:3000",
     ]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
+        """Parsea CORS origins desde string JSON o lista"""
+        if isinstance(v, str):
+            # Si es un string JSON, parsearlo
+            if v.startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            # Si es un string separado por comas
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     class Config:
         env_file = ".env"

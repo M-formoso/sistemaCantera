@@ -15,9 +15,11 @@ const camionSchema = z.object({
   marca: z.string().min(2, 'La marca es requerida'),
   modelo: z.string().min(2, 'El modelo es requerido'),
   año: z.number().min(1990, 'Año mínimo 1990').max(new Date().getFullYear() + 1),
-  kilometraje: z.number().min(0, 'El kilometraje debe ser positivo'),
-  estado: z.enum(['operativo', 'en_servicio', 'fuera_de_servicio']),
+  kilometraje_actual: z.number().min(0, 'El kilometraje debe ser positivo'),
+  estado: z.enum(['operativo', 'en_servicio', 'fuera_servicio']),
   observaciones: z.string().optional(),
+  intervalo_servicio_km: z.number().min(1000, 'Mínimo 1000 km').optional().nullable(),
+  proximo_servicio_km: z.number().min(0).optional().nullable(),
 })
 
 type CamionFormData = z.infer<typeof camionSchema>
@@ -43,7 +45,8 @@ export default function CamionFormPage() {
     resolver: zodResolver(camionSchema),
     defaultValues: {
       estado: 'operativo',
-      kilometraje: 0,
+      kilometraje_actual: 0,
+      intervalo_servicio_km: 10000,
     },
   })
 
@@ -54,9 +57,11 @@ export default function CamionFormPage() {
         marca: camion.marca,
         modelo: camion.modelo,
         año: camion.año,
-        kilometraje: camion.kilometraje,
+        kilometraje_actual: camion.kilometraje_actual,
         estado: camion.estado,
         observaciones: camion.observaciones || '',
+        intervalo_servicio_km: camion.intervalo_servicio_km || 10000,
+        proximo_servicio_km: camion.proximo_servicio_km,
       })
     }
   }, [camion, reset])
@@ -180,17 +185,17 @@ export default function CamionFormPage() {
 
               {/* Kilometraje */}
               <div className="space-y-2">
-                <label htmlFor="kilometraje" className="text-sm font-medium">
-                  Kilometraje <span className="text-red-500">*</span>
+                <label htmlFor="kilometraje_actual" className="text-sm font-medium">
+                  Kilometraje Actual <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  id="kilometraje"
+                  id="kilometraje_actual"
                   type="number"
-                  {...register('kilometraje', { valueAsNumber: true })}
+                  {...register('kilometraje_actual', { valueAsNumber: true })}
                   placeholder="50000"
                 />
-                {errors.kilometraje && (
-                  <p className="text-sm text-red-600">{errors.kilometraje.message}</p>
+                {errors.kilometraje_actual && (
+                  <p className="text-sm text-red-600">{errors.kilometraje_actual.message}</p>
                 )}
               </div>
 
@@ -206,10 +211,44 @@ export default function CamionFormPage() {
                 >
                   <option value="operativo">Operativo</option>
                   <option value="en_servicio">En servicio</option>
-                  <option value="fuera_de_servicio">Fuera de servicio</option>
+                  <option value="fuera_servicio">Fuera de servicio</option>
                 </select>
                 {errors.estado && (
                   <p className="text-sm text-red-600">{errors.estado.message}</p>
+                )}
+              </div>
+
+              {/* Intervalo de Servicio */}
+              <div className="space-y-2">
+                <label htmlFor="intervalo_servicio_km" className="text-sm font-medium">
+                  Intervalo de Servicio (km)
+                </label>
+                <Input
+                  id="intervalo_servicio_km"
+                  type="number"
+                  {...register('intervalo_servicio_km', { valueAsNumber: true })}
+                  placeholder="10000"
+                />
+                <p className="text-xs text-muted-foreground">Cada cuántos km se debe hacer servicio</p>
+                {errors.intervalo_servicio_km && (
+                  <p className="text-sm text-red-600">{errors.intervalo_servicio_km.message}</p>
+                )}
+              </div>
+
+              {/* Próximo Servicio */}
+              <div className="space-y-2">
+                <label htmlFor="proximo_servicio_km" className="text-sm font-medium">
+                  Próximo Servicio (km)
+                </label>
+                <Input
+                  id="proximo_servicio_km"
+                  type="number"
+                  {...register('proximo_servicio_km', { valueAsNumber: true })}
+                  placeholder="60000"
+                />
+                <p className="text-xs text-muted-foreground">Se calcula automáticamente al registrar servicios</p>
+                {errors.proximo_servicio_km && (
+                  <p className="text-sm text-red-600">{errors.proximo_servicio_km.message}</p>
                 )}
               </div>
             </div>

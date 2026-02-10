@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, Numeric, Enum as SQLEnum, Text
+from sqlalchemy import Column, String, Integer, Boolean, Numeric, Enum as SQLEnum, Text, Date
 from sqlalchemy.orm import relationship
 import enum
 
@@ -37,6 +37,13 @@ class Camion(BaseModel):
     foto = Column(String(500))  # URL de Cloudinary
     observaciones = Column(Text)
     activo = Column(Boolean, default=True, nullable=False)
+
+    # Campos de servicio
+    ultimo_servicio = Column(Date, nullable=True)
+    ultimo_servicio_km = Column(Integer, nullable=True)
+    proximo_servicio_km = Column(Integer, nullable=True)
+    proximo_servicio_fecha = Column(Date, nullable=True)
+    intervalo_servicio_km = Column(Integer, default=10000)  # Cada cuántos km hacer servicio
 
     # Relaciones
     servicios = relationship("Servicio", back_populates="camion")

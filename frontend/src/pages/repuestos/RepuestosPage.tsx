@@ -1,30 +1,31 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  SortingState,
-  getFilteredRowModel,
-  ColumnFiltersState,
-} from '@tanstack/react-table'
-import { Package, Plus, Pencil, Trash2, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
+import { Package, Plus, Pencil, Trash2, AlertTriangle, TrendingUp, TrendingDown, X, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DataTable } from '@/components/ui/data-table'
 import { repuestosService } from '@/services/repuestosService'
-import { Repuesto } from '@/types'
+import { Repuesto, MovimientoStock } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+
+interface MovimientoModal {
+  repuesto: Repuesto | null
+  tipo: 'ingreso' | 'egreso' | null
+}
 
 export default function RepuestosPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [showOnlyBajoStock, setShowOnlyBajoStock] = useState(false)
+  const [movimientoModal, setMovimientoModal] = useState<MovimientoModal>({ repuesto: null, tipo: null })
+  const [cantidad, setCantidad] = useState('')
+  const [observaciones, setObservaciones] = useState('')
+  const [historialRepuesto, setHistorialRepuesto] = useState<Repuesto | null>(null)
+  const [movimientos, setMovimientos] = useState<MovimientoStock[]>([])
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
 
   const { data: repuestos = [], isLoading } = useQuery({
     queryKey: ['repuestos', showOnlyBajoStock],
@@ -38,6 +39,17 @@ export default function RepuestosPage() {
     },
   })
 
+  const ajustarStockMutation = useMutation({
+    mutationFn: ({ id, cantidad, tipo, observaciones }: { id: string; cantidad: number; tipo: 'ingreso' | 'egreso'; observaciones?: string }) =>
+      tipo === 'ingreso'
+        ? repuestosService.registrarEntrada(id, cantidad, observaciones)
+        : repuestosService.registrarSalida(id, cantidad, observaciones),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repuestos'] })
+      cerrarModal()
+    },
+  })
+
   const handleDelete = async (id: string, nombre: string) => {
     if (window.confirm(`¿Está seguro de eliminar el repuesto ${nombre}?`)) {
       try {
@@ -48,8 +60,61 @@ export default function RepuestosPage() {
     }
   }
 
-  const handleRegistrarMovimiento = (id: string, tipo: 'entrada' | 'salida') => {
-    navigate(`/repuestos/${id}/movimiento?tipo=${tipo}`)
+  const abrirModal = (repuesto: Repuesto, tipo: 'ingreso' | 'egreso') => {
+    setMovimientoModal({ repuesto, tipo })
+    setCantidad('')
+    setObservaciones('')
+  }
+
+  const cerrarModal = () => {
+    setMovimientoModal({ repuesto: null, tipo: null })
+    setCantidad('')
+    setObservaciones('')
+  }
+
+  const abrirHistorial = async (repuesto: Repuesto) => {
+    setHistorialRepuesto(repuesto)
+    setLoadingHistorial(true)
+    try {
+      const data = await repuestosService.getMovimientos(repuesto.id)
+      setMovimientos(data)
+    } catch (error) {
+      console.error('Error al cargar historial:', error)
+      setMovimientos([])
+    } finally {
+      setLoadingHistorial(false)
+    }
+  }
+
+  const cerrarHistorial = () => {
+    setHistorialRepuesto(null)
+    setMovimientos([])
+  }
+
+  const handleAjustarStock = async () => {
+    if (!movimientoModal.repuesto || !movimientoModal.tipo || !cantidad) return
+
+    const cantidadNum = parseFloat(cantidad)
+    if (isNaN(cantidadNum) || cantidadNum <= 0) {
+      alert('La cantidad debe ser mayor a 0')
+      return
+    }
+
+    if (movimientoModal.tipo === 'egreso' && cantidadNum > movimientoModal.repuesto.stock_actual) {
+      alert('No hay suficiente stock disponible')
+      return
+    }
+
+    try {
+      await ajustarStockMutation.mutateAsync({
+        id: movimientoModal.repuesto.id,
+        cantidad: cantidadNum,
+        tipo: movimientoModal.tipo,
+        observaciones: observaciones || undefined,
+      })
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Error al ajustar el stock')
+    }
   }
 
   const columns: ColumnDef<Repuesto>[] = [
@@ -130,7 +195,15 @@ export default function RepuestosPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleRegistrarMovimiento(repuesto.id, 'entrada')}
+              onClick={() => abrirHistorial(repuesto)}
+              title="Ver historial"
+            >
+              <History className="h-4 w-4 text-blue-600" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => abrirModal(repuesto, 'ingreso')}
               title="Registrar entrada"
             >
               <TrendingUp className="h-4 w-4 text-green-600" />
@@ -138,7 +211,7 @@ export default function RepuestosPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleRegistrarMovimiento(repuesto.id, 'salida')}
+              onClick={() => abrirModal(repuesto, 'egreso')}
               title="Registrar salida"
             >
               <TrendingDown className="h-4 w-4 text-orange-600" />
@@ -166,21 +239,69 @@ export default function RepuestosPage() {
     },
   ]
 
-  const table = useReactTable({
-    data: repuestos,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    state: {
-      sorting,
-      columnFilters,
-    },
-  })
-
   const repuestosBajoStock = repuestos.filter(r => r.stock_actual <= r.stock_minimo).length
+
+  // Columnas para el historial de movimientos
+  const movimientosColumns: ColumnDef<MovimientoStock>[] = [
+    {
+      accessorKey: 'created_at',
+      header: 'Fecha',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          {new Date(row.getValue('created_at')).toLocaleDateString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'tipo',
+      header: 'Tipo',
+      cell: ({ row }) => {
+        const tipo = row.getValue('tipo') as string
+        return (
+          <div className="flex items-center gap-2">
+            {tipo === 'ingreso' ? (
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-orange-600" />
+            )}
+            <span className={tipo === 'ingreso' ? 'text-green-700' : 'text-orange-700'}>
+              {tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
+            </span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'cantidad',
+      header: 'Cantidad',
+      cell: ({ row }) => {
+        const mov = row.original
+        return (
+          <span className={`font-semibold ${mov.tipo === 'ingreso' ? 'text-green-700' : 'text-orange-700'}`}>
+            {mov.tipo === 'ingreso' ? '+' : '-'}{mov.cantidad}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'usuario_nombre',
+      header: 'Usuario',
+      cell: ({ row }) => <div className="text-sm font-medium">{row.getValue('usuario_nombre')}</div>,
+    },
+    {
+      accessorKey: 'observaciones',
+      header: 'Observaciones',
+      cell: ({ row }) => (
+        <div className="text-sm text-muted-foreground">{row.getValue('observaciones') || '-'}</div>
+      ),
+    },
+  ]
 
   if (isLoading) {
     return (
@@ -235,85 +356,143 @@ export default function RepuestosPage() {
             <CardTitle>
               {showOnlyBajoStock ? 'Repuestos con Stock Bajo' : 'Lista de Repuestos'}
             </CardTitle>
-            <div className="flex items-center gap-4">
-              {showOnlyBajoStock && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowOnlyBajoStock(false)}
-                >
-                  Ver todos
-                </Button>
-              )}
-              <Input
-                placeholder="Buscar por nombre o código..."
-                value={(table.getColumn('nombre')?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn('nombre')?.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
+            {showOnlyBajoStock && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOnlyBajoStock(false)}
+              >
+                Ver todos
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b bg-gray-50">
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="px-4 py-3 text-left text-sm font-medium text-gray-700"
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="px-4 py-3 text-sm">
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      No hay repuestos registrados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 text-sm text-muted-foreground">
-            Total: {repuestos.length} repuestos
-            {repuestosBajoStock > 0 && ` • ${repuestosBajoStock} con stock bajo`}
-          </div>
+          <DataTable
+            columns={columns}
+            data={repuestos}
+            searchPlaceholder="Buscar por código, nombre, categoría..."
+            defaultPageSize={10}
+          />
         </CardContent>
       </Card>
+
+      {/* Modal de ajuste de stock */}
+      {movimientoModal.repuesto && movimientoModal.tipo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold">
+                {movimientoModal.tipo === 'ingreso' ? 'Registrar Entrada' : 'Registrar Salida'}
+              </h3>
+              <Button variant="ghost" size="sm" onClick={cerrarModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Repuesto</p>
+                <p className="font-semibold">{movimientoModal.repuesto.nombre}</p>
+                <p className="text-sm text-muted-foreground">
+                  Stock actual: <span className="font-medium">{movimientoModal.repuesto.stock_actual}</span>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Cantidad a {movimientoModal.tipo === 'ingreso' ? 'ingresar' : 'egresar'}
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={movimientoModal.tipo === 'egreso' ? movimientoModal.repuesto.stock_actual : undefined}
+                  value={cantidad}
+                  onChange={(e) => setCantidad(e.target.value)}
+                  placeholder="Ingrese la cantidad"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Observaciones (opcional)</label>
+                <Input
+                  type="text"
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Motivo del ajuste..."
+                />
+              </div>
+
+              {cantidad && (
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <p className="text-sm text-blue-700">
+                    Nuevo stock: <span className="font-bold">
+                      {movimientoModal.tipo === 'ingreso'
+                        ? movimientoModal.repuesto.stock_actual + parseFloat(cantidad || '0')
+                        : movimientoModal.repuesto.stock_actual - parseFloat(cantidad || '0')
+                      }
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button variant="outline" onClick={cerrarModal}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleAjustarStock}
+                disabled={ajustarStockMutation.isPending || !cantidad}
+                className={movimientoModal.tipo === 'ingreso' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-600 hover:bg-orange-700'}
+              >
+                {ajustarStockMutation.isPending ? 'Guardando...' : movimientoModal.tipo === 'ingreso' ? 'Registrar Entrada' : 'Registrar Salida'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de historial de movimientos */}
+      {historialRepuesto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <History className="h-5 w-5 text-blue-600" />
+                  Historial de Movimientos
+                </h3>
+                <p className="text-sm text-muted-foreground">{historialRepuesto.nombre} • Stock actual: {historialRepuesto.stock_actual}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={cerrarHistorial}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1">
+              {loadingHistorial ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Cargando historial...</div>
+                </div>
+              ) : (
+                <DataTable
+                  columns={movimientosColumns}
+                  data={movimientos}
+                  searchPlaceholder="Buscar por usuario, observaciones..."
+                  defaultPageSize={10}
+                  pageSizeOptions={[5, 10, 25, 50]}
+                />
+              )}
+            </div>
+
+            <div className="flex justify-end p-4 border-t">
+              <Button variant="outline" onClick={cerrarHistorial}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

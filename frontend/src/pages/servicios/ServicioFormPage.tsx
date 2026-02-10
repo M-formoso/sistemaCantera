@@ -16,11 +16,11 @@ import { formatCurrency, formatNumber } from '@/lib/utils'
 const servicioSchema = z.object({
   camion_id: z.string().min(1, 'Debe seleccionar un camión'),
   fecha: z.string().min(1, 'La fecha es requerida'),
-  tipo: z.enum(['preventivo', 'correctivo', 'reparacion']),
+  tipo: z.enum(['preventivo', 'correctivo', 'emergencia']),
   descripcion: z.string().min(5, 'La descripción debe tener al menos 5 caracteres'),
   costo_mano_obra: z.number().min(0, 'El costo debe ser positivo'),
-  kilometraje_actual: z.number().min(0, 'El kilometraje debe ser positivo').optional().nullable(),
-  proximo_servicio_km: z.number().min(0, 'El kilometraje debe ser positivo').optional().nullable(),
+  kilometraje_servicio: z.number().min(0, 'El kilometraje debe ser positivo').optional().nullable(),
+  mecanico: z.string().optional().nullable(),
   observaciones: z.string().optional(),
 })
 
@@ -103,8 +103,8 @@ export default function ServicioFormPage() {
         tipo: servicio.tipo,
         descripcion: servicio.descripcion,
         costo_mano_obra: servicio.costo_mano_obra,
-        kilometraje_actual: servicio.kilometraje_actual,
-        proximo_servicio_km: servicio.proximo_servicio_km,
+        kilometraje_servicio: servicio.kilometraje_servicio,
+        mecanico: servicio.mecanico || '',
         observaciones: servicio.observaciones || '',
       })
 
@@ -126,10 +126,12 @@ export default function ServicioFormPage() {
   const createMutation = useMutation({
     mutationFn: (data: ServicioFormData & { repuestos: RepuestoSeleccionado[] }) =>
       serviciosService.create(data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['servicios'] })
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumen'] })
+      queryClient.invalidateQueries({ queryKey: ['camion-servicios', variables.camion_id] })
+      queryClient.invalidateQueries({ queryKey: ['camiones'] })
       navigate('/servicios')
     },
   })
@@ -137,10 +139,12 @@ export default function ServicioFormPage() {
   const updateMutation = useMutation({
     mutationFn: (data: ServicioFormData & { repuestos: RepuestoSeleccionado[] }) =>
       serviciosService.update(id!, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['servicios'] })
       queryClient.invalidateQueries({ queryKey: ['servicio', id] })
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
+      queryClient.invalidateQueries({ queryKey: ['camion-servicios', variables.camion_id] })
+      queryClient.invalidateQueries({ queryKey: ['camiones'] })
       navigate('/servicios')
     },
   })
@@ -278,7 +282,7 @@ export default function ServicioFormPage() {
                   >
                     <option value="preventivo">Preventivo</option>
                     <option value="correctivo">Correctivo</option>
-                    <option value="reparacion">Reparación</option>
+                    <option value="emergencia">Emergencia</option>
                   </select>
                   {errors.tipo && (
                     <p className="text-sm text-red-600">{errors.tipo.message}</p>
@@ -302,29 +306,29 @@ export default function ServicioFormPage() {
                   )}
                 </div>
 
-                {/* Kilometraje Actual */}
+                {/* Kilometraje del Servicio */}
                 <div className="space-y-2">
-                  <label htmlFor="kilometraje_actual" className="text-sm font-medium">
-                    Kilometraje Actual
+                  <label htmlFor="kilometraje_servicio" className="text-sm font-medium">
+                    Kilometraje del Servicio
                   </label>
                   <Input
-                    id="kilometraje_actual"
+                    id="kilometraje_servicio"
                     type="number"
-                    {...register('kilometraje_actual', { valueAsNumber: true })}
+                    {...register('kilometraje_servicio', { valueAsNumber: true })}
                     placeholder="50000"
                   />
                 </div>
 
-                {/* Próximo Servicio */}
+                {/* Mecánico */}
                 <div className="space-y-2">
-                  <label htmlFor="proximo_servicio_km" className="text-sm font-medium">
-                    Próximo Servicio (km)
+                  <label htmlFor="mecanico" className="text-sm font-medium">
+                    Mecánico
                   </label>
                   <Input
-                    id="proximo_servicio_km"
-                    type="number"
-                    {...register('proximo_servicio_km', { valueAsNumber: true })}
-                    placeholder="60000"
+                    id="mecanico"
+                    type="text"
+                    {...register('mecanico')}
+                    placeholder="Nombre del mecánico"
                   />
                 </div>
               </div>

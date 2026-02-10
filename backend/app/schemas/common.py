@@ -1,6 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from uuid import UUID
+from typing import Generic, TypeVar, List
+
+T = TypeVar('T')
 
 
 class BaseSchema(BaseModel):
@@ -22,3 +25,14 @@ class MessageResponse(BaseModel):
 
     message: str
     detail: str | None = None
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Schema para respuestas paginadas"""
+
+    items: List[T]
+    total: int
+    skip: int
+    limit: int
+
+    model_config = ConfigDict(from_attributes=True)

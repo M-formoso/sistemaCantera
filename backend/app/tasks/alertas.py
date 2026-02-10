@@ -67,7 +67,7 @@ def verificar_nivel_cisterna():
         if not cisterna:
             return {"status": "error", "message": "Cisterna no configurada"}
 
-        if cisterna.nivel_actual > cisterna.nivel_alerta:
+        if cisterna.nivel_actual > cisterna.nivel_minimo:
             return {"status": "ok", "message": "Nivel de cisterna OK"}
 
         # Calcular porcentaje
@@ -76,13 +76,13 @@ def verificar_nivel_cisterna():
         # Crear alerta
         print(f"🚨 ALERTA: Nivel bajo de combustible en cisterna")
         print(f"   - Nivel actual: {cisterna.nivel_actual} litros ({porcentaje:.1f}%)")
-        print(f"   - Nivel de alerta: {cisterna.nivel_alerta} litros")
+        print(f"   - Nivel mínimo: {cisterna.nivel_minimo} litros")
         print(f"   - Capacidad total: {cisterna.capacidad_total} litros")
 
         return {
             "status": "alert_created",
             "nivel_actual": float(cisterna.nivel_actual),
-            "nivel_alerta": float(cisterna.nivel_alerta),
+            "nivel_minimo": float(cisterna.nivel_minimo),
             "porcentaje": round(porcentaje, 1)
         }
 
@@ -142,6 +142,78 @@ def verificar_servicios_proximos():
             "total_servicios": len(servicios_proximos),
             "urgentes": urgentes,
             "proximos": proximos
+        }
+
+    finally:
+        db.close()
+
+
+@shared_task
+def verificar_proximos_servicios():
+    """
+    Verifica camiones que requieren servicio pronto por kilometraje o fecha
+
+    Esta tarea se ejecuta:
+    - Automáticamente después de crear un servicio
+    - Diariamente como verificación
+
+    Criterios de alerta:
+    - Por km: cuando faltan menos de 1000 km
+    - Por fecha: cuando faltan 7 días o menos
+    """
+    db = SessionLocal()
+    try:
+        from app.services import camion_service
+
+        camiones_requieren = camion_service.obtener_camiones_requieren_servicio(db)
+
+        if not camiones_requieren:
+            return {"status": "ok", "message": "No hay camiones que requieran servicio"}
+
+        alertas = []
+        for camion in camiones_requieren:
+            estado = camion_service.calcular_estado_servicio(camion)
+            km_restantes = estado.get("km_para_proximo_servicio")
+            dias_restantes = estado.get("dias_para_proximo_servicio")
+            motivo = estado.get("motivo_alerta")
+
+            alerta = {
+                "camion_id": str(camion.id),
+                "patente": camion.patente,
+                "km_actual": camion.kilometraje_actual,
+                "proximo_servicio_km": camion.proximo_servicio_km,
+                "proximo_servicio_fecha": camion.proximo_servicio_fecha.isoformat() if camion.proximo_servicio_fecha else None,
+                "km_restantes": km_restantes,
+                "dias_restantes": dias_restantes,
+                "motivo": motivo,
+            }
+
+            # Alertas por kilometraje
+            if km_restantes is not None:
+                if km_restantes <= 0:
+                    print(f"🚨 URGENTE: Camión {camion.patente} PASÓ el kilometraje de servicio!")
+                    print(f"   - Km actual: {camion.kilometraje_actual}")
+                    print(f"   - Servicio era a los: {camion.proximo_servicio_km} km")
+                elif km_restantes <= 500:
+                    print(f"⚠️ ALERTA: Camión {camion.patente} muy cerca del servicio por km!")
+                    print(f"   - Km restantes: {km_restantes}")
+
+            # Alertas por fecha
+            if dias_restantes is not None:
+                if dias_restantes <= 0:
+                    print(f"🚨 URGENTE: Camión {camion.patente} PASÓ la fecha de servicio!")
+                    print(f"   - Fecha era: {camion.proximo_servicio_fecha}")
+                elif dias_restantes <= 3:
+                    print(f"⚠️ ALERTA: Camión {camion.patente} servicio en {dias_restantes} días!")
+                elif dias_restantes <= 7:
+                    print(f"📅 AVISO: Camión {camion.patente} servicio en {dias_restantes} días")
+
+            alertas.append(alerta)
+
+        return {
+            "status": "alerts_created",
+            "total_camiones": len(alertas),
+            "alertas": alertas
         }
 
     finally:
