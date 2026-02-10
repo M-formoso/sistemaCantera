@@ -42,6 +42,24 @@ async def test_password(password: str, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/reset-admin-password")
+async def reset_admin_password(db: Session = Depends(get_db)):
+    """Reset admin password - REMOVER EN PRODUCCION"""
+    usuario = db.query(Usuario).filter(Usuario.email == "admin@canteralarufina.com.ar").first()
+    if not usuario:
+        return {"error": "Usuario no existe"}
+
+    new_password = "Cantera2024!"
+    usuario.password_hash = get_password_hash(new_password)
+    db.commit()
+
+    return {
+        "mensaje": "Contraseña reseteada",
+        "email": "admin@canteralarufina.com.ar",
+        "nueva_password": new_password
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     credentials: LoginRequest,
