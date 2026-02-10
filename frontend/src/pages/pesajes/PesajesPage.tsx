@@ -171,22 +171,22 @@ export default function PesajesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Scale className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Scale className="h-6 w-6 sm:h-8 sm:w-8" />
             Pesajes
           </h1>
-          <p className="text-gray-500 mt-1">Registro de pesajes de camiones</p>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Registro de pesajes de camiones</p>
         </div>
-        <Button onClick={() => navigate('/pesajes/nuevo')}>
+        <Button onClick={() => navigate('/pesajes/nuevo')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Pesaje
         </Button>
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Pesajes</div>
@@ -212,10 +212,10 @@ export default function PesajesPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Pesajes</CardTitle>
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="text-lg sm:text-xl">Lista de Pesajes</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <DataTable
             columns={columns}
             data={pesajes}

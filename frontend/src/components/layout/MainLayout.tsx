@@ -14,7 +14,7 @@ export default function MainLayout() {
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">
+          <div className="container mx-auto p-3 sm:p-4 md:p-6">
             <Outlet />
           </div>
         </main>

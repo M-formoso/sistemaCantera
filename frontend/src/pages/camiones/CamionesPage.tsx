@@ -195,39 +195,37 @@ export default function CamionesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Truck className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Truck className="h-6 w-6 sm:h-8 sm:w-8" />
             Camiones
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de flota de camiones</p>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Gestión de flota de camiones</p>
         </div>
-        <Button onClick={() => navigate('/camiones/nuevo')}>
+        <Button onClick={() => navigate('/camiones/nuevo')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Camión
         </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Lista de Camiones</CardTitle>
-            <div className="flex items-center gap-4">
-              <Input
-                placeholder="Buscar por patente..."
-                value={(table.getColumn('patente')?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn('patente')?.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
+        <CardHeader className="px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-lg sm:text-xl">Lista de Camiones</CardTitle>
+            <Input
+              placeholder="Buscar por patente..."
+              value={(table.getColumn('patente')?.getFilterValue() as string) ?? ''}
+              onChange={(event) =>
+                table.getColumn('patente')?.setFilterValue(event.target.value)
+              }
+              className="w-full sm:max-w-sm"
+            />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full">
+        <CardContent className="px-3 sm:px-6">
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full min-w-[800px]">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b bg-gray-50">

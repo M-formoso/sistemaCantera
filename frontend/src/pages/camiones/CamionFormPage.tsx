@@ -113,28 +113,28 @@ export default function CamionFormPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate('/camiones')}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Button variant="outline" onClick={() => navigate('/camiones')} className="w-fit">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {isEditing ? 'Editar Camión' : 'Nuevo Camión'}
           </h1>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">
             {isEditing ? 'Modifica los datos del camión' : 'Registra un nuevo camión en la flota'}
           </p>
         </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Datos del Camión</CardTitle>
+        <CardHeader className="px-4 sm:px-6">
+          <CardTitle className="text-lg sm:text-xl">Datos del Camión</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="px-4 sm:px-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Patente */}
               <div className="space-y-2">
                 <label htmlFor="patente" className="text-sm font-medium">
@@ -285,8 +285,8 @@ export default function CamionFormPage() {
             </div>
 
             {/* Botones */}
-            <div className="flex items-center gap-4 pt-4 border-t">
-              <Button type="submit" disabled={isLoading}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-4 border-t">
+              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear Camión'}
               </Button>
@@ -295,6 +295,7 @@ export default function CamionFormPage() {
                 variant="outline"
                 onClick={() => navigate('/camiones')}
                 disabled={isLoading}
+                className="w-full sm:w-auto"
               >
                 Cancelar
               </Button>

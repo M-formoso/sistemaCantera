@@ -313,15 +313,15 @@ export default function RepuestosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Package className="h-6 w-6 sm:h-8 sm:w-8" />
             Repuestos
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de inventario de repuestos</p>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Gestión de inventario de repuestos</p>
         </div>
-        <Button onClick={() => navigate('/repuestos/nuevo')}>
+        <Button onClick={() => navigate('/repuestos/nuevo')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Repuesto
         </Button>
@@ -351,9 +351,9 @@ export default function RepuestosPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>
+        <CardHeader className="px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-lg sm:text-xl">
               {showOnlyBajoStock ? 'Repuestos con Stock Bajo' : 'Lista de Repuestos'}
             </CardTitle>
             {showOnlyBajoStock && (
@@ -367,7 +367,7 @@ export default function RepuestosPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <DataTable
             columns={columns}
             data={repuestos}
@@ -379,8 +379,8 @@ export default function RepuestosPage() {
 
       {/* Modal de ajuste de stock */}
       {movimientoModal.repuesto && movimientoModal.tipo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">
                 {movimientoModal.tipo === 'ingreso' ? 'Registrar Entrada' : 'Registrar Salida'}
@@ -454,8 +454,8 @@ export default function RepuestosPage() {
 
       {/* Modal de historial de movimientos */}
       {historialRepuesto && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
               <div>
                 <h3 className="text-lg font-semibold flex items-center gap-2">

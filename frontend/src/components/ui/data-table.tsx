@@ -114,7 +114,7 @@ export function DataTable<TData, TValue>({
 
       {/* Tabla */}
       <div className="rounded-md border overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[600px]">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b bg-gray-50">
@@ -197,8 +197,8 @@ export function DataTable<TData, TValue>({
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            {/* Números de página */}
-            <div className="flex items-center gap-1 mx-2">
+            {/* Números de página - ocultos en móvil */}
+            <div className="hidden sm:flex items-center gap-1 mx-2">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pageNum: number
                 if (totalPages <= 5) {
@@ -224,6 +224,10 @@ export function DataTable<TData, TValue>({
                 )
               })}
             </div>
+            {/* Indicador de página en móvil */}
+            <span className="sm:hidden text-sm text-muted-foreground mx-2">
+              {currentPage}/{totalPages}
+            </span>
 
             <Button
               variant="outline"

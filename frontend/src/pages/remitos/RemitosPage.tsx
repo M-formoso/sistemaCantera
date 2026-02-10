@@ -187,22 +187,22 @@ export default function RemitosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <FileText className="h-6 w-6 sm:h-8 sm:w-8" />
             Remitos
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de remitos de transporte</p>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Gestión de remitos de transporte</p>
         </div>
-        <Button onClick={() => navigate('/pesajes')}>
+        <Button onClick={() => navigate('/pesajes')} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Generar desde Pesaje
         </Button>
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Remitos</div>
@@ -220,24 +220,22 @@ export default function RemitosPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Lista de Remitos</CardTitle>
-            <div className="flex items-center gap-4">
-              <Input
-                placeholder="Buscar por número..."
-                value={(table.getColumn('numero_remito')?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn('numero_remito')?.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
+        <CardHeader className="px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-lg sm:text-xl">Lista de Remitos</CardTitle>
+            <Input
+              placeholder="Buscar por número..."
+              value={(table.getColumn('numero_remito')?.getFilterValue() as string) ?? ''}
+              onChange={(event) =>
+                table.getColumn('numero_remito')?.setFilterValue(event.target.value)
+              }
+              className="w-full sm:max-w-sm"
+            />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full">
+        <CardContent className="px-3 sm:px-6">
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full min-w-[700px]">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b bg-gray-50">

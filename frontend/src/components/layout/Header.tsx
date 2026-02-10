@@ -30,15 +30,15 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             <Menu className="h-5 w-5" />
           </Button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src={logo}
               alt="Logo Cantera La Rufina"
-              className="h-10 w-auto object-contain"
+              className="h-8 sm:h-10 w-auto object-contain"
             />
             <div>
-              <h1 className="text-lg font-bold text-gray-900">Cantera La Rufina</h1>
-              <p className="text-xs text-gray-500">Sistema de Gestión</p>
+              <h1 className="text-sm sm:text-lg font-bold text-gray-900 line-clamp-1">Cantera La Rufina</h1>
+              <p className="text-xs text-gray-500 hidden sm:block">Sistema de Gestión</p>
             </div>
           </div>
         </div>

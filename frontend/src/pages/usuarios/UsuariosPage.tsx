@@ -236,15 +236,15 @@ export default function UsuariosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 text-brand-600" />
+          <Users className="h-6 w-6 sm:h-8 sm:w-8 text-brand-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Usuarios</h1>
-            <p className="text-gray-500">Gestión de usuarios del sistema</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Usuarios</h1>
+            <p className="text-gray-500 text-sm sm:text-base">Gestión de usuarios del sistema</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/usuarios/nuevo')}>
+        <Button onClick={() => navigate('/usuarios/nuevo')} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Usuario
         </Button>
@@ -252,21 +252,17 @@ export default function UsuariosPage() {
 
       {/* Filtros */}
       <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="text-lg sm:text-xl">Filtros</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Buscar por nombre o email..."
-                value={(table.getColumn('nombre')?.getFilterValue() as string) ?? ''}
-                onChange={(event) =>
-                  table.getColumn('nombre')?.setFilterValue(event.target.value)
-                }
-              />
-            </div>
-          </div>
+        <CardContent className="px-3 sm:px-6">
+          <Input
+            placeholder="Buscar por nombre o email..."
+            value={(table.getColumn('nombre')?.getFilterValue() as string) ?? ''}
+            onChange={(event) =>
+              table.getColumn('nombre')?.setFilterValue(event.target.value)
+            }
+          />
         </CardContent>
       </Card>
 
@@ -274,7 +270,7 @@ export default function UsuariosPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[600px]">
               <thead className="bg-gray-50 border-b">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id}>
@@ -323,7 +319,7 @@ export default function UsuariosPage() {
 
       {/* Modal de resetear contraseña */}
       {showResetPassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
               <CardTitle>Resetear Contraseña</CardTitle>

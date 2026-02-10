@@ -146,28 +146,28 @@ export default function CombustiblePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Fuel className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Fuel className="h-6 w-6 sm:h-8 sm:w-8" />
             Combustible
           </h1>
-          <p className="text-gray-500 mt-1">Gestión de cisternas y suministros</p>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Gestión de cisternas y suministros</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => navigate('/combustible/carga-nueva')}>
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Nueva Carga
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button onClick={() => navigate('/combustible/carga-nueva')} className="flex-1 sm:flex-none" size="sm">
+            <TrendingUp className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nueva</span> Carga
           </Button>
-          <Button onClick={() => navigate('/combustible/suministro-nuevo')}>
-            <TrendingDown className="h-4 w-4 mr-2" />
-            Nuevo Suministro
+          <Button onClick={() => navigate('/combustible/suministro-nuevo')} className="flex-1 sm:flex-none" size="sm">
+            <TrendingDown className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo</span> Suministro
           </Button>
         </div>
       </div>
 
       {/* Estadísticas globales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Nivel Actual</div>
@@ -201,8 +201,8 @@ export default function CombustiblePage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b">
-        <div className="flex gap-4">
+      <div className="border-b overflow-x-auto">
+        <div className="flex gap-2 sm:gap-4 min-w-max">
           <button
             onClick={() => setSelectedTab('cisternas')}
             className={`pb-3 px-1 border-b-2 transition-colors ${
@@ -238,7 +238,7 @@ export default function CombustiblePage() {
 
       {/* Contenido de tabs */}
       {selectedTab === 'cisternas' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {cisternas.map((cisterna) => {
             const porcentaje = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
             const isLow = porcentaje <= 30
