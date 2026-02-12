@@ -7,17 +7,18 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Solo endpoints de auth NO llevan barra final
+  // Endpoints que NO llevan barra final
   let normalizedEndpoint = endpoint
-  const isAuthEndpoint = endpoint.startsWith('/auth/')
+  const noSlashEndpoints = ['/auth/', '/usuarios']
+  const needsNoSlash = noSlashEndpoints.some(e => endpoint.startsWith(e))
 
-  // Si NO es auth y NO termina en / y NO tiene ?, agregar /
-  if (!isAuthEndpoint && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+  // Si NO necesita quitar barra y NO termina en / y NO tiene ?, agregar /
+  if (!needsNoSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
   }
 
-  // Si ES auth y termina en /, quitarla
-  if (isAuthEndpoint && endpoint.endsWith('/')) {
+  // Si necesita quitar barra y termina en /, quitarla
+  if (needsNoSlash && endpoint.endsWith('/')) {
     normalizedEndpoint = endpoint.slice(0, -1)
   }
 
