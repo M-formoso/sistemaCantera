@@ -7,7 +7,13 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  let url = `${BASE_URL}${endpoint}`
+  // Asegurar que el endpoint termine con / para evitar redirecciones de FastAPI
+  let normalizedEndpoint = endpoint
+  if (!endpoint.endsWith('/') && !endpoint.includes('?')) {
+    normalizedEndpoint = endpoint + '/'
+  }
+
+  let url = `${BASE_URL}${normalizedEndpoint}`
   if (params) {
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
@@ -17,7 +23,7 @@ function buildUrl(endpoint: string, params?: Record<string, any>): string {
     })
     const queryString = searchParams.toString()
     if (queryString) {
-      url += '?' + queryString
+      url += (url.includes('?') ? '&' : '?') + queryString
     }
   }
   return url
