@@ -1,21 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
-// Determinar la URL base de la API
-const getApiUrl = () => {
-  // En producción, forzar HTTPS
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    const envUrl = import.meta.env.VITE_API_URL || ''
-    // Si la URL del env es HTTP, convertirla a HTTPS
-    if (envUrl.startsWith('http://')) {
-      return envUrl.replace('http://', 'https://')
-    }
-    return envUrl || 'https://backend-production-ee51.up.railway.app/api/v1'
-  }
-  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-}
-
-const API_URL = getApiUrl()
-console.log('API URL:', API_URL)
+// URL de la API - se configura en tiempo de build via VITE_API_URL
+export const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-ee51.up.railway.app/api/v1'
 
 // Crear instancia de Axios
 const api = axios.create({
