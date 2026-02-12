@@ -6,9 +6,9 @@ export const camionesService = {
    * Obtiene todos los camiones
    */
   async getAll(soloActivos: boolean = true): Promise<Camion[]> {
-    // Construir URL manualmente para evitar problema de params
-    const url = `/camiones/?solo_activos=${soloActivos}&limit=500`
-    const response = await api.get<Camion[]>(url)
+    const response = await api.get<Camion[]>('/camiones', {
+      params: { solo_activos: soloActivos, limit: 500 },
+    })
     return response.data
   },
 
@@ -24,21 +24,8 @@ export const camionesService = {
    * Crea un nuevo camión
    */
   async create(data: CamionCreate): Promise<Camion> {
-    // Usar fetch directo para evitar problema de redirección
-    const token = localStorage.getItem('access_token')
-    const response = await fetch('https://backend.canteralarufina.com.ar/api/v1/camiones/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(data)
-    })
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Error al crear camión')
-    }
-    return response.json()
+    const response = await api.post<Camion>('/camiones', data)
+    return response.data
   },
 
   /**

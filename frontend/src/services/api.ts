@@ -1,93 +1,114 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { API_URL } from '@/constants'
 
-// Crear instancia de Axios con fetch adapter
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  adapter: 'fetch',  // Usar fetch en lugar de XMLHttpRequest
-})
-
-// Interceptor para agregar el token a cada request
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // DEBUG: Ver config completo
-    console.log('[AXIOS] Full config:', JSON.stringify({
-      baseURL: config.baseURL,
-      url: config.url,
-      params: config.params,
-      method: config.method
-    }));
-
-    // Forzar HTTPS en la URL si por alguna razón es HTTP
-    if (config.baseURL && config.baseURL.startsWith('http://')) {
-      config.baseURL = config.baseURL.replace('http://', 'https://');
-      console.log('[AXIOS] Converted to HTTPS:', config.baseURL);
-    }
-
+// Cliente API usando fetch nativo
+const api = {
+  async request<T>(method: string, url: string, data?: any, params?: Record<string, any>): Promise<{ data: T }> {
     const token = localStorage.getItem('access_token')
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
 
-// Interceptor para manejar errores de respuesta
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
-
-    // Si es 401 y no es el endpoint de login, intentar refrescar token
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
-      originalRequest._retry = true
-
-      try {
-        const refreshToken = localStorage.getItem('refresh_token')
-        if (!refreshToken) {
-          throw new Error('No refresh token available')
+    // Construir URL con params
+    let fullUrl = `${API_URL}${url}`
+    if (params) {
+      const searchParams = new URLSearchParams()
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value))
         }
-
-        const response = await axios.post(
-          `${API_URL}/auth/refresh`,
-          { refresh_token: refreshToken }
-        )
-
-        const { access_token } = response.data
-        localStorage.setItem('access_token', access_token)
-
-        // Reintentar request original
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${access_token}`
-        }
-        return api(originalRequest)
-      } catch (refreshError) {
-        // Si falla el refresh, limpiar tokens y redirigir a login
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
+      })
+      const queryString = searchParams.toString()
+      if (queryString) {
+        fullUrl += (fullUrl.includes('?') ? '&' : '?') + queryString
       }
     }
 
-    return Promise.reject(error)
-  }
-)
+    console.log('[API] Request:', method, fullUrl)
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await fetch(fullUrl, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+    })
+
+    // Manejar 401 - token expirado
+    if (response.status === 401 && !url.includes('/auth/login')) {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        try {
+          const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          })
+          if (refreshResponse.ok) {
+            const { access_token } = await refreshResponse.json()
+            localStorage.setItem('access_token', access_token)
+            // Reintentar request original
+            headers['Authorization'] = `Bearer ${access_token}`
+            const retryResponse = await fetch(fullUrl, {
+              method,
+              headers,
+              body: data ? JSON.stringify(data) : undefined,
+            })
+            if (!retryResponse.ok) {
+              throw new Error('Request failed after token refresh')
+            }
+            const retryData = await retryResponse.json().catch(() => ({}))
+            return { data: retryData as T }
+          }
+        } catch {
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          window.location.href = '/login'
+        }
+      }
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      window.location.href = '/login'
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+      const err = new Error(error.detail || `HTTP ${response.status}`) as any
+      err.response = { data: error, status: response.status }
+      throw err
+    }
+
+    const responseData = await response.json().catch(() => ({}))
+    return { data: responseData as T }
+  },
+
+  get<T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
+    return this.request<T>('GET', url, undefined, config?.params)
+  },
+
+  post<T>(url: string, data?: any, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
+    return this.request<T>('POST', url, data, config?.params)
+  },
+
+  put<T>(url: string, data?: any, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
+    return this.request<T>('PUT', url, data, config?.params)
+  },
+
+  delete<T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
+    return this.request<T>('DELETE', url, undefined, config?.params)
+  },
+}
 
 export default api
 
 // Helper para manejar errores de API
 export function getErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    return error.response?.data?.detail || error.message || 'Error en la solicitud'
-  }
   if (error instanceof Error) {
+    const err = error as any
+    if (err.response?.data?.detail) {
+      return err.response.data.detail
+    }
     return error.message
   }
   return 'Error desconocido'

@@ -6,9 +6,9 @@ export const repuestosService = {
    * Obtiene todos los repuestos
    */
   async getAll(soloActivos: boolean = true): Promise<Repuesto[]> {
-    // Construir URL manualmente para evitar problema de params
-    const url = `/repuestos/?solo_activos=${soloActivos}&limit=500`
-    const response = await api.get<Repuesto[]>(url)
+    const response = await api.get<Repuesto[]>('/repuestos', {
+      params: { solo_activos: soloActivos, limit: 500 },
+    })
     return response.data
   },
 
@@ -32,21 +32,8 @@ export const repuestosService = {
    * Crea un nuevo repuesto
    */
   async create(data: RepuestoCreate): Promise<Repuesto> {
-    // Usar fetch directo para evitar problema de redirección
-    const token = localStorage.getItem('access_token')
-    const response = await fetch('https://backend.canteralarufina.com.ar/api/v1/repuestos/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(data)
-    })
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.detail || 'Error al crear repuesto')
-    }
-    return response.json()
+    const response = await api.post<Repuesto>('/repuestos', data)
+    return response.data
   },
 
   /**
