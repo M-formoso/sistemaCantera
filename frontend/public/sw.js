@@ -1,5 +1,5 @@
 // Service Worker para Cantera La Rufina PWA
-const CACHE_NAME = 'cantera-rufina-v1';
+const CACHE_NAME = 'cantera-rufina-v2';
 const urlsToCache = [
   '/',
   '/favicon.png',
