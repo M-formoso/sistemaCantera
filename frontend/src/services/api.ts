@@ -7,14 +7,12 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Pesajes y remitos necesitan barra, el resto no
+  // Endpoints de recursos necesitan barra, auth/dashboard no
   let normalizedEndpoint = endpoint
-  const needsSlash = endpoint.startsWith('/pesajes') || endpoint.startsWith('/remitos')
+  const noSlash = endpoint.startsWith('/auth') || endpoint.startsWith('/dashboard')
 
-  if (needsSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
-  } else if (!needsSlash && endpoint.endsWith('/')) {
-    normalizedEndpoint = endpoint.slice(0, -1)
   }
 
   let url = `${BASE_URL}${normalizedEndpoint}`
