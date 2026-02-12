@@ -1,18 +1,44 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
+
+class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware que intercepta redirects y fuerza HTTPS.
+    Esto evita el error de Mixed Content cuando FastAPI hace redirect de trailing slashes.
+    """
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Si es un redirect (307 o 308), forzar HTTPS en la URL de destino
+        if response.status_code in (307, 308):
+            location = response.headers.get("location", "")
+            if location.startswith("http://"):
+                # Cambiar http:// por https://
+                new_location = "https://" + location[7:]
+                return RedirectResponse(
+                    url=new_location,
+                    status_code=response.status_code
+                )
+
+        return response
+
+
 # Crear aplicación FastAPI
-# redirect_slashes=False evita redirects HTTP que causan Mixed Content errors en HTTPS
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    redirect_slashes=False,
 )
+
+# Middleware para forzar HTTPS en redirects (debe ir ANTES de CORS)
+app.add_middleware(HTTPSRedirectMiddleware)
 
 # Configurar CORS
 app.add_middleware(
