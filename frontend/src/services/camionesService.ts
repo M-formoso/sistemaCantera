@@ -6,9 +6,9 @@ export const camionesService = {
    * Obtiene todos los camiones
    */
   async getAll(soloActivos: boolean = true): Promise<Camion[]> {
-    const response = await api.get<Camion[]>('/camiones', {
-      params: { solo_activos: soloActivos, limit: 500 },
-    })
+    // Construir URL manualmente para evitar problema de params
+    const url = `/camiones/?solo_activos=${soloActivos}&limit=500`
+    const response = await api.get<Camion[]>(url)
     return response.data
   },
 

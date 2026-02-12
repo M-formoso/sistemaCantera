@@ -6,9 +6,9 @@ export const repuestosService = {
    * Obtiene todos los repuestos
    */
   async getAll(soloActivos: boolean = true): Promise<Repuesto[]> {
-    const response = await api.get<Repuesto[]>('/repuestos', {
-      params: { solo_activos: soloActivos, limit: 500 },
-    })
+    // Construir URL manualmente para evitar problema de params
+    const url = `/repuestos/?solo_activos=${soloActivos}&limit=500`
+    const response = await api.get<Repuesto[]>(url)
     return response.data
   },
 
