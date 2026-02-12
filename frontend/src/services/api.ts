@@ -10,13 +10,7 @@ function buildUrl(endpoint: string, params?: Record<string, any>): string {
   // Configuración específica por endpoint
   let normalizedEndpoint = endpoint
 
-  // Estos NO llevan barra
-  const noSlash = endpoint.startsWith('/auth') ||
-                  endpoint.startsWith('/dashboard') ||
-                  endpoint.startsWith('/usuarios') ||
-                  endpoint.startsWith('/combustible')
-
-  // Estos SÍ llevan barra
+  // Estos SÍ llevan barra (camiones, repuestos, pesajes, remitos, servicios)
   const withSlash = endpoint.startsWith('/camiones') ||
                     endpoint.startsWith('/repuestos') ||
                     endpoint.startsWith('/pesajes') ||
