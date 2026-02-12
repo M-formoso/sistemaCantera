@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Scale, Plus, Pencil, Trash2, Printer, FileText } from 'lucide-react'
+import { Scale, Plus, Pencil, Trash2, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
-import { remitosService } from '@/services/remitosService'
 import { Pesaje } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
 
@@ -18,12 +17,6 @@ export default function PesajesRemitosPage() {
   const { data: pesajes = [], isLoading } = useQuery({
     queryKey: ['pesajes'],
     queryFn: () => pesajesService.getAll(0, 500),
-  })
-
-  // Query para remitos (para obtener el ID del remito asociado a cada pesaje)
-  const { data: remitos = [] } = useQuery({
-    queryKey: ['remitos'],
-    queryFn: () => remitosService.getAll(0, 500),
   })
 
   // Mutation para eliminar
@@ -46,34 +39,11 @@ export default function PesajesRemitosPage() {
     }
   }
 
-  const handleDownloadTicketPDF = async (id: string, numeroPesaje: number) => {
+  const handleDownloadPDF = async (id: string, numeroPesaje: number) => {
     try {
       await pesajesService.downloadTicketPDF(id, numeroPesaje)
     } catch (error) {
-      alert('Error al descargar el ticket PDF')
-    }
-  }
-
-  const handleDownloadRemitoPDF = async (pesajeId: string) => {
-    // Buscar el remito asociado al pesaje
-    const remito = remitos.find(r => r.pesaje_id === pesajeId)
-    if (!remito) {
-      alert('No se encontró el remito asociado')
-      return
-    }
-
-    try {
-      const blob = await remitosService.downloadPDF(remito.id)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `remito-${remito.numero_remito}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-    } catch (error) {
-      alert('Error al descargar el remito PDF')
+      alert('Error al descargar el comprobante')
     }
   }
 
@@ -142,18 +112,10 @@ export default function PesajesRemitosPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleDownloadTicketPDF(pesaje.id, pesaje.numero_pesaje)}
-              title="Descargar Ticket PDF"
+              onClick={() => handleDownloadPDF(pesaje.id, pesaje.numero_pesaje)}
+              title="Descargar Comprobante"
             >
-              <Printer className="h-4 w-4 text-green-600" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownloadRemitoPDF(pesaje.id)}
-              title="Descargar Remito PDF"
-            >
-              <FileText className="h-4 w-4 text-blue-600" />
+              <Download className="h-4 w-4 text-green-600" />
             </Button>
             <Button
               variant="outline"
