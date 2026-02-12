@@ -7,17 +7,9 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  let normalizedEndpoint = endpoint
-
-  // Estos NO llevan barra (auth y dashboard)
-  const noSlash = endpoint.startsWith('/auth') || endpoint.startsWith('/dashboard')
-
-  // Todo lo demás SÍ lleva barra al final
-  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
-    normalizedEndpoint = endpoint + '/'
-  }
-
-  let url = `${BASE_URL}${normalizedEndpoint}`
+  // Con redirect_slashes=False en el backend, no necesitamos agregar barras
+  // Las URLs van tal cual están definidas en los services
+  let url = `${BASE_URL}${endpoint}`
   if (params) {
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {

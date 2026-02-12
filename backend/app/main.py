@@ -4,12 +4,14 @@ from app.core.config import settings
 from app.api.v1.api import api_router
 
 # Crear aplicación FastAPI
+# redirect_slashes=False evita redirects HTTP que causan Mixed Content errors en HTTPS
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    redirect_slashes=False,
 )
 
 # Configurar CORS
