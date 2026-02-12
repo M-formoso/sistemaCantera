@@ -9,7 +9,7 @@ const getApiUrl = () => {
     if (envUrl.startsWith('http://')) {
       return envUrl.replace('http://', 'https://')
     }
-    return envUrl || 'https://backend.canteralarufina.com.ar/api/v1'
+    return envUrl || 'https://backend.canteralarufina.com.ar:8080/api/v1'
   }
   return import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 }
