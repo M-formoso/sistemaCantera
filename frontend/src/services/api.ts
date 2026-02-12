@@ -7,8 +7,13 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // URL simple, sin manipular barras (backend tiene redirect_slashes=False)
-  let url = `${BASE_URL}${endpoint}`
+  // Agregar / al final si no tiene (excepto si tiene ? o ya termina en /)
+  let normalizedEndpoint = endpoint
+  if (!endpoint.endsWith('/') && !endpoint.includes('?')) {
+    normalizedEndpoint = endpoint + '/'
+  }
+
+  let url = `${BASE_URL}${normalizedEndpoint}`
   if (params) {
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
