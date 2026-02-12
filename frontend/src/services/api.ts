@@ -7,17 +7,13 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Configuración específica por endpoint
   let normalizedEndpoint = endpoint
 
-  // Estos SÍ llevan barra (camiones, repuestos, pesajes, remitos, servicios)
-  const withSlash = endpoint.startsWith('/camiones') ||
-                    endpoint.startsWith('/repuestos') ||
-                    endpoint.startsWith('/pesajes') ||
-                    endpoint.startsWith('/remitos') ||
-                    endpoint.startsWith('/servicios')
+  // Estos NO llevan barra (auth y dashboard)
+  const noSlash = endpoint.startsWith('/auth') || endpoint.startsWith('/dashboard')
 
-  if (withSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+  // Todo lo demás SÍ lleva barra al final
+  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
   }
 
