@@ -12,9 +12,19 @@ const api = axios.create({
 // Interceptor para agregar el token a cada request
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // DEBUG: Ver qué URL se está construyendo
-    console.log('[AXIOS] Request URL:', config.baseURL, config.url);
-    console.log('[AXIOS] Full URL:', (config.baseURL || '') + (config.url || ''));
+    // DEBUG: Ver config completo
+    console.log('[AXIOS] Full config:', JSON.stringify({
+      baseURL: config.baseURL,
+      url: config.url,
+      params: config.params,
+      method: config.method
+    }));
+
+    // Forzar HTTPS en la URL si por alguna razón es HTTP
+    if (config.baseURL && config.baseURL.startsWith('http://')) {
+      config.baseURL = config.baseURL.replace('http://', 'https://');
+      console.log('[AXIOS] Converted to HTTPS:', config.baseURL);
+    }
 
     const token = localStorage.getItem('access_token')
     if (token && config.headers) {
