@@ -7,17 +7,12 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Estos endpoints NO llevan barra
+  // NINGÚN endpoint lleva barra (backend no hace redirect)
   let normalizedEndpoint = endpoint
-  const noSlash = endpoint.startsWith('/auth') ||
-                  endpoint.startsWith('/dashboard') ||
-                  endpoint.startsWith('/combustible') ||
-                  endpoint.startsWith('/usuarios') ||
-                  endpoint.startsWith('/pesajes') ||
-                  endpoint.startsWith('/remitos')
 
-  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
-    normalizedEndpoint = endpoint + '/'
+  // Si termina en /, quitarla
+  if (normalizedEndpoint.endsWith('/')) {
+    normalizedEndpoint = normalizedEndpoint.slice(0, -1)
   }
 
   let url = `${BASE_URL}${normalizedEndpoint}`
