@@ -7,9 +7,11 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Agregar / al final si no tiene (excepto si tiene ? o ya termina en /)
+  // Auth endpoints NO llevan barra, el resto SÍ
   let normalizedEndpoint = endpoint
-  if (!endpoint.endsWith('/') && !endpoint.includes('?')) {
+  const isAuthEndpoint = endpoint.startsWith('/auth')
+
+  if (!isAuthEndpoint && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
   }
 
