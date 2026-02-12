@@ -128,6 +128,8 @@ class SuministroCombustibleSchema(ResponseBase):
     created_by: UUID
     # Información del camión (opcional)
     camion_patente: Optional[str] = None
+    # Información del usuario que creó el suministro
+    usuario_nombre: Optional[str] = None
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 

@@ -115,23 +115,11 @@ export default function CombustiblePage() {
       ),
     },
     {
-      accessorKey: 'cisterna_nombre',
-      header: 'Cisterna',
+      accessorKey: 'usuario_nombre',
+      header: 'Realizado por',
       cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">{row.getValue('cisterna_nombre') || 'Cisterna'}</div>
+        <div className="text-sm">{row.getValue('usuario_nombre') || '-'}</div>
       ),
-    },
-    {
-      accessorKey: 'kilometraje_actual',
-      header: 'Kilometraje',
-      cell: ({ row }) => {
-        const km = row.getValue('kilometraje_actual') as number
-        return km ? (
-          <div className="text-sm text-muted-foreground">{formatNumber(km)} km</div>
-        ) : (
-          <div className="text-sm text-muted-foreground">-</div>
-        )
-      },
     },
     {
       accessorKey: 'litros',

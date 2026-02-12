@@ -285,6 +285,7 @@ export interface SuministroCombustible {
   kilometraje_actual?: number
   observaciones?: string
   created_by: string
+  usuario_nombre?: string
   created_at: string
   updated_at: string
 }

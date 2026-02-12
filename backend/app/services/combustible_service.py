@@ -265,8 +265,32 @@ def obtener_todos_suministros(
     skip: int = 0,
     limit: int = 100
 ) -> List[SuministroCombustible]:
-    """Obtiene todos los suministros"""
-    return db.query(SuministroCombustible).order_by(desc(SuministroCombustible.fecha)).offset(skip).limit(limit).all()
+    """Obtiene todos los suministros con info de camión y usuario"""
+    from app.models.camion import Camion
+    from app.models.usuario import Usuario
+
+    suministros = db.query(SuministroCombustible).order_by(
+        desc(SuministroCombustible.fecha)
+    ).offset(skip).limit(limit).all()
+
+    # Enriquecer con datos de camión, cisterna y usuario
+    for s in suministros:
+        # Obtener camión
+        camion = db.query(Camion).filter(Camion.id == s.camion_id).first()
+        if camion:
+            s.camion_patente = camion.patente
+
+        # Obtener cisterna
+        cisterna = db.query(CisternaCombustible).filter(CisternaCombustible.id == s.cisterna_id).first()
+        if cisterna:
+            s.cisterna_nombre = cisterna.nombre
+
+        # Obtener usuario
+        usuario = db.query(Usuario).filter(Usuario.id == s.created_by).first()
+        if usuario:
+            s.usuario_nombre = usuario.nombre
+
+    return suministros
 
 
 def obtener_suministro_por_id(db: Session, suministro_id: UUID) -> Optional[SuministroCombustible]:
