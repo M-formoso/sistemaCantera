@@ -12,6 +12,10 @@ const api = axios.create({
 // Interceptor para agregar el token a cada request
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // DEBUG: Ver qué URL se está construyendo
+    console.log('[AXIOS] Request URL:', config.baseURL, config.url);
+    console.log('[AXIOS] Full URL:', (config.baseURL || '') + (config.url || ''));
+
     const token = localStorage.getItem('access_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
