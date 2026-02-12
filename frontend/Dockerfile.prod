@@ -13,8 +13,8 @@ RUN npm install
 COPY . .
 
 # Build arguments for environment variables
-ARG VITE_API_URL=https://backend-production-ee51.up.railway.app/api/v1
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL:-https://backend-production-ee51.up.railway.app/api/v1}
 
 # Build production bundle
 RUN npm run build

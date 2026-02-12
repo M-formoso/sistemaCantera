@@ -1,7 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
-
-// URL de la API - se configura en tiempo de build via VITE_API_URL
-export const API_URL = import.meta.env.VITE_API_URL || 'https://backend-production-ee51.up.railway.app/api/v1'
+import { API_URL } from '@/constants'
 
 // Crear instancia de Axios
 const api = axios.create({
