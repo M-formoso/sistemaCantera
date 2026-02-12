@@ -12,7 +12,9 @@ function buildUrl(endpoint: string, params?: Record<string, any>): string {
   const noSlash = endpoint.startsWith('/auth') ||
                   endpoint.startsWith('/dashboard') ||
                   endpoint.startsWith('/combustible') ||
-                  endpoint.startsWith('/usuarios')
+                  endpoint.startsWith('/usuarios') ||
+                  endpoint.startsWith('/pesajes') ||
+                  endpoint.startsWith('/remitos')
 
   if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
