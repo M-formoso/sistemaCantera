@@ -10,6 +10,7 @@ from datetime import datetime, date
 from fastapi import HTTPException, status
 
 from app.models.pesaje import Pesaje
+from app.models.remito import Remito
 from app.schemas.pesaje import PesajeCreate, PesajeUpdate
 from app.services import camion_service
 
@@ -140,7 +141,47 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     db.commit()
     db.refresh(db_pesaje)
 
+    # Generar remito automáticamente
+    _generar_remito_automatico(db, db_pesaje, usuario_id)
+
     return db_pesaje
+
+
+def _obtener_proximo_numero_remito(db: Session) -> int:
+    """Obtiene el próximo número de remito"""
+    from sqlalchemy import desc
+    ultimo_remito = db.query(Remito).order_by(desc(Remito.numero_remito)).first()
+    return (ultimo_remito.numero_remito + 1) if ultimo_remito else 1
+
+
+def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) -> Remito:
+    """
+    Genera un remito automáticamente al crear un pesaje
+    """
+    numero_remito = _obtener_proximo_numero_remito(db)
+
+    db_remito = Remito(
+        numero_remito=numero_remito,
+        pesaje_id=pesaje.id,
+        fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
+        cliente=pesaje.cliente_destino or "Cliente no especificado",
+        producto=pesaje.material or "Material no especificado",
+        peso_neto=pesaje.peso_neto,
+        camion_patente=pesaje.camion.patente if pesaje.camion else None,
+        chofer=pesaje.chofer,
+        observaciones=pesaje.observaciones,
+        created_by=usuario_id
+    )
+
+    db.add(db_remito)
+
+    # Marcar pesaje como con remito generado
+    pesaje.remito_generado = True
+
+    db.commit()
+    db.refresh(db_remito)
+
+    return db_remito
 
 
 def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaje:

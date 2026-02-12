@@ -36,7 +36,7 @@ const menuItems = [
     path: '/repuestos',
   },
   {
-    title: 'Pesajes y Remitos',
+    title: 'Pesajes',
     icon: Scale,
     path: '/pesajes-remitos',
   },
