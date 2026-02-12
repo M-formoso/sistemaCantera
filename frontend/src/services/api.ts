@@ -7,22 +7,8 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Endpoints que NO llevan barra final
-  let normalizedEndpoint = endpoint
-  const noSlashEndpoints = ['/auth/', '/usuarios']
-  const needsNoSlash = noSlashEndpoints.some(e => endpoint.startsWith(e))
-
-  // Si NO necesita quitar barra y NO termina en / y NO tiene ?, agregar /
-  if (!needsNoSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
-    normalizedEndpoint = endpoint + '/'
-  }
-
-  // Si necesita quitar barra y termina en /, quitarla
-  if (needsNoSlash && endpoint.endsWith('/')) {
-    normalizedEndpoint = endpoint.slice(0, -1)
-  }
-
-  let url = `${BASE_URL}${normalizedEndpoint}`
+  // URL simple, sin manipular barras (backend tiene redirect_slashes=False)
+  let url = `${BASE_URL}${endpoint}`
   if (params) {
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
