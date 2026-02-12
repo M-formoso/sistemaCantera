@@ -7,11 +7,23 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Endpoints de recursos necesitan barra, auth/dashboard no
+  // Configuración específica por endpoint
   let normalizedEndpoint = endpoint
-  const noSlash = endpoint.startsWith('/auth') || endpoint.startsWith('/dashboard')
 
-  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+  // Estos NO llevan barra
+  const noSlash = endpoint.startsWith('/auth') ||
+                  endpoint.startsWith('/dashboard') ||
+                  endpoint.startsWith('/usuarios') ||
+                  endpoint.startsWith('/combustible')
+
+  // Estos SÍ llevan barra
+  const withSlash = endpoint.startsWith('/camiones') ||
+                    endpoint.startsWith('/repuestos') ||
+                    endpoint.startsWith('/pesajes') ||
+                    endpoint.startsWith('/remitos') ||
+                    endpoint.startsWith('/servicios')
+
+  if (withSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
   }
 
