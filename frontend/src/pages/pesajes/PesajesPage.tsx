@@ -15,7 +15,7 @@ export default function PesajesPage() {
 
   const { data: pesajes = [], isLoading } = useQuery({
     queryKey: ['pesajes'],
-    queryFn: () => pesajesService.getAll(0, 1000),
+    queryFn: () => pesajesService.getAll(0, 500),
   })
 
   const deleteMutation = useMutation({

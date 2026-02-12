@@ -4,7 +4,6 @@ import {
   Truck,
   Wrench,
   Scale,
-  FileText,
   Fuel,
   BarChart3,
   Users,
@@ -37,14 +36,9 @@ const menuItems = [
     path: '/repuestos',
   },
   {
-    title: 'Pesajes',
+    title: 'Pesajes y Remitos',
     icon: Scale,
-    path: '/pesajes',
-  },
-  {
-    title: 'Remitos',
-    icon: FileText,
-    path: '/remitos',
+    path: '/pesajes-remitos',
   },
   {
     title: 'Combustible',

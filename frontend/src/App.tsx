@@ -13,8 +13,8 @@ import CamionDetailPage from '@/pages/camiones/CamionDetailPage'
 import RepuestosPage from '@/pages/repuestos/RepuestosPage'
 import RepuestoFormPage from '@/pages/repuestos/RepuestoFormPage'
 
-// Pesajes
-import PesajesPage from '@/pages/pesajes/PesajesPage'
+// Pesajes y Remitos (unificados)
+import PesajesRemitosPage from '@/pages/pesajes/PesajesRemitosPage'
 import PesajeFormPage from '@/pages/pesajes/PesajeFormPage'
 
 // Servicios
@@ -26,8 +26,6 @@ import CombustiblePage from '@/pages/combustible/CombustiblePage'
 import CargaFormPage from '@/pages/combustible/CargaFormPage'
 import SuministroFormPage from '@/pages/combustible/SuministroFormPage'
 
-// Remitos
-import RemitosPage from '@/pages/remitos/RemitosPage'
 
 // Usuarios
 import UsuariosPage from '@/pages/usuarios/UsuariosPage'
@@ -68,13 +66,14 @@ function App() {
           <Route path="servicios/nuevo" element={<ServicioFormPage />} />
           <Route path="servicios/:id/editar" element={<ServicioFormPage />} />
 
-          {/* Pesajes */}
-          <Route path="pesajes" element={<PesajesPage />} />
-          <Route path="pesajes/nuevo" element={<PesajeFormPage />} />
-          <Route path="pesajes/:id/editar" element={<PesajeFormPage />} />
+          {/* Pesajes y Remitos (unificados) */}
+          <Route path="pesajes-remitos" element={<PesajesRemitosPage />} />
+          <Route path="pesajes-remitos/nuevo" element={<PesajeFormPage />} />
+          <Route path="pesajes-remitos/:id/editar" element={<PesajeFormPage />} />
 
-          {/* Remitos */}
-          <Route path="remitos" element={<RemitosPage />} />
+          {/* Rutas legacy para compatibilidad */}
+          <Route path="pesajes" element={<Navigate to="/pesajes-remitos" replace />} />
+          <Route path="remitos" element={<Navigate to="/pesajes-remitos" replace />} />
 
           {/* Combustible */}
           <Route path="combustible" element={<CombustiblePage />} />

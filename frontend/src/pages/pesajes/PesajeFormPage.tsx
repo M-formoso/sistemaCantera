@@ -203,10 +203,10 @@ export default function PesajeFormPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate('/pesajes')}
+                onClick={() => navigate('/pesajes-remitos')}
                 className="w-full"
               >
-                Volver a Pesajes
+                Volver a Pesajes y Remitos
               </Button>
               <Button
                 variant="ghost"
@@ -243,7 +243,7 @@ export default function PesajeFormPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => navigate('/pesajes')}>
+        <Button variant="outline" onClick={() => navigate('/pesajes-remitos')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
@@ -487,7 +487,7 @@ export default function PesajeFormPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate('/pesajes')}
+                    onClick={() => navigate('/pesajes-remitos')}
                     disabled={isLoading}
                   >
                     Cancelar
