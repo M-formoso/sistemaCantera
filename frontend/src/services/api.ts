@@ -7,12 +7,14 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // NINGÚN endpoint lleva barra (backend no hace redirect)
+  // Pesajes y remitos necesitan barra, el resto no
   let normalizedEndpoint = endpoint
+  const needsSlash = endpoint.startsWith('/pesajes') || endpoint.startsWith('/remitos')
 
-  // Si termina en /, quitarla
-  if (normalizedEndpoint.endsWith('/')) {
-    normalizedEndpoint = normalizedEndpoint.slice(0, -1)
+  if (needsSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+    normalizedEndpoint = endpoint + '/'
+  } else if (!needsSlash && endpoint.endsWith('/')) {
+    normalizedEndpoint = endpoint.slice(0, -1)
   }
 
   let url = `${BASE_URL}${normalizedEndpoint}`
