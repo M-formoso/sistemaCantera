@@ -32,8 +32,21 @@ export const repuestosService = {
    * Crea un nuevo repuesto
    */
   async create(data: RepuestoCreate): Promise<Repuesto> {
-    const response = await api.post<Repuesto>('/repuestos', data)
-    return response.data
+    // Usar fetch directo para evitar problema de redirección
+    const token = localStorage.getItem('access_token')
+    const response = await fetch('https://backend.canteralarufina.com.ar/api/v1/repuestos/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Error al crear repuesto')
+    }
+    return response.json()
   },
 
   /**

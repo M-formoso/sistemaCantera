@@ -24,8 +24,21 @@ export const camionesService = {
    * Crea un nuevo camión
    */
   async create(data: CamionCreate): Promise<Camion> {
-    const response = await api.post<Camion>('/camiones', data)
-    return response.data
+    // Usar fetch directo para evitar problema de redirección
+    const token = localStorage.getItem('access_token')
+    const response = await fetch('https://backend.canteralarufina.com.ar/api/v1/camiones/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Error al crear camión')
+    }
+    return response.json()
   },
 
   /**
