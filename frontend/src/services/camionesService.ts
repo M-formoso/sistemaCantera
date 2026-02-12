@@ -47,7 +47,7 @@ export const camionesService = {
    * Obtiene servicios de un camión
    */
   async getServicios(id: string): Promise<any[]> {
-    const response = await api.get(`/camiones/${id}/servicios`)
+    const response = await api.get<any[]>(`/camiones/${id}/servicios`)
     return response.data
   },
 }

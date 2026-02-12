@@ -1,15 +1,20 @@
 import { API_URL } from '@/constants'
 
+interface RequestConfig {
+  params?: Record<string, any>
+  responseType?: 'json' | 'blob'
+}
+
 // Cliente API usando fetch nativo
 const api = {
-  async request<T>(method: string, url: string, data?: any, params?: Record<string, any>): Promise<{ data: T }> {
+  async request<T>(method: string, url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
     const token = localStorage.getItem('access_token')
 
     // Construir URL con params
     let fullUrl = `${API_URL}${url}`
-    if (params) {
+    if (config?.params) {
       const searchParams = new URLSearchParams()
-      Object.entries(params).forEach(([key, value]) => {
+      Object.entries(config.params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           searchParams.append(key, String(value))
         }
@@ -46,7 +51,8 @@ const api = {
             body: JSON.stringify({ refresh_token: refreshToken }),
           })
           if (refreshResponse.ok) {
-            const { access_token } = await refreshResponse.json()
+            const refreshData = await refreshResponse.json()
+            const access_token = refreshData.access_token
             localStorage.setItem('access_token', access_token)
             // Reintentar request original
             headers['Authorization'] = `Bearer ${access_token}`
@@ -57,6 +63,10 @@ const api = {
             })
             if (!retryResponse.ok) {
               throw new Error('Request failed after token refresh')
+            }
+            if (config?.responseType === 'blob') {
+              const blobData = await retryResponse.blob()
+              return { data: blobData as T }
             }
             const retryData = await retryResponse.json().catch(() => ({}))
             return { data: retryData as T }
@@ -79,24 +89,29 @@ const api = {
       throw err
     }
 
+    if (config?.responseType === 'blob') {
+      const blobData = await response.blob()
+      return { data: blobData as T }
+    }
+
     const responseData = await response.json().catch(() => ({}))
     return { data: responseData as T }
   },
 
-  get<T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
-    return this.request<T>('GET', url, undefined, config?.params)
+  get<T>(url: string, config?: RequestConfig): Promise<{ data: T }> {
+    return this.request<T>('GET', url, undefined, config)
   },
 
-  post<T>(url: string, data?: any, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
-    return this.request<T>('POST', url, data, config?.params)
+  post<T>(url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+    return this.request<T>('POST', url, data, config)
   },
 
-  put<T>(url: string, data?: any, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
-    return this.request<T>('PUT', url, data, config?.params)
+  put<T>(url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+    return this.request<T>('PUT', url, data, config)
   },
 
-  delete<T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> {
-    return this.request<T>('DELETE', url, undefined, config?.params)
+  delete<T>(url: string, config?: RequestConfig): Promise<{ data: T }> {
+    return this.request<T>('DELETE', url, undefined, config)
   },
 }
 

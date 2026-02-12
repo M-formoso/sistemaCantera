@@ -53,7 +53,7 @@ export const remitosService = {
    * Descarga el PDF de un remito
    */
   async downloadPDF(id: string): Promise<Blob> {
-    const response = await api.get(`/remitos/${id}/pdf`, {
+    const response = await api.get<Blob>(`/remitos/${id}/pdf`, {
       responseType: 'blob',
     })
     return response.data

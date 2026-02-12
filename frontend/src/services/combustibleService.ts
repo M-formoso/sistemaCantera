@@ -117,7 +117,12 @@ export const combustibleService = {
     promedio_por_camion: number
     por_camion: { camion_patente: string; total_litros: number }[]
   }> {
-    const response = await api.get('/combustible/suministros/estadisticas', {
+    const response = await api.get<{
+      total_suministrado: number
+      total_camiones: number
+      promedio_por_camion: number
+      por_camion: { camion_patente: string; total_litros: number }[]
+    }>('/combustible/suministros/estadisticas', {
       params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
     })
     return response.data

@@ -65,7 +65,12 @@ export const pesajesService = {
     peso_promedio: number
     por_material: { material: string; total_toneladas: number }[]
   }> {
-    const response = await api.get('/pesajes/estadisticas', {
+    const response = await api.get<{
+      total_pesajes: number
+      total_toneladas: number
+      peso_promedio: number
+      por_material: { material: string; total_toneladas: number }[]
+    }>('/pesajes/estadisticas', {
       params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
     })
     return response.data
@@ -75,7 +80,7 @@ export const pesajesService = {
    * Descarga el ticket PDF de un pesaje
    */
   async downloadTicketPDF(id: string, numeroPesaje: number): Promise<void> {
-    const response = await api.get(`/pesajes/${id}/ticket-pdf`, {
+    const response = await api.get<Blob>(`/pesajes/${id}/ticket-pdf`, {
       responseType: 'blob',
     })
 
