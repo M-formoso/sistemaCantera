@@ -7,11 +7,11 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Auth endpoints NO llevan barra, el resto SÍ
+  // Auth y dashboard endpoints NO llevan barra, el resto SÍ
   let normalizedEndpoint = endpoint
-  const isAuthEndpoint = endpoint.startsWith('/auth')
+  const noSlash = endpoint.startsWith('/auth') || endpoint.startsWith('/dashboard')
 
-  if (!isAuthEndpoint && !endpoint.endsWith('/') && !endpoint.includes('?')) {
+  if (!noSlash && !endpoint.endsWith('/') && !endpoint.includes('?')) {
     normalizedEndpoint = endpoint + '/'
   }
 
