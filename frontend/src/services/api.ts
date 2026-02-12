@@ -7,9 +7,11 @@ interface RequestConfig {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
-  // Asegurar que el endpoint termine con / para evitar redirecciones de FastAPI
+  // Endpoints de auth NO llevan barra final, el resto SÍ
   let normalizedEndpoint = endpoint
-  if (!endpoint.endsWith('/') && !endpoint.includes('?')) {
+  const noTrailingSlash = ['/auth/login', '/auth/me', '/auth/refresh', '/auth/change-password']
+
+  if (!endpoint.endsWith('/') && !endpoint.includes('?') && !noTrailingSlash.some(e => endpoint.startsWith(e))) {
     normalizedEndpoint = endpoint + '/'
   }
 
