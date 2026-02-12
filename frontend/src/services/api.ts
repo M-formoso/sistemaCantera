@@ -1,130 +1,116 @@
-import { API_URL } from '@/constants'
+// Cliente API usando fetch nativo con URL hardcodeada
+const BASE_URL = 'https://backend-production-ee51.up.railway.app/api/v1'
 
 interface RequestConfig {
   params?: Record<string, any>
   responseType?: 'json' | 'blob'
 }
 
-// Cliente API usando fetch nativo
-const api = {
-  async request<T>(method: string, url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
-    const token = localStorage.getItem('access_token')
-
-    // Construir URL con params
-    let fullUrl = `${API_URL}${url}`
-    if (config?.params) {
-      const searchParams = new URLSearchParams()
-      Object.entries(config.params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          searchParams.append(key, String(value))
-        }
-      })
-      const queryString = searchParams.toString()
-      if (queryString) {
-        fullUrl += (fullUrl.includes('?') ? '&' : '?') + queryString
+function buildUrl(endpoint: string, params?: Record<string, any>): string {
+  let url = `${BASE_URL}${endpoint}`
+  if (params) {
+    const searchParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value))
       }
-    }
-
-    console.log('[API] Request:', method, fullUrl)
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-
-    const response = await fetch(fullUrl, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
     })
+    const queryString = searchParams.toString()
+    if (queryString) {
+      url += '?' + queryString
+    }
+  }
+  return url
+}
 
-    // Manejar 401 - token expirado
-    if (response.status === 401 && !url.includes('/auth/login')) {
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (refreshToken) {
-        try {
-          const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
+async function request<T>(method: string, endpoint: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+  const token = localStorage.getItem('access_token')
+  const url = buildUrl(endpoint, config?.params)
+
+  console.log('[API] Fetching:', method, url)
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+  })
+
+  // Manejar 401 - token expirado
+  if (response.status === 401 && !endpoint.includes('/auth/login')) {
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (refreshToken) {
+      try {
+        const refreshResponse = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        })
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          localStorage.setItem('access_token', refreshData.access_token)
+          headers['Authorization'] = `Bearer ${refreshData.access_token}`
+          const retryResponse = await fetch(url, {
+            method,
+            headers,
+            body: data ? JSON.stringify(data) : undefined,
           })
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json()
-            const access_token = refreshData.access_token
-            localStorage.setItem('access_token', access_token)
-            // Reintentar request original
-            headers['Authorization'] = `Bearer ${access_token}`
-            const retryResponse = await fetch(fullUrl, {
-              method,
-              headers,
-              body: data ? JSON.stringify(data) : undefined,
-            })
-            if (!retryResponse.ok) {
-              throw new Error('Request failed after token refresh')
-            }
-            if (config?.responseType === 'blob') {
-              const blobData = await retryResponse.blob()
-              return { data: blobData as T }
-            }
-            const retryData = await retryResponse.json().catch(() => ({}))
-            return { data: retryData as T }
+          if (config?.responseType === 'blob') {
+            return { data: await retryResponse.blob() as T }
           }
-        } catch {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          window.location.href = '/login'
+          return { data: await retryResponse.json().catch(() => ({})) as T }
         }
+      } catch {
+        // Ignore
       }
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
     }
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
-      const err = new Error(error.detail || `HTTP ${response.status}`) as any
-      err.response = { data: error, status: response.status }
-      throw err
-    }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+    const err = new Error(error.detail || `HTTP ${response.status}`) as any
+    err.response = { data: error, status: response.status }
+    throw err
+  }
 
-    if (config?.responseType === 'blob') {
-      const blobData = await response.blob()
-      return { data: blobData as T }
-    }
+  if (config?.responseType === 'blob') {
+    return { data: await response.blob() as T }
+  }
 
-    const responseData = await response.json().catch(() => ({}))
-    return { data: responseData as T }
+  return { data: await response.json().catch(() => ({})) as T }
+}
+
+const api = {
+  get<T>(endpoint: string, config?: RequestConfig): Promise<{ data: T }> {
+    return request<T>('GET', endpoint, undefined, config)
   },
-
-  get<T>(url: string, config?: RequestConfig): Promise<{ data: T }> {
-    return this.request<T>('GET', url, undefined, config)
+  post<T>(endpoint: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+    return request<T>('POST', endpoint, data, config)
   },
-
-  post<T>(url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
-    return this.request<T>('POST', url, data, config)
+  put<T>(endpoint: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+    return request<T>('PUT', endpoint, data, config)
   },
-
-  put<T>(url: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
-    return this.request<T>('PUT', url, data, config)
-  },
-
-  delete<T>(url: string, config?: RequestConfig): Promise<{ data: T }> {
-    return this.request<T>('DELETE', url, undefined, config)
+  delete<T>(endpoint: string, config?: RequestConfig): Promise<{ data: T }> {
+    return request<T>('DELETE', endpoint, undefined, config)
   },
 }
 
 export default api
 
-// Helper para manejar errores de API
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const err = error as any
-    if (err.response?.data?.detail) {
-      return err.response.data.detail
-    }
-    return error.message
+    return err.response?.data?.detail || error.message
   }
   return 'Error desconocido'
 }
