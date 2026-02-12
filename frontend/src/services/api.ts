@@ -1,12 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { API_URL } from '@/constants'
 
-// Crear instancia de Axios
+// Crear instancia de Axios con fetch adapter
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  adapter: 'fetch',  // Usar fetch en lugar de XMLHttpRequest
 })
 
 // Interceptor para agregar el token a cada request
