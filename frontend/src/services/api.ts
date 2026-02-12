@@ -9,9 +9,18 @@ interface RequestConfig {
 function buildUrl(endpoint: string, params?: Record<string, any>): string {
   // Endpoints de auth NO llevan barra final, el resto SÍ
   let normalizedEndpoint = endpoint
-  const noTrailingSlash = ['/auth/login', '/auth/me', '/auth/refresh', '/auth/change-password', '/dashboard/resumen-dia', '/dashboard/estadisticas-mes']
+  const noTrailingSlash = [
+    '/auth/',
+    '/dashboard/',
+    '/combustible/cisternas',
+    '/combustible/cargas',
+    '/combustible/suministros',
+  ]
 
-  if (!endpoint.endsWith('/') && !endpoint.includes('?') && !noTrailingSlash.some(e => endpoint.startsWith(e))) {
+  // Verificar si el endpoint empieza con alguno de los que no llevan barra
+  const shouldSkipSlash = noTrailingSlash.some(e => endpoint.startsWith(e))
+
+  if (!endpoint.endsWith('/') && !endpoint.includes('?') && !shouldSkipSlash) {
     normalizedEndpoint = endpoint + '/'
   }
 
