@@ -1,41 +1,72 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Calculator, Printer, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { pesajesService } from '@/services/pesajesService'
 import { camionesService } from '@/services/camionesService'
+import { empresasService } from '@/services/empresasService'
 import { formatNumber } from '@/lib/utils'
-import { Pesaje } from '@/types'
+import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
+
+// Lista de materiales disponibles
+const MATERIALES_DISPONIBLES = [
+  '10.30',
+  '6.19',
+  '0.20',
+  '6.12',
+  'relleno',
+  'binder',
+  '0.6',
+]
 
 const pesajeSchema = z.object({
-  camion_id: z.string().min(1, 'Debe seleccionar un camión'),
-  fecha: z.string().min(1, 'La fecha es requerida'),
-  // Datos del transporte
-  acoplado: z.string().optional(),
+  tipo_entrega: z.enum(['propio', 'transportista']),
+  // Camión propio (opcional si es transportista)
+  camion_id: z.string().optional(),
+  // Transportista externo
+  transportista_id: z.string().optional(),
+  patente_externa: z.string().optional(),
   transportista: z.string().optional(),
-  remitente: z.string().default('LA RUFINA'),
+  // Cliente
+  cliente_id: z.string().optional(),
+  cliente_nombre: z.string().optional(),
+  // Datos comunes
+  fecha: z.string().min(1, 'La fecha es requerida'),
+  acoplado: z.string().optional(),
   chofer: z.string().optional(),
-  // Datos del producto
-  producto: z.string().optional(),
-  numero_guia: z.string().optional(),
   // Pesos
   peso_bruto: z.number().min(1, 'El peso bruto debe ser mayor a 0'),
   peso_tara: z.number().min(1, 'El peso tara debe ser mayor a 0'),
-  // Destino
+  // Material
   material: z.string().optional(),
-  cliente_destino: z.string().optional(),
   // Operación
   operario: z.string().optional(),
   observaciones: z.string().optional(),
 }).refine((data) => data.peso_bruto > data.peso_tara, {
   message: 'El peso bruto debe ser mayor al peso tara',
   path: ['peso_bruto'],
+}).refine((data) => {
+  if (data.tipo_entrega === 'propio') {
+    return !!data.camion_id
+  }
+  return true
+}, {
+  message: 'Debe seleccionar un camión propio',
+  path: ['camion_id'],
+}).refine((data) => {
+  if (data.tipo_entrega === 'transportista') {
+    return !!data.patente_externa
+  }
+  return true
+}, {
+  message: 'Debe ingresar la patente del camión externo',
+  path: ['patente_externa'],
 })
 
 type PesajeFormData = z.infer<typeof pesajeSchema>
@@ -48,6 +79,19 @@ export default function PesajeFormPage() {
 
   const [pesoNeto, setPesoNeto] = useState(0)
   const [createdPesaje, setCreatedPesaje] = useState<Pesaje | null>(null)
+
+  // Estados para autocompletado
+  const [transportistaBusqueda, setTransportistaBusqueda] = useState('')
+  const [clienteBusqueda, setClienteBusqueda] = useState('')
+  const [transportistaSugerencias, setTransportistaSugerencias] = useState<Empresa[]>([])
+  const [clienteSugerencias, setClienteSugerencias] = useState<Empresa[]>([])
+  const [showTransportistaSugerencias, setShowTransportistaSugerencias] = useState(false)
+  const [showClienteSugerencias, setShowClienteSugerencias] = useState(false)
+
+  // Modal para crear nueva empresa
+  const [showNuevaEmpresaModal, setShowNuevaEmpresaModal] = useState(false)
+  const [nuevaEmpresaTipo, setNuevaEmpresaTipo] = useState<'cliente' | 'transportista'>('cliente')
+  const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('')
 
   const { data: pesaje } = useQuery({
     queryKey: ['pesaje', id],
@@ -66,17 +110,19 @@ export default function PesajeFormPage() {
     formState: { errors },
     reset,
     watch,
+    setValue,
+    control,
   } = useForm<PesajeFormData>({
     resolver: zodResolver(pesajeSchema),
     defaultValues: {
+      tipo_entrega: 'propio',
       fecha: new Date().toISOString().split('T')[0],
       peso_bruto: 0,
       peso_tara: 0,
-      remitente: 'LA RUFINA',
     },
   })
 
-  // Observar cambios en peso bruto y tara para calcular peso neto
+  const tipoEntrega = watch('tipo_entrega')
   const pesoBruto = watch('peso_bruto')
   const pesoTara = watch('peso_tara')
 
@@ -90,23 +136,125 @@ export default function PesajeFormPage() {
   useEffect(() => {
     if (pesaje) {
       reset({
-        camion_id: pesaje.camion_id,
+        tipo_entrega: (pesaje.tipo_entrega as TipoEntrega) || 'propio',
+        camion_id: pesaje.camion_id || '',
+        transportista_id: pesaje.transportista_id || '',
+        patente_externa: pesaje.patente_externa || '',
+        transportista: pesaje.transportista || '',
+        cliente_id: pesaje.cliente_id || '',
+        cliente_nombre: pesaje.cliente_nombre || '',
         fecha: pesaje.fecha.split('T')[0],
         acoplado: pesaje.acoplado || '',
-        transportista: pesaje.transportista || '',
-        remitente: pesaje.remitente || 'LA RUFINA',
         chofer: pesaje.chofer || '',
-        producto: pesaje.producto || '',
-        numero_guia: pesaje.numero_guia || '',
         peso_bruto: pesaje.peso_bruto,
         peso_tara: pesaje.peso_tara,
         material: pesaje.material || '',
-        cliente_destino: pesaje.cliente_destino || '',
         operario: pesaje.operario || '',
         observaciones: pesaje.observaciones || '',
       })
+      if (pesaje.transportista_nombre) {
+        setTransportistaBusqueda(pesaje.transportista_nombre)
+      }
+      if (pesaje.cliente_nombre) {
+        setClienteBusqueda(pesaje.cliente_nombre)
+      }
     }
   }, [pesaje, reset])
+
+  // Buscar transportistas
+  const buscarTransportistas = useCallback(async (nombre: string) => {
+    if (nombre.length >= 2) {
+      try {
+        const resultados = await empresasService.buscar(nombre, 'transportista')
+        setTransportistaSugerencias(resultados)
+        setShowTransportistaSugerencias(true)
+      } catch {
+        setTransportistaSugerencias([])
+      }
+    } else {
+      setTransportistaSugerencias([])
+      setShowTransportistaSugerencias(false)
+    }
+  }, [])
+
+  // Buscar clientes
+  const buscarClientes = useCallback(async (nombre: string) => {
+    if (nombre.length >= 2) {
+      try {
+        const resultados = await empresasService.buscar(nombre, 'cliente')
+        setClienteSugerencias(resultados)
+        setShowClienteSugerencias(true)
+      } catch {
+        setClienteSugerencias([])
+      }
+    } else {
+      setClienteSugerencias([])
+      setShowClienteSugerencias(false)
+    }
+  }, [])
+
+  // Debounce para búsquedas
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (transportistaBusqueda) {
+        buscarTransportistas(transportistaBusqueda)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [transportistaBusqueda, buscarTransportistas])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (clienteBusqueda) {
+        buscarClientes(clienteBusqueda)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [clienteBusqueda, buscarClientes])
+
+  const seleccionarTransportista = (empresa: Empresa) => {
+    setValue('transportista_id', empresa.id)
+    setValue('transportista', empresa.nombre)
+    setTransportistaBusqueda(empresa.nombre)
+    setShowTransportistaSugerencias(false)
+  }
+
+  const seleccionarCliente = (empresa: Empresa) => {
+    setValue('cliente_id', empresa.id)
+    setValue('cliente_nombre', empresa.nombre)
+    setClienteBusqueda(empresa.nombre)
+    setShowClienteSugerencias(false)
+  }
+
+  // Crear nueva empresa
+  const createEmpresaMutation = useMutation({
+    mutationFn: (data: EmpresaCreate) => empresasService.create(data),
+    onSuccess: (empresa) => {
+      queryClient.invalidateQueries({ queryKey: ['empresas'] })
+      if (nuevaEmpresaTipo === 'transportista') {
+        seleccionarTransportista(empresa)
+      } else {
+        seleccionarCliente(empresa)
+      }
+      setShowNuevaEmpresaModal(false)
+      setNuevaEmpresaNombre('')
+    },
+  })
+
+  const handleCrearNuevaEmpresa = async () => {
+    if (!nuevaEmpresaNombre.trim()) {
+      alert('Debe ingresar un nombre')
+      return
+    }
+    try {
+      await createEmpresaMutation.mutateAsync({
+        nombre: nuevaEmpresaNombre.trim(),
+        tipo: nuevaEmpresaTipo,
+      })
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Error al crear la empresa')
+    }
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: PesajeFormData) => pesajesService.create(data),
@@ -129,10 +277,20 @@ export default function PesajeFormPage() {
 
   const onSubmit = async (data: PesajeFormData) => {
     try {
-      if (isEditing) {
-        await updateMutation.mutateAsync(data)
+      // Limpiar campos según tipo de entrega
+      const cleanData = { ...data }
+      if (data.tipo_entrega === 'propio') {
+        cleanData.transportista_id = undefined
+        cleanData.patente_externa = undefined
+        cleanData.transportista = undefined
       } else {
-        await createMutation.mutateAsync(data)
+        cleanData.camion_id = undefined
+      }
+
+      if (isEditing) {
+        await updateMutation.mutateAsync(cleanData)
+      } else {
+        await createMutation.mutateAsync(cleanData)
       }
     } catch (error: any) {
       const detail = error.response?.data?.detail
@@ -141,7 +299,6 @@ export default function PesajeFormPage() {
       if (typeof detail === 'string') {
         errorMessage = detail
       } else if (Array.isArray(detail)) {
-        // Errores de validación de Pydantic
         errorMessage = detail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join('\n')
       } else if (typeof detail === 'object' && detail !== null) {
         errorMessage = detail.msg || detail.message || JSON.stringify(detail)
@@ -164,6 +321,10 @@ export default function PesajeFormPage() {
 
   // Pantalla de éxito después de crear el pesaje
   if (createdPesaje) {
+    const patenteMostrar = createdPesaje.tipo_entrega === 'propio'
+      ? createdPesaje.camion_patente
+      : createdPesaje.patente_externa
+
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
@@ -181,9 +342,21 @@ export default function PesajeFormPage() {
 
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-left">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Camión:</span>
-                <span className="font-medium">{createdPesaje.camion_patente}</span>
+                <span className="text-gray-500">Tipo:</span>
+                <span className="font-medium">
+                  {createdPesaje.tipo_entrega === 'propio' ? 'Camión Propio' : 'Transportista'}
+                </span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Patente:</span>
+                <span className="font-medium">{patenteMostrar || '-'}</span>
+              </div>
+              {createdPesaje.cliente_nombre && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Cliente:</span>
+                  <span className="font-medium">{createdPesaje.cliente_nombre}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Material:</span>
                 <span className="font-medium">{createdPesaje.material || '-'}</span>
@@ -212,19 +385,17 @@ export default function PesajeFormPage() {
                 variant="ghost"
                 onClick={() => {
                   setCreatedPesaje(null)
+                  setTransportistaBusqueda('')
+                  setClienteBusqueda('')
                   reset({
+                    tipo_entrega: 'propio',
                     fecha: new Date().toISOString().split('T')[0],
                     peso_bruto: 0,
                     peso_tara: 0,
-                    remitente: 'LA RUFINA',
                     camion_id: '',
                     acoplado: '',
-                    transportista: '',
                     chofer: '',
-                    producto: '',
-                    numero_guia: '',
                     material: '',
-                    cliente_destino: '',
                     operario: '',
                     observaciones: '',
                   })
@@ -265,152 +436,272 @@ export default function PesajeFormPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                {/* Sección: Datos Básicos */}
+                {/* Sección: Tipo de Entrega */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">Datos Básicos</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Camión */}
-                    <div className="space-y-2">
-                      <label htmlFor="camion_id" className="text-sm font-medium">
-                        Camión <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="camion_id"
-                        {...register('camion_id')}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="">Seleccionar camión</option>
-                        {camiones.map((camion) => (
-                          <option key={camion.id} value={camion.id}>
-                            {camion.patente} - {camion.marca} {camion.modelo}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.camion_id && (
-                        <p className="text-sm text-red-600">{errors.camion_id.message}</p>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    Tipo de Entrega
+                  </h3>
+                  <div className="flex gap-4">
+                    <Controller
+                      name="tipo_entrega"
+                      control={control}
+                      render={({ field }) => (
+                        <>
+                          <Button
+                            type="button"
+                            variant={field.value === 'propio' ? 'default' : 'outline'}
+                            onClick={() => field.onChange('propio')}
+                            className="flex-1"
+                          >
+                            <Truck className="mr-2 h-4 w-4" />
+                            Camión Propio
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === 'transportista' ? 'default' : 'outline'}
+                            onClick={() => field.onChange('transportista')}
+                            className="flex-1"
+                          >
+                            <Building2 className="mr-2 h-4 w-4" />
+                            Transportista Externo
+                          </Button>
+                        </>
                       )}
-                    </div>
-
-                    {/* Acoplado */}
-                    <div className="space-y-2">
-                      <label htmlFor="acoplado" className="text-sm font-medium">Acoplado</label>
-                      <Input
-                        id="acoplado"
-                        {...register('acoplado')}
-                        placeholder="Patente acoplado"
-                      />
-                    </div>
-
-                    {/* Fecha */}
-                    <div className="space-y-2">
-                      <label htmlFor="fecha" className="text-sm font-medium">
-                        Fecha <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        id="fecha"
-                        type="date"
-                        {...register('fecha')}
-                      />
-                      {errors.fecha && (
-                        <p className="text-sm text-red-600">{errors.fecha.message}</p>
-                      )}
-                    </div>
+                    />
                   </div>
                 </div>
 
-                {/* Sección: Datos del Transporte */}
+                {/* Sección: Datos del Camión/Transportista */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">Datos del Transporte</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Transportista */}
-                    <div className="space-y-2">
-                      <label htmlFor="transportista" className="text-sm font-medium">Transportista</label>
-                      <Input
-                        id="transportista"
-                        {...register('transportista')}
-                        placeholder="Nombre transportista"
-                      />
-                    </div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    {tipoEntrega === 'propio' ? 'Datos del Camión' : 'Datos del Transportista'}
+                  </h3>
 
-                    {/* Remitente */}
-                    <div className="space-y-2">
-                      <label htmlFor="remitente" className="text-sm font-medium">Remitente</label>
-                      <Input
-                        id="remitente"
-                        {...register('remitente')}
-                        placeholder="LA RUFINA"
-                      />
+                  {tipoEntrega === 'propio' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Camión propio */}
+                      <div className="space-y-2">
+                        <label htmlFor="camion_id" className="text-sm font-medium">
+                          Camión <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="camion_id"
+                          {...register('camion_id')}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Seleccionar camión</option>
+                          {camiones.map((camion) => (
+                            <option key={camion.id} value={camion.id}>
+                              {camion.patente} - {camion.marca} {camion.modelo}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.camion_id && (
+                          <p className="text-sm text-red-600">{errors.camion_id.message}</p>
+                        )}
+                      </div>
+
+                      {/* Acoplado */}
+                      <div className="space-y-2">
+                        <label htmlFor="acoplado" className="text-sm font-medium">
+                          Acoplado
+                        </label>
+                        <Input
+                          id="acoplado"
+                          {...register('acoplado')}
+                          placeholder="Patente acoplado"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Transportista con autocompletado */}
+                      <div className="space-y-2 relative">
+                        <label className="text-sm font-medium">
+                          Transportista
+                        </label>
+                        <div className="relative">
+                          <Input
+                            value={transportistaBusqueda}
+                            onChange={(e) => {
+                              setTransportistaBusqueda(e.target.value)
+                              setValue('transportista', e.target.value)
+                              setValue('transportista_id', '')
+                            }}
+                            onFocus={() => transportistaSugerencias.length > 0 && setShowTransportistaSugerencias(true)}
+                            onBlur={() => setTimeout(() => setShowTransportistaSugerencias(false), 200)}
+                            placeholder="Buscar o escribir transportista..."
+                          />
+                          {showTransportistaSugerencias && transportistaSugerencias.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              {transportistaSugerencias.map((empresa) => (
+                                <button
+                                  key={empresa.id}
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
+                                  onMouseDown={() => seleccionarTransportista(empresa)}
+                                >
+                                  {empresa.nombre}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            setNuevaEmpresaTipo('transportista')
+                            setNuevaEmpresaNombre(transportistaBusqueda)
+                            setShowNuevaEmpresaModal(true)
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Agregar nuevo transportista
+                        </Button>
+                      </div>
+
+                      {/* Patente externa */}
+                      <div className="space-y-2">
+                        <label htmlFor="patente_externa" className="text-sm font-medium">
+                          Patente del Camión <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          id="patente_externa"
+                          {...register('patente_externa')}
+                          placeholder="ABC123"
+                        />
+                        {errors.patente_externa && (
+                          <p className="text-sm text-red-600">{errors.patente_externa.message}</p>
+                        )}
+                      </div>
+
+                      {/* Acoplado */}
+                      <div className="space-y-2">
+                        <label htmlFor="acoplado" className="text-sm font-medium">
+                          Acoplado
+                        </label>
+                        <Input
+                          id="acoplado"
+                          {...register('acoplado')}
+                          placeholder="Patente acoplado"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sección: Cliente Destino */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    Cliente Destino
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Cliente con autocompletado */}
+                    <div className="space-y-2 relative">
+                      <label className="text-sm font-medium">Cliente</label>
+                      <div className="relative">
+                        <Input
+                          value={clienteBusqueda}
+                          onChange={(e) => {
+                            setClienteBusqueda(e.target.value)
+                            setValue('cliente_nombre', e.target.value)
+                            setValue('cliente_id', '')
+                          }}
+                          onFocus={() => clienteSugerencias.length > 0 && setShowClienteSugerencias(true)}
+                          onBlur={() => setTimeout(() => setShowClienteSugerencias(false), 200)}
+                          placeholder="Buscar o escribir cliente..."
+                        />
+                        {showClienteSugerencias && clienteSugerencias.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {clienteSugerencias.map((empresa) => (
+                              <button
+                                key={empresa.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
+                                onMouseDown={() => seleccionarCliente(empresa)}
+                              >
+                                {empresa.nombre}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setNuevaEmpresaTipo('cliente')
+                          setNuevaEmpresaNombre(clienteBusqueda)
+                          setShowNuevaEmpresaModal(true)
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Agregar nuevo cliente
+                      </Button>
                     </div>
 
                     {/* Chofer */}
                     <div className="space-y-2">
-                      <label htmlFor="chofer" className="text-sm font-medium">Chofer</label>
+                      <label htmlFor="chofer" className="text-sm font-medium">
+                        Chofer
+                      </label>
                       <Input
                         id="chofer"
                         {...register('chofer')}
                         placeholder="Nombre del chofer"
                       />
                     </div>
-
-                    {/* Destinatario */}
-                    <div className="space-y-2">
-                      <label htmlFor="cliente_destino" className="text-sm font-medium">Destinatario</label>
-                      <Input
-                        id="cliente_destino"
-                        {...register('cliente_destino')}
-                        placeholder="Nombre del destinatario"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                {/* Sección: Producto */}
+                {/* Sección: Fecha y Material */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">Producto</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Producto/Material */}
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    Fecha y Material
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Fecha */}
                     <div className="space-y-2">
-                      <label htmlFor="producto" className="text-sm font-medium">Código Producto</label>
-                      <Input
-                        id="producto"
-                        {...register('producto')}
-                        placeholder="Ej: 020"
-                      />
+                      <label htmlFor="fecha" className="text-sm font-medium">
+                        Fecha <span className="text-red-500">*</span>
+                      </label>
+                      <Input id="fecha" type="date" {...register('fecha')} />
+                      {errors.fecha && (
+                        <p className="text-sm text-red-600">{errors.fecha.message}</p>
+                      )}
                     </div>
 
                     {/* Material */}
                     <div className="space-y-2">
-                      <label htmlFor="material" className="text-sm font-medium">Material</label>
+                      <label htmlFor="material" className="text-sm font-medium">
+                        Material
+                      </label>
                       <select
                         id="material"
                         {...register('material')}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         <option value="">Seleccionar material</option>
-                        <option value="piedra">Piedra</option>
-                        <option value="arena">Arena</option>
-                        <option value="ripio">Ripio</option>
-                        <option value="tierra">Tierra</option>
-                        <option value="escombros">Escombros</option>
-                        <option value="otros">Otros</option>
+                        {MATERIALES_DISPONIBLES.map((mat) => (
+                          <option key={mat} value={mat}>
+                            {mat}
+                          </option>
+                        ))}
                       </select>
-                    </div>
-
-                    {/* Número de Guía */}
-                    <div className="space-y-2">
-                      <label htmlFor="numero_guia" className="text-sm font-medium">Nro. Guía</label>
-                      <Input
-                        id="numero_guia"
-                        {...register('numero_guia')}
-                        placeholder="Número de guía"
-                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Sección: Pesos */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">Pesos</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    Pesos
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Peso Bruto */}
                     <div className="space-y-2">
@@ -450,11 +741,15 @@ export default function PesajeFormPage() {
 
                 {/* Sección: Operación */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">Operación</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                    Operación
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Operario */}
                     <div className="space-y-2">
-                      <label htmlFor="operario" className="text-sm font-medium">Operario</label>
+                      <label htmlFor="operario" className="text-sm font-medium">
+                        Operario
+                      </label>
                       <Input
                         id="operario"
                         {...register('operario')}
@@ -547,6 +842,52 @@ export default function PesajeFormPage() {
           </Card>
         </div>
       </div>
+
+      {/* Modal para crear nueva empresa */}
+      {showNuevaEmpresaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {nuevaEmpresaTipo === 'cliente' ? (
+                  <UserCheck className="h-5 w-5" />
+                ) : (
+                  <Truck className="h-5 w-5" />
+                )}
+                Agregar {nuevaEmpresaTipo === 'cliente' ? 'Cliente' : 'Transportista'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Nombre *</label>
+                <Input
+                  value={nuevaEmpresaNombre}
+                  onChange={(e) => setNuevaEmpresaNombre(e.target.value)}
+                  placeholder={`Nombre del ${nuevaEmpresaTipo}`}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowNuevaEmpresaModal(false)
+                    setNuevaEmpresaNombre('')
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCrearNuevaEmpresa}
+                  disabled={createEmpresaMutation.isPending}
+                >
+                  {createEmpresaMutation.isPending ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

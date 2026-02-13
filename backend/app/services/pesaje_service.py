@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 
 from app.models.pesaje import Pesaje
 from app.models.remito import Remito
+from app.models.empresa import Empresa
 from app.schemas.pesaje import PesajeCreate, PesajeUpdate
 from app.services import camion_service
 
@@ -20,8 +21,32 @@ def obtener_todos(
     skip: int = 0,
     limit: int = 100
 ) -> List[Pesaje]:
-    """Obtiene todos los pesajes con paginación"""
-    return db.query(Pesaje).order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
+    """Obtiene todos los pesajes con paginación, enriquecidos con datos relacionados"""
+    from app.models.camion import Camion
+
+    pesajes = db.query(Pesaje).order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
+
+    # Enriquecer con datos
+    for p in pesajes:
+        # Patente del camión propio
+        if p.camion_id:
+            camion = db.query(Camion).filter(Camion.id == p.camion_id).first()
+            if camion:
+                p.camion_patente = camion.patente
+
+        # Nombre del transportista
+        if p.transportista_id:
+            transportista = db.query(Empresa).filter(Empresa.id == p.transportista_id).first()
+            if transportista:
+                p.transportista_nombre = transportista.nombre
+
+        # Nombre del cliente
+        if p.cliente_id:
+            cliente = db.query(Empresa).filter(Empresa.id == p.cliente_id).first()
+            if cliente:
+                p.cliente_nombre = cliente.nombre
+
+    return pesajes
 
 
 def obtener_por_id(db: Session, pesaje_id: UUID) -> Optional[Pesaje]:
@@ -97,24 +122,47 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     - Número de pesaje (autoincremental)
     - Peso neto (bruto - tara)
 
-    Args:
-        db: Sesión de base de datos
-        pesaje_data: Datos del pesaje
-        usuario_id: ID del usuario que crea el pesaje
+    Soporta dos tipos de entrega:
+    - propio: Camión de la cantera
+    - transportista: Camión externo
 
     Returns:
         Pesaje creado
-
-    Raises:
-        HTTPException: Si el camión no existe o pesos inválidos
     """
-    # Verificar que el camión exista
-    camion = camion_service.obtener_por_id(db, pesaje_data.camion_id)
-    if not camion:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Camión no encontrado"
-        )
+    camion = None
+    transportista_empresa = None
+    cliente_empresa = None
+
+    # Validar según tipo de entrega
+    if pesaje_data.tipo_entrega == "propio":
+        if not pesaje_data.camion_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe seleccionar un camión propio"
+            )
+        camion = camion_service.obtener_por_id(db, pesaje_data.camion_id)
+        if not camion:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Camión no encontrado"
+            )
+    else:  # transportista
+        if pesaje_data.transportista_id:
+            transportista_empresa = db.query(Empresa).filter(Empresa.id == pesaje_data.transportista_id).first()
+            if not transportista_empresa:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Transportista no encontrado"
+                )
+
+    # Verificar cliente si se proporciona
+    if pesaje_data.cliente_id:
+        cliente_empresa = db.query(Empresa).filter(Empresa.id == pesaje_data.cliente_id).first()
+        if not cliente_empresa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente no encontrado"
+            )
 
     # Validar pesos
     if pesaje_data.peso_bruto <= pesaje_data.peso_tara:
@@ -129,9 +177,12 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     # Obtener próximo número de pesaje
     numero_pesaje = _obtener_proximo_numero(db)
 
+    # Preparar datos (excluir cliente_nombre que no es campo del modelo)
+    pesaje_dict = pesaje_data.model_dump(exclude={'cliente_nombre'})
+
     # Crear pesaje
     db_pesaje = Pesaje(
-        **pesaje_data.model_dump(),
+        **pesaje_dict,
         numero_pesaje=numero_pesaje,
         peso_neto=peso_neto,
         created_by=usuario_id
@@ -143,6 +194,14 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
 
     # Generar remito automáticamente
     _generar_remito_automatico(db, db_pesaje, usuario_id)
+
+    # Agregar info para respuesta
+    if camion:
+        db_pesaje.camion_patente = camion.patente
+    if transportista_empresa:
+        db_pesaje.transportista_nombre = transportista_empresa.nombre
+    if cliente_empresa:
+        db_pesaje.cliente_nombre = cliente_empresa.nombre
 
     return db_pesaje
 
@@ -160,14 +219,27 @@ def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) ->
     """
     numero_remito = _obtener_proximo_numero_remito(db)
 
+    # Determinar patente según tipo de entrega
+    if pesaje.tipo_entrega == "propio" and pesaje.camion:
+        patente = pesaje.camion.patente
+    else:
+        patente = pesaje.patente_externa
+
+    # Determinar cliente
+    cliente_nombre = None
+    if pesaje.cliente_id and pesaje.cliente:
+        cliente_nombre = pesaje.cliente.nombre
+    elif pesaje.transportista:
+        cliente_nombre = pesaje.transportista
+
     db_remito = Remito(
         numero_remito=numero_remito,
         pesaje_id=pesaje.id,
         fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
-        cliente=pesaje.cliente_destino or "Cliente no especificado",
+        cliente=cliente_nombre or "Cliente no especificado",
         producto=pesaje.material or "Material no especificado",
         peso_neto=pesaje.peso_neto,
-        camion_patente=pesaje.camion.patente if pesaje.camion else None,
+        camion_patente=patente,
         chofer=pesaje.chofer,
         observaciones=pesaje.observaciones,
         created_by=usuario_id

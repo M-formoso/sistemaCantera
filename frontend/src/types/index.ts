@@ -172,29 +172,63 @@ export interface ServicioCreate {
   repuestos: RepuestoAsignado[]
 }
 
+// ==================== EMPRESA (CLIENTES/TRANSPORTISTAS) ====================
+
+export type TipoEmpresa = 'cliente' | 'transportista'
+
+export interface Empresa {
+  id: string
+  nombre: string
+  tipo: TipoEmpresa
+  cuit?: string
+  direccion?: string
+  telefono?: string
+  email?: string
+  contacto?: string
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface EmpresaCreate {
+  nombre: string
+  tipo: TipoEmpresa
+  cuit?: string
+  direccion?: string
+  telefono?: string
+  email?: string
+  contacto?: string
+}
+
 // ==================== PESAJE ====================
+
+export type TipoEntrega = 'propio' | 'transportista'
 
 export interface Pesaje {
   id: string
   numero_pesaje: number
   fecha: string
-  camion_id: string
-  camion_patente: string
+  tipo_entrega: TipoEntrega
+  // Camión propio
+  camion_id?: string
+  camion_patente?: string
+  // Transportista externo
+  transportista_id?: string
+  transportista_nombre?: string
+  patente_externa?: string
+  transportista?: string
+  // Cliente
+  cliente_id?: string
+  cliente_nombre?: string
   // Datos del transporte
   acoplado?: string
-  transportista?: string
-  remitente: string
   chofer?: string
-  // Datos del producto
-  producto?: string
-  numero_guia?: string
   // Pesos
   peso_tara: number
   peso_bruto: number
   peso_neto: number
-  // Destino
+  // Material
   material?: string
-  cliente_destino?: string
   // Operación
   operario?: string
   observaciones?: string
@@ -205,22 +239,25 @@ export interface Pesaje {
 }
 
 export interface PesajeCreate {
-  camion_id: string
   fecha: string
+  tipo_entrega: TipoEntrega
+  // Camión propio (requerido si tipo_entrega = "propio")
+  camion_id?: string
+  // Transportista externo (requerido si tipo_entrega = "transportista")
+  transportista_id?: string
+  patente_externa?: string
+  transportista?: string
+  // Cliente
+  cliente_id?: string
+  cliente_nombre?: string
   // Datos del transporte
   acoplado?: string
-  transportista?: string
-  remitente?: string
   chofer?: string
-  // Datos del producto
-  producto?: string
-  numero_guia?: string
   // Pesos
   peso_tara: number
   peso_bruto: number
-  // Destino
+  // Material
   material?: string
-  cliente_destino?: string
   // Operación
   operario?: string
   observaciones?: string

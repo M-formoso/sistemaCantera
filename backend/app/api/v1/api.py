@@ -8,7 +8,8 @@ from app.api.v1.endpoints import (
     pesajes,
     remitos,
     combustible,
-    dashboard
+    dashboard,
+    empresas
 )
 
 # Crear router principal de la API v1
@@ -30,3 +31,4 @@ api_router.include_router(pesajes.router, prefix="/pesajes", tags=["Pesajes"])
 api_router.include_router(remitos.router, prefix="/remitos", tags=["Remitos"])
 api_router.include_router(combustible.router, prefix="/combustible", tags=["Combustible"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+api_router.include_router(empresas.router, prefix="/empresas", tags=["Empresas"])

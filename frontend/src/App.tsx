@@ -31,6 +31,9 @@ import SuministroFormPage from '@/pages/combustible/SuministroFormPage'
 import UsuariosPage from '@/pages/usuarios/UsuariosPage'
 import UsuarioFormPage from '@/pages/usuarios/UsuarioFormPage'
 
+// Empresas (Clientes/Transportistas)
+import EmpresasPage from '@/pages/empresas/EmpresasPage'
+
 function App() {
   return (
     <Router>
@@ -55,6 +58,9 @@ function App() {
           <Route path="camiones/nuevo" element={<CamionFormPage />} />
           <Route path="camiones/:id" element={<CamionDetailPage />} />
           <Route path="camiones/:id/editar" element={<CamionFormPage />} />
+
+          {/* Empresas (Clientes/Transportistas) */}
+          <Route path="empresas" element={<EmpresasPage />} />
 
           {/* Repuestos */}
           <Route path="repuestos" element={<RepuestosPage />} />

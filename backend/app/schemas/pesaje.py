@@ -1,34 +1,52 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from uuid import UUID
-from typing import Optional, Union
+from typing import Optional, Union, Literal
 from decimal import Decimal
 from datetime import datetime, date
 
 from app.schemas.common import ResponseBase
 
 
+# Materiales disponibles
+MATERIALES_DISPONIBLES = [
+    "10.30",
+    "6.19",
+    "0.20",
+    "6.12",
+    "relleno",
+    "binder",
+    "0.6"
+]
+
+
 class PesajeBase(BaseModel):
     """Schema base de Pesaje"""
 
-    camion_id: UUID
+    # Tipo de entrega
+    tipo_entrega: Literal["propio", "transportista"] = "propio"
+
+    # Camión propio (requerido si tipo_entrega = "propio")
+    camion_id: Optional[UUID] = None
+
+    # Transportista externo (requerido si tipo_entrega = "transportista")
+    transportista_id: Optional[UUID] = None
+    patente_externa: Optional[str] = Field(None, max_length=20)
+    transportista: Optional[str] = Field(None, max_length=100)  # Nombre libre si no está en el sistema
+
+    # Cliente destino
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = Field(None, max_length=255)  # Nombre libre si no está en el sistema
 
     # Datos del transporte
     acoplado: Optional[str] = Field(None, max_length=20)
-    transportista: Optional[str] = Field(None, max_length=100)
-    remitente: str = Field(default="LA RUFINA", max_length=100)
     chofer: Optional[str] = Field(None, max_length=100)
-
-    # Datos del producto
-    producto: Optional[str] = Field(None, max_length=100)
-    numero_guia: Optional[str] = Field(None, max_length=50)
 
     # Pesos
     peso_tara: Decimal = Field(..., gt=0)
     peso_bruto: Decimal = Field(..., gt=0)
 
-    # Destino
+    # Material
     material: Optional[str] = Field(None, max_length=100)
-    cliente_destino: Optional[str] = Field(None, max_length=255)
 
     # Operación
     operario: Optional[str] = Field(None, max_length=100)
@@ -43,6 +61,18 @@ class PesajeBase(BaseModel):
             raise ValueError('El peso bruto debe ser mayor que el peso tara')
         return v
 
+    @model_validator(mode='after')
+    def validar_tipo_entrega(self):
+        """Validar que se proporcionen los datos según el tipo de entrega"""
+        if self.tipo_entrega == "propio" and not self.camion_id:
+            raise ValueError('Debe seleccionar un camión propio')
+        if self.tipo_entrega == "transportista":
+            if not self.transportista_id and not self.transportista:
+                raise ValueError('Debe seleccionar o ingresar un transportista')
+            if not self.patente_externa:
+                raise ValueError('Debe ingresar la patente del camión externo')
+        return self
+
 
 class PesajeCreate(PesajeBase):
     """Schema para crear Pesaje"""
@@ -55,11 +85,9 @@ class PesajeCreate(PesajeBase):
         """Convertir string a datetime si es necesario"""
         if isinstance(v, str):
             try:
-                # Intentar parsear como datetime completo
                 return datetime.fromisoformat(v.replace('Z', '+00:00'))
             except ValueError:
                 try:
-                    # Intentar parsear como fecha simple (YYYY-MM-DD)
                     return datetime.strptime(v, '%Y-%m-%d')
                 except ValueError:
                     raise ValueError('Formato de fecha inválido')
@@ -69,51 +97,59 @@ class PesajeCreate(PesajeBase):
 class PesajeUpdate(BaseModel):
     """Schema para actualizar Pesaje"""
 
+    tipo_entrega: Optional[Literal["propio", "transportista"]] = None
     camion_id: Optional[UUID] = None
+    transportista_id: Optional[UUID] = None
+    patente_externa: Optional[str] = Field(None, max_length=20)
+    transportista: Optional[str] = Field(None, max_length=100)
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = Field(None, max_length=255)
     chofer: Optional[str] = Field(None, max_length=100)
     peso_tara: Optional[Decimal] = Field(None, gt=0)
     peso_bruto: Optional[Decimal] = Field(None, gt=0)
     material: Optional[str] = Field(None, max_length=100)
-    cliente_destino: Optional[str] = Field(None, max_length=255)
     observaciones: Optional[str] = None
 
 
 class PesajeSchema(ResponseBase):
     """Schema de respuesta de Pesaje"""
 
-    camion_id: UUID
     numero_pesaje: int
     fecha: datetime
-    peso_neto: Decimal
-    remito_generado: bool
-    created_by: UUID
+    tipo_entrega: str = "propio"
 
-    # Datos del transporte (todos opcionales en respuesta para compatibilidad)
-    acoplado: Optional[str] = None
+    # Camión propio
+    camion_id: Optional[UUID] = None
+    camion_patente: Optional[str] = None
+
+    # Transportista externo
+    transportista_id: Optional[UUID] = None
+    transportista_nombre: Optional[str] = None
+    patente_externa: Optional[str] = None
     transportista: Optional[str] = None
-    remitente: Optional[str] = "LA RUFINA"
-    chofer: Optional[str] = None
 
-    # Datos del producto
-    producto: Optional[str] = None
-    numero_guia: Optional[str] = None
+    # Cliente
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = None
+
+    # Datos del transporte
+    acoplado: Optional[str] = None
+    chofer: Optional[str] = None
 
     # Pesos
     peso_tara: Decimal
     peso_bruto: Decimal
+    peso_neto: Decimal
 
-    # Destino
+    # Material
     material: Optional[str] = None
-    cliente_destino: Optional[str] = None
 
     # Operación
     operario: Optional[str] = None
     observaciones: Optional[str] = None
 
-    # Información del camión (opcional)
-    camion_patente: Optional[str] = None
-    # Información del creador (opcional)
-    operario_nombre: Optional[str] = None
+    remito_generado: bool
+    created_by: UUID
 
 
 class PesajeStats(BaseModel):
@@ -123,3 +159,8 @@ class PesajeStats(BaseModel):
     total_toneladas: Decimal
     promedio_peso_neto: Decimal
     material_mas_pesado: Optional[str]
+
+
+class MaterialesDisponibles(BaseModel):
+    """Lista de materiales disponibles"""
+    materiales: list[str] = MATERIALES_DISPONIBLES

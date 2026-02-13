@@ -12,26 +12,32 @@ class Pesaje(BaseModel):
 
     numero_pesaje = Column(Integer, unique=True, nullable=False, index=True)
     fecha = Column(DateTime, nullable=False)
-    camion_id = Column(UUID(as_uuid=True), ForeignKey("camiones.id"), nullable=False, index=True)
+
+    # Tipo de entrega: 'propio' (camión de la cantera) o 'transportista' (externo)
+    tipo_entrega = Column(String(20), default="propio")
+
+    # Camión propio (opcional si es transportista externo)
+    camion_id = Column(UUID(as_uuid=True), ForeignKey("camiones.id"), nullable=True, index=True)
+
+    # Transportista externo (cuando no es camión propio)
+    transportista_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"), nullable=True)
+    patente_externa = Column(String(20))  # Patente del camión externo
+
+    # Cliente destino
+    cliente_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"), nullable=True)
 
     # Datos del transporte
     acoplado = Column(String(20))  # Patente del acoplado
-    transportista = Column(String(100))  # Nombre del transportista
-    remitente = Column(String(100), default="LA RUFINA")  # Empresa remitente
+    transportista = Column(String(100))  # Nombre del transportista (legacy/texto libre)
     chofer = Column(String(100))
-
-    # Datos del producto
-    producto = Column(String(100))  # Código o nombre del producto
-    numero_guia = Column(String(50))  # Número de guía
 
     # Pesos
     peso_tara = Column(Numeric(10, 2), nullable=False)  # kg
     peso_bruto = Column(Numeric(10, 2), nullable=False)  # kg
     peso_neto = Column(Numeric(10, 2))  # Calculado: bruto - tara
 
-    # Destino
+    # Material
     material = Column(String(100))
-    cliente_destino = Column(String(255))  # Destinatario
 
     # Operación
     operario = Column(String(100))  # Nombre del operario
@@ -42,6 +48,8 @@ class Pesaje(BaseModel):
 
     # Relaciones
     camion = relationship("Camion", back_populates="pesajes")
+    transportista_empresa = relationship("Empresa", foreign_keys=[transportista_id])
+    cliente = relationship("Empresa", foreign_keys=[cliente_id])
     creador = relationship("Usuario", back_populates="pesajes_creados", foreign_keys=[created_by])
     remito = relationship("Remito", back_populates="pesaje", uselist=False)
 

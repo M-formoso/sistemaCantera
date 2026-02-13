@@ -8,6 +8,7 @@ import {
   BarChart3,
   Users,
   X,
+  Building2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,11 @@ const menuItems = [
     title: 'Camiones',
     icon: Truck,
     path: '/camiones',
+  },
+  {
+    title: 'Clientes/Transportistas',
+    icon: Building2,
+    path: '/empresas',
   },
   {
     title: 'Repuestos',
