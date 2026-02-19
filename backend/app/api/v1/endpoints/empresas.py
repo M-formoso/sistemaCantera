@@ -3,12 +3,11 @@ Endpoints API para Empresas (Clientes y Transportistas)
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID
 
 from app.core.deps import get_db, get_current_active_user, require_admin
 from app.models.usuario import Usuario
-from app.models.empresa import TipoEmpresaEnum
 from app.schemas.empresa import EmpresaSchema, EmpresaCreate, EmpresaUpdate
 from app.services import empresa_service
 
@@ -17,7 +16,7 @@ router = APIRouter()
 
 @router.get("/", response_model=List[EmpresaSchema])
 async def listar_empresas(
-    tipo: Optional[TipoEmpresaEnum] = None,
+    tipo: Optional[Literal["cliente", "transportista"]] = None,
     solo_activos: bool = Query(True),
     skip: int = Query(0, ge=0),
     limit: int = Query(500, ge=1, le=500),
@@ -57,7 +56,7 @@ async def listar_transportistas(
 @router.get("/buscar", response_model=List[EmpresaSchema])
 async def buscar_empresas(
     q: str = Query(..., min_length=1, description="Texto a buscar"),
-    tipo: Optional[TipoEmpresaEnum] = None,
+    tipo: Optional[Literal["cliente", "transportista"]] = None,
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)

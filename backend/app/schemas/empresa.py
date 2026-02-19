@@ -1,15 +1,13 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Literal
 from uuid import UUID
 from datetime import datetime
-
-from app.models.empresa import TipoEmpresaEnum
 
 
 class EmpresaBase(BaseModel):
     """Schema base de Empresa"""
     nombre: str = Field(..., max_length=200)
-    tipo: TipoEmpresaEnum
+    tipo: Literal["cliente", "transportista"]
     cuit: Optional[str] = Field(None, max_length=20)
     direccion: Optional[str] = Field(None, max_length=255)
     telefono: Optional[str] = Field(None, max_length=50)

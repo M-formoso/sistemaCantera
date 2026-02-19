@@ -16,7 +16,7 @@ class Empresa(BaseModel):
     __tablename__ = "empresas"
 
     nombre = Column(String(200), nullable=False, index=True)
-    tipo = Column(Enum(TipoEmpresaEnum), nullable=False, index=True)
+    tipo = Column(Enum('cliente', 'transportista', name='tipoempresaenum'), nullable=False, index=True)
     cuit = Column(String(20))
     direccion = Column(String(255))
     telefono = Column(String(50))
