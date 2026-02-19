@@ -43,16 +43,31 @@ export interface PaginatedResponse<T> {
   limit: number
 }
 
-// ==================== CAMION ====================
+// ==================== CAMION/MÁQUINA ====================
+
+export type CategoriaEquipo = 'camion' | 'maquina'
+export type TipoCamion = 'volcador' | 'acoplado' | 'mixer' | 'otro'
+export type TipoMaquina = 'pala_cargadora' | 'retroexcavadora' | 'excavadora' | 'motoniveladora' | 'compactadora' | 'trituradora' | 'generador' | 'bomba' | 'otro'
+export type EstadoEquipo = 'operativo' | 'en_servicio' | 'fuera_servicio'
 
 export interface Camion {
   id: string
-  patente: string
-  marca: string
-  modelo: string
-  año: number
+  categoria: CategoriaEquipo
+  patente?: string
+  nombre?: string
+  codigo_interno?: string
+  marca?: string
+  modelo?: string
+  año?: number
+  numero_serie?: string
+  tipo?: TipoCamion
+  tipo_maquina?: string
+  estado: EstadoEquipo
   kilometraje_actual: number
-  estado: 'operativo' | 'en_servicio' | 'fuera_servicio'
+  horometro_actual: number
+  horas_promedio_diarias?: number
+  chofer_habitual?: string
+  foto?: string
   observaciones?: string
   activo: boolean
   created_at: string
@@ -60,25 +75,78 @@ export interface Camion {
   // Campos de servicio
   ultimo_servicio?: string
   ultimo_servicio_km?: number
+  ultimo_servicio_horas?: number
   proximo_servicio_km?: number
+  proximo_servicio_horas?: number
   proximo_servicio_fecha?: string
   intervalo_servicio_km?: number
+  intervalo_servicio_horas?: number
+  // Documentación
+  tarjeta_verde_url?: string
+  tarjeta_verde_vencimiento?: string
+  seguro_url?: string
+  seguro_compania?: string
+  seguro_poliza?: string
+  seguro_vencimiento?: string
+  vtv_url?: string
+  vtv_vencimiento?: string
+  cedula_url?: string
   // Campos calculados
   km_para_proximo_servicio?: number
+  horas_para_proximo_servicio?: number
   requiere_servicio?: boolean
+  identificador?: string
 }
 
 export interface CamionCreate {
-  patente: string
-  marca: string
-  modelo: string
-  año: number
-  kilometraje_actual: number
-  estado: 'operativo' | 'en_servicio' | 'fuera_servicio'
+  categoria?: CategoriaEquipo
+  patente?: string
+  nombre?: string
+  codigo_interno?: string
+  marca?: string
+  modelo?: string
+  año?: number
+  numero_serie?: string
+  tipo?: TipoCamion
+  tipo_maquina?: string
+  estado?: EstadoEquipo
+  kilometraje_actual?: number
+  horometro_actual?: number
+  horas_promedio_diarias?: number
+  chofer_habitual?: string
+  foto?: string
   observaciones?: string
   proximo_servicio_km?: number
+  proximo_servicio_horas?: number
   proximo_servicio_fecha?: string
   intervalo_servicio_km?: number
+  intervalo_servicio_horas?: number
+  // Documentación
+  tarjeta_verde_url?: string
+  tarjeta_verde_vencimiento?: string
+  seguro_url?: string
+  seguro_compania?: string
+  seguro_poliza?: string
+  seguro_vencimiento?: string
+  vtv_url?: string
+  vtv_vencimiento?: string
+  cedula_url?: string
+}
+
+export interface DocumentoEquipo {
+  id: string
+  equipo_id: string
+  tipo: string
+  nombre: string
+  descripcion?: string
+  archivo_url: string
+  archivo_nombre?: string
+  archivo_tipo?: string
+  archivo_tamaño?: number
+  fecha_vencimiento?: string
+  notas?: string
+  created_at: string
+  updated_at: string
 }
 
 // ==================== REPUESTO ====================
@@ -390,4 +458,112 @@ export interface EstadisticasMes {
   total_combustible_mes: number
   total_servicios_mes: number
   costo_total_servicios: number
+}
+
+// ==================== FINANZAS ====================
+
+export type TipoMovimiento = 'ingreso' | 'egreso'
+export type EstadoMovimiento = 'completado' | 'pendiente' | 'anulado'
+
+export interface CategoriaFinanzas {
+  id: string
+  nombre: string
+  tipo: TipoMovimiento
+  descripcion?: string
+  color?: string
+  icono?: string
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CategoriaFinanzasCreate {
+  nombre: string
+  tipo: TipoMovimiento
+  descripcion?: string
+  color?: string
+  icono?: string
+}
+
+export interface MovimientoFinanciero {
+  id: string
+  tipo: TipoMovimiento
+  categoria_id?: string
+  fecha: string
+  monto: number
+  descripcion: string
+  detalle?: string
+  camion_id?: string
+  empresa_id?: string
+  numero_comprobante?: string
+  tipo_comprobante?: string
+  comprobante_url?: string
+  metodo_pago?: string
+  referencia_pago?: string
+  banco?: string
+  estado: EstadoMovimiento
+  created_by: string
+  notas?: string
+  created_at: string
+  updated_at: string
+  // Datos relacionados
+  categoria_nombre?: string
+  camion_identificador?: string
+  empresa_nombre?: string
+  creador_nombre?: string
+}
+
+export interface MovimientoFinancieroCreate {
+  tipo: TipoMovimiento
+  categoria_id?: string
+  fecha: string
+  monto: number
+  descripcion: string
+  detalle?: string
+  camion_id?: string
+  empresa_id?: string
+  numero_comprobante?: string
+  tipo_comprobante?: string
+  comprobante_url?: string
+  metodo_pago?: string
+  referencia_pago?: string
+  banco?: string
+  estado?: EstadoMovimiento
+  notas?: string
+}
+
+export interface CuentaBancaria {
+  id: string
+  nombre: string
+  banco: string
+  tipo_cuenta?: string
+  numero_cuenta?: string
+  cbu?: string
+  alias?: string
+  titular?: string
+  cuit_titular?: string
+  saldo_inicial: number
+  saldo_actual: number
+  moneda: string
+  activo: boolean
+  notas?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ResumenFinanciero {
+  total_ingresos: number
+  total_egresos: number
+  balance: number
+  cantidad_ingresos: number
+  cantidad_egresos: number
+}
+
+export interface ResumenPorCategoria {
+  categoria_id: string
+  categoria_nombre: string
+  tipo: TipoMovimiento
+  total: number
+  cantidad: number
+  color?: string
 }

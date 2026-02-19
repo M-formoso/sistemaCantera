@@ -9,6 +9,7 @@ import {
   Users,
   X,
   Building2,
+  DollarSign,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,11 @@ const menuItems = [
     title: 'Combustible',
     icon: Fuel,
     path: '/combustible',
+  },
+  {
+    title: 'Finanzas',
+    icon: DollarSign,
+    path: '/finanzas',
   },
   {
     title: 'Usuarios',

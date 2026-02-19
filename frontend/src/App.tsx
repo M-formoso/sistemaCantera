@@ -34,6 +34,9 @@ import UsuarioFormPage from '@/pages/usuarios/UsuarioFormPage'
 // Empresas (Clientes/Transportistas)
 import EmpresasPage from '@/pages/empresas/EmpresasPage'
 
+// Finanzas
+import FinanzasPage from '@/pages/finanzas/FinanzasPage'
+
 function App() {
   return (
     <Router>
@@ -90,6 +93,9 @@ function App() {
           <Route path="usuarios" element={<UsuariosPage />} />
           <Route path="usuarios/nuevo" element={<UsuarioFormPage />} />
           <Route path="usuarios/:id/editar" element={<UsuarioFormPage />} />
+
+          {/* Finanzas */}
+          <Route path="finanzas" element={<FinanzasPage />} />
 
           {/* Pendientes */}
           <Route path="reportes" element={<div className="p-4">Módulo de Reportes (en desarrollo)</div>} />
