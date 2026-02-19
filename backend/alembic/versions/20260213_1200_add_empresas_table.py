@@ -39,6 +39,7 @@ def upgrade() -> None:
     op.add_column('pesajes', sa.Column('tipo_entrega', sa.String(length=20), nullable=True, server_default='propio'))
     op.add_column('pesajes', sa.Column('transportista_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.add_column('pesajes', sa.Column('cliente_id', postgresql.UUID(as_uuid=True), nullable=True))
+    op.add_column('pesajes', sa.Column('cliente_nombre', sa.String(length=255), nullable=True))
     op.add_column('pesajes', sa.Column('patente_externa', sa.String(length=20), nullable=True))
 
     # Crear foreign keys
@@ -63,6 +64,7 @@ def downgrade() -> None:
 
     # Eliminar columnas de pesajes
     op.drop_column('pesajes', 'patente_externa')
+    op.drop_column('pesajes', 'cliente_nombre')
     op.drop_column('pesajes', 'cliente_id')
     op.drop_column('pesajes', 'transportista_id')
     op.drop_column('pesajes', 'tipo_entrega')

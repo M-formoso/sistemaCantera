@@ -25,6 +25,7 @@ class Pesaje(BaseModel):
 
     # Cliente destino
     cliente_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id"), nullable=True)
+    cliente_nombre = Column(String(255))  # Nombre del cliente (texto libre/legacy)
 
     # Datos del transporte
     acoplado = Column(String(20))  # Patente del acoplado
