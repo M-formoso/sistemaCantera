@@ -8,7 +8,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ordenEntregaService, OrdenEntrega, OrdenEntregaCreate, OrdenEntregaConPesajes } from '@/services/ordenEntregaService'
+import { ordenEntregaService, OrdenEntregaCreate } from '@/services/ordenEntregaService'
 import { empresasService } from '@/services/empresasService'
 import { formatDate, formatNumber } from '@/lib/utils'
 

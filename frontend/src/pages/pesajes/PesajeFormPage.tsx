@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { pesajesService } from '@/services/pesajesService'
 import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
-import { ordenEntregaService, OrdenEntrega } from '@/services/ordenEntregaService'
+import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { formatNumber } from '@/lib/utils'
 import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
 
