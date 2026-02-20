@@ -6,7 +6,6 @@ import {
   TrendingDown,
   Plus,
   Filter,
-  Calendar,
   Building2,
   Truck,
   FileText,
@@ -15,26 +14,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { finanzasService } from '@/services/finanzasService'
 import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
 import { formatNumber, formatDate } from '@/lib/utils'
-import {
-  MovimientoFinanciero,
-  MovimientoFinancieroCreate,
-  CategoriaFinanzas,
-  TipoMovimiento,
-  Camion,
-  Empresa
-} from '@/types'
+import { MovimientoFinancieroCreate, TipoMovimiento } from '@/types'
 
 export default function FinanzasPage() {
   const queryClient = useQueryClient()
@@ -250,68 +234,70 @@ export default function FinanzasPage() {
               No hay movimientos registrados
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Referencia</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movimientos.map((mov) => (
-                  <TableRow key={mov.id}>
-                    <TableCell>{formatDate(mov.fecha)}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        mov.tipo === 'ingreso'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2 font-medium">Fecha</th>
+                    <th className="text-left py-3 px-2 font-medium">Tipo</th>
+                    <th className="text-left py-3 px-2 font-medium">Categoría</th>
+                    <th className="text-left py-3 px-2 font-medium">Descripción</th>
+                    <th className="text-left py-3 px-2 font-medium">Referencia</th>
+                    <th className="text-right py-3 px-2 font-medium">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimientos.map((mov) => (
+                    <tr key={mov.id} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-2">{formatDate(mov.fecha)}</td>
+                      <td className="py-3 px-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          mov.tipo === 'ingreso'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {mov.tipo === 'ingreso' ? (
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3 mr-1" />
+                          )}
+                          {mov.tipo}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2">{mov.categoria_nombre || '-'}</td>
+                      <td className="py-3 px-2 max-w-xs truncate">{mov.descripcion}</td>
+                      <td className="py-3 px-2">
+                        <div className="text-sm">
+                          {mov.camion_identificador && (
+                            <span className="flex items-center gap-1 text-gray-600">
+                              <Truck className="h-3 w-3" />
+                              {mov.camion_identificador}
+                            </span>
+                          )}
+                          {mov.empresa_nombre && (
+                            <span className="flex items-center gap-1 text-gray-600">
+                              <Building2 className="h-3 w-3" />
+                              {mov.empresa_nombre}
+                            </span>
+                          )}
+                          {mov.numero_comprobante && (
+                            <span className="flex items-center gap-1 text-gray-600">
+                              <FileText className="h-3 w-3" />
+                              {mov.numero_comprobante}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`py-3 px-2 text-right font-medium ${
+                        mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {mov.tipo === 'ingreso' ? (
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3 mr-1" />
-                        )}
-                        {mov.tipo}
-                      </span>
-                    </TableCell>
-                    <TableCell>{mov.categoria_nombre || '-'}</TableCell>
-                    <TableCell className="max-w-xs truncate">{mov.descripcion}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {mov.camion_identificador && (
-                          <span className="flex items-center gap-1 text-gray-600">
-                            <Truck className="h-3 w-3" />
-                            {mov.camion_identificador}
-                          </span>
-                        )}
-                        {mov.empresa_nombre && (
-                          <span className="flex items-center gap-1 text-gray-600">
-                            <Building2 className="h-3 w-3" />
-                            {mov.empresa_nombre}
-                          </span>
-                        )}
-                        {mov.numero_comprobante && (
-                          <span className="flex items-center gap-1 text-gray-600">
-                            <FileText className="h-3 w-3" />
-                            {mov.numero_comprobante}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className={`text-right font-medium ${
-                      mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {mov.tipo === 'ingreso' ? '+' : '-'}${formatNumber(mov.monto)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        {mov.tipo === 'ingreso' ? '+' : '-'}${formatNumber(mov.monto)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

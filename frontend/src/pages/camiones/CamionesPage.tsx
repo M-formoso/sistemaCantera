@@ -159,7 +159,7 @@ export default function CamionesPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleDelete(camion.id, camion.patente)}
+              onClick={() => handleDelete(camion.id, camion.patente || camion.nombre || 'este equipo')}
               disabled={deleteMutation.isPending}
               title="Eliminar"
             >
