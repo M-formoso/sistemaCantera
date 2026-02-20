@@ -300,6 +300,10 @@ export interface Pesaje {
   // Operación
   operario?: string
   observaciones?: string
+  // Importe
+  precio_unitario?: number
+  importe_total?: number
+  movimiento_financiero_id?: string
   remito_generado: boolean
   created_by: string
   created_at: string
@@ -329,6 +333,9 @@ export interface PesajeCreate {
   // Operación
   operario?: string
   observaciones?: string
+  // Importe
+  precio_unitario?: number
+  importe_total?: number
 }
 
 // ==================== REMITO ====================

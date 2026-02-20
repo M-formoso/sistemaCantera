@@ -53,6 +53,10 @@ class PesajeBase(BaseModel):
 
     observaciones: Optional[str] = None
 
+    # Importe
+    precio_unitario: Optional[Decimal] = Field(None, ge=0, description="Precio por tonelada")
+    importe_total: Optional[Decimal] = Field(None, ge=0, description="Importe total del pesaje")
+
     @field_validator('peso_bruto')
     @classmethod
     def validar_peso_bruto(cls, v, info):
@@ -109,6 +113,8 @@ class PesajeUpdate(BaseModel):
     peso_bruto: Optional[Decimal] = Field(None, gt=0)
     material: Optional[str] = Field(None, max_length=100)
     observaciones: Optional[str] = None
+    precio_unitario: Optional[Decimal] = Field(None, ge=0)
+    importe_total: Optional[Decimal] = Field(None, ge=0)
 
 
 class PesajeSchema(ResponseBase):
@@ -147,6 +153,11 @@ class PesajeSchema(ResponseBase):
     # Operación
     operario: Optional[str] = None
     observaciones: Optional[str] = None
+
+    # Importe
+    precio_unitario: Optional[Decimal] = None
+    importe_total: Optional[Decimal] = None
+    movimiento_financiero_id: Optional[UUID] = None
 
     remito_generado: bool
     created_by: UUID

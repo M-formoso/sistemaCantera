@@ -47,8 +47,14 @@ class Pesaje(BaseModel):
     remito_generado = Column(Boolean, default=False, nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
 
+    # Importe y vinculación con finanzas
+    precio_unitario = Column(Numeric(12, 2))  # Precio por tonelada
+    importe_total = Column(Numeric(12, 2))  # Importe total del pesaje
+    movimiento_financiero_id = Column(UUID(as_uuid=True), ForeignKey("movimientos_financieros.id"), nullable=True)
+
     # Relaciones
     camion = relationship("Camion", back_populates="pesajes")
+    movimiento_financiero = relationship("MovimientoFinanciero")
     transportista_empresa = relationship("Empresa", foreign_keys=[transportista_id])
     cliente = relationship("Empresa", foreign_keys=[cliente_id])
     creador = relationship("Usuario", back_populates="pesajes_creados", foreign_keys=[created_by])

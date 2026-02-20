@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck } from 'lucide-react'
+import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck, DollarSign } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +48,9 @@ const pesajeSchema = z.object({
   // Operación
   operario: z.string().optional(),
   observaciones: z.string().optional(),
+  // Importe
+  precio_unitario: z.number().min(0).optional(),
+  importe_total: z.number().min(0).optional(),
 }).refine((data) => data.peso_bruto > data.peso_tara, {
   message: 'El peso bruto debe ser mayor al peso tara',
   path: ['peso_bruto'],
@@ -78,6 +81,7 @@ export default function PesajeFormPage() {
   const isEditing = !!id
 
   const [pesoNeto, setPesoNeto] = useState(0)
+  const [importeCalculado, setImporteCalculado] = useState(0)
   const [createdPesaje, setCreatedPesaje] = useState<Pesaje | null>(null)
 
   // Estados para autocompletado
@@ -125,13 +129,25 @@ export default function PesajeFormPage() {
   const tipoEntrega = watch('tipo_entrega')
   const pesoBruto = watch('peso_bruto')
   const pesoTara = watch('peso_tara')
+  const precioUnitario = watch('precio_unitario')
 
   useEffect(() => {
     const bruto = Number(pesoBruto) || 0
     const tara = Number(pesoTara) || 0
     const neto = bruto > tara ? bruto - tara : 0
     setPesoNeto(neto)
-  }, [pesoBruto, pesoTara])
+
+    // Calcular importe automáticamente si hay precio unitario
+    const precio = Number(precioUnitario) || 0
+    if (precio > 0 && neto > 0) {
+      const toneladas = neto / 1000
+      const importe = toneladas * precio
+      setImporteCalculado(importe)
+      setValue('importe_total', Math.round(importe * 100) / 100)
+    } else {
+      setImporteCalculado(0)
+    }
+  }, [pesoBruto, pesoTara, precioUnitario, setValue])
 
   useEffect(() => {
     if (pesaje) {
@@ -367,6 +383,21 @@ export default function PesajeFormPage() {
                   {formatNumber(createdPesaje.peso_neto)} kg ({formatNumber(createdPesaje.peso_neto / 1000, 2)} t)
                 </span>
               </div>
+              {createdPesaje.importe_total && createdPesaje.importe_total > 0 && (
+                <>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Importe Total:</span>
+                      <span className="font-bold text-green-600">
+                        ${formatNumber(createdPesaje.importe_total, 2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    Ingreso registrado en Finanzas
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex flex-col gap-3">
@@ -759,6 +790,52 @@ export default function PesajeFormPage() {
                   </div>
                 </div>
 
+                {/* Sección: Importe */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Importe (Opcional)
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Si completa el precio por tonelada, se generará automáticamente un ingreso en Finanzas.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Precio por tonelada */}
+                    <div className="space-y-2">
+                      <label htmlFor="precio_unitario" className="text-sm font-medium">
+                        Precio por Tonelada ($)
+                      </label>
+                      <Input
+                        id="precio_unitario"
+                        type="number"
+                        step="0.01"
+                        {...register('precio_unitario', { valueAsNumber: true })}
+                        placeholder="5000"
+                      />
+                    </div>
+
+                    {/* Importe total */}
+                    <div className="space-y-2">
+                      <label htmlFor="importe_total" className="text-sm font-medium">
+                        Importe Total ($)
+                      </label>
+                      <Input
+                        id="importe_total"
+                        type="number"
+                        step="0.01"
+                        {...register('importe_total', { valueAsNumber: true })}
+                        placeholder="Calculado automáticamente"
+                        className="bg-gray-50"
+                      />
+                      {importeCalculado > 0 && (
+                        <p className="text-xs text-green-600">
+                          Calculado: ${formatNumber(importeCalculado, 2)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Observaciones */}
                 <div className="space-y-2">
                   <label htmlFor="observaciones" className="text-sm font-medium">
@@ -836,6 +913,35 @@ export default function PesajeFormPage() {
               {pesoNeto > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700">
                   Cálculo automático: Peso Neto = Peso Bruto - Peso Tara
+                </div>
+              )}
+
+              {/* Sección de importe calculado */}
+              {importeCalculado > 0 && (
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <span className="font-semibold text-sm">Importe</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Precio/Tonelada:</span>
+                      <span className="font-medium">${formatNumber(precioUnitario || 0, 2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Toneladas:</span>
+                      <span className="font-medium">{formatNumber(pesoNeto / 1000, 2)} t</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="font-semibold">Total:</span>
+                      <span className="text-xl font-bold text-green-600">
+                        ${formatNumber(importeCalculado, 2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-700 mt-3">
+                    Este importe se registrará automáticamente como ingreso en Finanzas
+                  </div>
                 </div>
               )}
             </CardContent>

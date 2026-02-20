@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Scale, Plus, Pencil, Trash2, Download } from 'lucide-react'
+import { Scale, Plus, Pencil, Trash2, Download, DollarSign } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -103,6 +103,21 @@ export default function PesajesRemitosPage() {
       },
     },
     {
+      accessorKey: 'importe_total',
+      header: 'Importe',
+      cell: ({ row }) => {
+        const importe = row.original.importe_total
+        if (!importe || importe <= 0) {
+          return <div className="text-sm text-gray-400 text-right">-</div>
+        }
+        return (
+          <div className="text-sm font-semibold text-right text-blue-700">
+            ${formatNumber(importe, 2)}
+          </div>
+        )
+      },
+    },
+    {
       id: 'actions',
       header: 'Acciones',
       cell: ({ row }) => {
@@ -150,6 +165,7 @@ export default function PesajesRemitosPage() {
 
   const totalToneladas = pesajes.reduce((sum, p) => sum + p.peso_neto / 1000, 0)
   const promedioToneladas = pesajes.length > 0 ? totalToneladas / pesajes.length : 0
+  const totalIngresos = pesajes.reduce((sum, p) => sum + (p.importe_total || 0), 0)
 
   return (
     <div className="space-y-6">
@@ -171,7 +187,7 @@ export default function PesajesRemitosPage() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Pesajes</div>
@@ -191,6 +207,17 @@ export default function PesajesRemitosPage() {
             <div className="text-sm text-muted-foreground">Promedio por Pesaje</div>
             <div className="text-2xl font-bold">
               {formatNumber(promedioToneladas, 2)} t
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <DollarSign className="h-3 w-3" />
+              Ingresos por Pesajes
+            </div>
+            <div className="text-2xl font-bold text-blue-600">
+              ${formatNumber(totalIngresos, 2)}
             </div>
           </CardContent>
         </Card>
