@@ -36,7 +36,6 @@ import EmpresasPage from '@/pages/empresas/EmpresasPage'
 
 // Finanzas
 import FinanzasPage from '@/pages/finanzas/FinanzasPage'
-import CuentaCorrientePage from '@/pages/finanzas/CuentaCorrientePage'
 
 function App() {
   return (
@@ -97,7 +96,6 @@ function App() {
 
           {/* Finanzas */}
           <Route path="finanzas" element={<FinanzasPage />} />
-          <Route path="cuenta-corriente" element={<CuentaCorrientePage />} />
 
           {/* Pendientes */}
           <Route path="reportes" element={<div className="p-4">Módulo de Reportes (en desarrollo)</div>} />

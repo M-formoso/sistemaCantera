@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Users, DollarSign, Plus, CreditCard, FileText,
+  Users, Plus, CreditCard, FileText,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   X
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { cuentaCorrienteService, ClienteConDeuda, MovimientoCC, ResumenCuentaCorriente } from '@/services/cuentaCorrienteService'
+import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
 import { formatDate, formatNumber } from '@/lib/utils'
 
-export default function CuentaCorrientePage() {
+export default function CuentaCorrienteTab() {
   const queryClient = useQueryClient()
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null)
   const [showPagoModal, setShowPagoModal] = useState(false)
@@ -46,19 +46,6 @@ export default function CuentaCorrientePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="h-6 w-6 sm:h-8 sm:w-8" />
-            Cuenta Corriente
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm sm:text-base">
-            Control de deudas y pagos de clientes
-          </p>
-        </div>
-      </div>
-
       {/* Estadísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
