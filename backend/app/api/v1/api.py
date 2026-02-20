@@ -11,7 +11,8 @@ from app.api.v1.endpoints import (
     dashboard,
     empresas,
     finanzas,
-    upload
+    upload,
+    cuenta_corriente
 )
 
 # Crear router principal de la API v1
@@ -36,3 +37,4 @@ api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboar
 api_router.include_router(empresas.router, prefix="/empresas", tags=["Empresas"])
 api_router.include_router(finanzas.router, prefix="/finanzas", tags=["Finanzas"])
 api_router.include_router(upload.router, prefix="/upload", tags=["Upload"])
+api_router.include_router(cuenta_corriente.router, prefix="/cuenta-corriente", tags=["Cuenta Corriente"])

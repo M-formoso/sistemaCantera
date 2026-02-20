@@ -10,6 +10,7 @@ import {
   X,
   Building2,
   DollarSign,
+  CreditCard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,11 @@ const menuItems = [
     title: 'Finanzas',
     icon: DollarSign,
     path: '/finanzas',
+  },
+  {
+    title: 'Cuenta Corriente',
+    icon: CreditCard,
+    path: '/cuenta-corriente',
   },
   {
     title: 'Usuarios',

@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from app.models.pesaje import Pesaje
 from app.models.remito import Remito
 from app.models.empresa import Empresa
-from app.models.finanzas import MovimientoFinanciero, CategoriaFinanzas
+from app.models.cuenta_corriente import MovimientoCuentaCorriente
 from app.schemas.pesaje import PesajeCreate, PesajeUpdate
 from app.services import camion_service
 
@@ -196,9 +196,9 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     # Generar remito automáticamente
     _generar_remito_automatico(db, db_pesaje, usuario_id)
 
-    # Si hay importe, crear movimiento financiero de ingreso
-    if db_pesaje.importe_total and db_pesaje.importe_total > 0:
-        _crear_movimiento_ingreso(db, db_pesaje, usuario_id, cliente_empresa)
+    # Si hay importe y cliente, registrar en cuenta corriente
+    if db_pesaje.importe_total and db_pesaje.importe_total > 0 and db_pesaje.cliente_id:
+        _registrar_en_cuenta_corriente(db, db_pesaje, usuario_id)
 
     # Agregar info para respuesta
     if camion:
@@ -218,63 +218,47 @@ def _obtener_proximo_numero_remito(db: Session) -> int:
     return (ultimo_remito.numero_remito + 1) if ultimo_remito else 1
 
 
-def _crear_movimiento_ingreso(db: Session, pesaje: Pesaje, usuario_id: UUID, cliente_empresa: Optional[Empresa] = None) -> MovimientoFinanciero:
+def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID) -> MovimientoCuentaCorriente:
     """
-    Crea un movimiento financiero de ingreso al registrar un pesaje con importe
+    Registra un cargo en la cuenta corriente del cliente al crear un pesaje con importe
     """
-    # Buscar categoría de "Venta de materiales" (creada por defecto en la migración)
-    categoria = db.query(CategoriaFinanzas).filter(
-        CategoriaFinanzas.nombre == "Venta de materiales",
-        CategoriaFinanzas.tipo == "ingreso"
-    ).first()
+    # Obtener empresa y saldo actual
+    empresa = db.query(Empresa).filter(Empresa.id == pesaje.cliente_id).first()
+    if not empresa:
+        return None
 
-    # Determinar cliente para descripción
-    cliente_nombre = None
-    if cliente_empresa:
-        cliente_nombre = cliente_empresa.nombre
-    elif pesaje.cliente_nombre:
-        cliente_nombre = pesaje.cliente_nombre
+    saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
+    saldo_posterior = saldo_anterior + pesaje.importe_total
 
-    # Crear descripción detallada
+    # Crear descripción
+    peso_tn = pesaje.peso_neto / Decimal("1000")
     descripcion = f"Pesaje #{pesaje.numero_pesaje}"
     if pesaje.material:
         descripcion += f" - {pesaje.material}"
-    if cliente_nombre:
-        descripcion += f" - {cliente_nombre}"
+    descripcion += f" ({peso_tn:.2f} tn)"
 
-    # Detalle con información completa
-    peso_tn = pesaje.peso_neto / Decimal("1000")
-    detalle = f"Peso neto: {peso_tn:.2f} tn"
-    if pesaje.precio_unitario:
-        detalle += f"\nPrecio/tn: ${pesaje.precio_unitario:,.2f}"
-    detalle += f"\nImporte: ${pesaje.importe_total:,.2f}"
-
-    # Crear el movimiento
-    db_movimiento = MovimientoFinanciero(
-        tipo="ingreso",
-        categoria_id=categoria.id if categoria else None,
-        fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
+    # Crear movimiento de cuenta corriente
+    movimiento = MovimientoCuentaCorriente(
+        empresa_id=pesaje.cliente_id,
+        tipo="cargo",
         monto=pesaje.importe_total,
+        saldo_anterior=saldo_anterior,
+        saldo_posterior=saldo_posterior,
+        fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
         descripcion=descripcion,
-        detalle=detalle,
-        empresa_id=cliente_empresa.id if cliente_empresa else None,
-        numero_comprobante=f"P-{pesaje.numero_pesaje}",
-        tipo_comprobante="pesaje",
-        estado="completado",
-        created_by=usuario_id,
-        notas=f"Generado automáticamente desde pesaje #{pesaje.numero_pesaje}"
+        detalle=f"Precio/tn: ${pesaje.precio_unitario:,.2f}" if pesaje.precio_unitario else None,
+        pesaje_id=pesaje.id,
+        created_by=usuario_id
     )
 
-    db.add(db_movimiento)
-    db.flush()  # Para obtener el ID del movimiento
+    # Actualizar saldo de empresa
+    empresa.saldo_cuenta_corriente = saldo_posterior
 
-    # Vincular el pesaje con el movimiento financiero
-    pesaje.movimiento_financiero_id = db_movimiento.id
-
+    db.add(movimiento)
     db.commit()
-    db.refresh(db_movimiento)
+    db.refresh(movimiento)
 
-    return db_movimiento
+    return movimiento
 
 
 def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) -> Remito:

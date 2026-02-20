@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Enum
+from sqlalchemy import Column, String, Boolean, Enum, Numeric
 from sqlalchemy.orm import relationship
 import enum
 
@@ -23,6 +23,12 @@ class Empresa(BaseModel):
     email = Column(String(100))
     contacto = Column(String(100))  # Persona de contacto
     activo = Column(Boolean, default=True, nullable=False)
+
+    # Cuenta corriente
+    saldo_cuenta_corriente = Column(Numeric(12, 2), default=0, nullable=False)
+
+    # Relaciones
+    movimientos_cuenta_corriente = relationship("MovimientoCuentaCorriente", back_populates="empresa")
 
     def __repr__(self):
         return f"<Empresa {self.nombre} ({self.tipo})>"
