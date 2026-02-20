@@ -13,6 +13,7 @@ from app.models.pesaje import Pesaje
 from app.models.remito import Remito
 from app.models.empresa import Empresa
 from app.models.cuenta_corriente import MovimientoCuentaCorriente
+from app.models.orden_entrega import OrdenEntrega, EstadoOrdenEntrega
 from app.schemas.pesaje import PesajeCreate, PesajeUpdate
 from app.services import camion_service
 
@@ -200,6 +201,10 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     if db_pesaje.importe_total and db_pesaje.importe_total > 0 and db_pesaje.cliente_id:
         _registrar_en_cuenta_corriente(db, db_pesaje, usuario_id)
 
+    # Si está asociado a una orden de entrega, actualizar la orden
+    if db_pesaje.orden_entrega_id:
+        _actualizar_orden_entrega(db, db_pesaje.orden_entrega_id, db_pesaje.peso_neto)
+
     # Agregar info para respuesta
     if camion:
         db_pesaje.camion_patente = camion.patente
@@ -216,6 +221,31 @@ def _obtener_proximo_numero_remito(db: Session) -> int:
     from sqlalchemy import desc
     ultimo_remito = db.query(Remito).order_by(desc(Remito.numero_remito)).first()
     return (ultimo_remito.numero_remito + 1) if ultimo_remito else 1
+
+
+def _actualizar_orden_entrega(db: Session, orden_id: UUID, peso_neto: Decimal) -> None:
+    """
+    Actualiza una orden de entrega al crear un pesaje asociado
+    Incrementa cargas_entregadas y peso_total_entregado
+    """
+    orden = db.query(OrdenEntrega).filter(OrdenEntrega.id == orden_id).first()
+    if not orden:
+        return
+
+    # Incrementar cargas entregadas
+    orden.cargas_entregadas = (orden.cargas_entregadas or 0) + 1
+
+    # Actualizar peso total entregado
+    peso_actual = orden.peso_total_entregado or Decimal("0")
+    orden.peso_total_entregado = peso_actual + (peso_neto or Decimal("0"))
+
+    # Actualizar estado
+    if orden.cargas_entregadas >= orden.cantidad_cargas:
+        orden.estado = EstadoOrdenEntrega.completada.value
+    elif orden.cargas_entregadas > 0:
+        orden.estado = EstadoOrdenEntrega.en_proceso.value
+
+    db.commit()
 
 
 def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID) -> MovimientoCuentaCorriente:

@@ -52,6 +52,9 @@ class Pesaje(BaseModel):
     importe_total = Column(Numeric(12, 2))  # Importe total del pesaje
     movimiento_financiero_id = Column(UUID(as_uuid=True), ForeignKey("movimientos_financieros.id"), nullable=True)
 
+    # Vinculación con orden de entrega
+    orden_entrega_id = Column(UUID(as_uuid=True), ForeignKey("ordenes_entrega.id"), nullable=True, index=True)
+
     # Relaciones
     camion = relationship("Camion", back_populates="pesajes")
     movimiento_financiero = relationship("MovimientoFinanciero")
@@ -59,6 +62,7 @@ class Pesaje(BaseModel):
     cliente = relationship("Empresa", foreign_keys=[cliente_id])
     creador = relationship("Usuario", back_populates="pesajes_creados", foreign_keys=[created_by])
     remito = relationship("Remito", back_populates="pesaje", uselist=False)
+    orden_entrega = relationship("OrdenEntrega", back_populates="pesajes")
 
     def __repr__(self):
         return f"<Pesaje #{self.numero_pesaje} - {self.material}>"

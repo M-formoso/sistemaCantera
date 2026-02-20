@@ -57,6 +57,9 @@ class PesajeBase(BaseModel):
     precio_unitario: Optional[Decimal] = Field(None, ge=0, description="Precio por tonelada")
     importe_total: Optional[Decimal] = Field(None, ge=0, description="Importe total del pesaje")
 
+    # Orden de entrega
+    orden_entrega_id: Optional[UUID] = None
+
     @field_validator('peso_bruto')
     @classmethod
     def validar_peso_bruto(cls, v, info):
@@ -115,6 +118,7 @@ class PesajeUpdate(BaseModel):
     observaciones: Optional[str] = None
     precio_unitario: Optional[Decimal] = Field(None, ge=0)
     importe_total: Optional[Decimal] = Field(None, ge=0)
+    orden_entrega_id: Optional[UUID] = None
 
 
 class PesajeSchema(ResponseBase):
@@ -158,6 +162,10 @@ class PesajeSchema(ResponseBase):
     precio_unitario: Optional[Decimal] = None
     importe_total: Optional[Decimal] = None
     movimiento_financiero_id: Optional[UUID] = None
+
+    # Orden de entrega
+    orden_entrega_id: Optional[UUID] = None
+    orden_entrega_numero: Optional[int] = None
 
     remito_generado: bool
     created_by: UUID

@@ -4,13 +4,14 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck, DollarSign } from 'lucide-react'
+import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck, DollarSign, ClipboardList } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { pesajesService } from '@/services/pesajesService'
 import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
+import { ordenEntregaService, OrdenEntrega } from '@/services/ordenEntregaService'
 import { formatNumber } from '@/lib/utils'
 import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
 
@@ -51,6 +52,8 @@ const pesajeSchema = z.object({
   // Importe
   precio_unitario: z.number().min(0).optional(),
   importe_total: z.number().min(0).optional(),
+  // Orden de entrega
+  orden_entrega_id: z.string().optional(),
 }).refine((data) => data.peso_bruto > data.peso_tara, {
   message: 'El peso bruto debe ser mayor al peso tara',
   path: ['peso_bruto'],
@@ -106,6 +109,11 @@ export default function PesajeFormPage() {
   const { data: camiones = [] } = useQuery({
     queryKey: ['camiones'],
     queryFn: () => camionesService.getAll(true),
+  })
+
+  const { data: ordenesPendientes = [] } = useQuery({
+    queryKey: ['ordenes-pendientes'],
+    queryFn: () => ordenEntregaService.getOrdenesPendientes(),
   })
 
   const {
@@ -727,6 +735,32 @@ export default function PesajeFormPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Sección: Orden de Entrega (opcional) */}
+                {ordenesPendientes.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      Orden de Entrega (Opcional)
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Si este pesaje corresponde a una orden de entrega pendiente, selecciónela aquí para descontar automáticamente.
+                    </p>
+                    <div className="space-y-2">
+                      <select
+                        {...register('orden_entrega_id')}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="">Sin orden de entrega</option>
+                        {ordenesPendientes.map((orden) => (
+                          <option key={orden.id} value={orden.id}>
+                            #{orden.numero_orden} - {orden.cliente_nombre_completo || orden.cliente_nombre || 'Sin cliente'} - {orden.material} ({orden.cargas_entregadas}/{orden.cantidad_cargas} cargas)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 {/* Sección: Pesos */}
                 <div>
