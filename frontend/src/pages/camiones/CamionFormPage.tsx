@@ -8,7 +8,9 @@ import { ArrowLeft, Save, Truck, Cog, FileText, Shield } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FileUpload } from '@/components/ui/file-upload'
 import { camionesService } from '@/services/camionesService'
+import { uploadService } from '@/services/uploadService'
 
 const camionSchema = z.object({
   categoria: z.enum(['camion', 'maquina']),
@@ -430,10 +432,13 @@ export default function CamionFormPage() {
                   Tarjeta Verde
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">URL del Documento</label>
-                    <Input {...register('tarjeta_verde_url')} placeholder="https://..." />
-                  </div>
+                  <FileUpload
+                    value={watch('tarjeta_verde_url')}
+                    onChange={(url) => setValue('tarjeta_verde_url', url || '')}
+                    onUpload={(file) => uploadService.uploadDocumento(file, 'tarjeta_verde')}
+                    accept="image/*,.pdf"
+                    placeholder="Subir Tarjeta Verde"
+                  />
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Fecha de Vencimiento</label>
                     <Input type="date" {...register('tarjeta_verde_vencimiento')} />
@@ -456,10 +461,13 @@ export default function CamionFormPage() {
                     <label className="text-sm font-medium">N° de Póliza</label>
                     <Input {...register('seguro_poliza')} placeholder="123456789" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">URL del Documento</label>
-                    <Input {...register('seguro_url')} placeholder="https://..." />
-                  </div>
+                  <FileUpload
+                    value={watch('seguro_url')}
+                    onChange={(url) => setValue('seguro_url', url || '')}
+                    onUpload={(file) => uploadService.uploadDocumento(file, 'seguro')}
+                    accept="image/*,.pdf"
+                    placeholder="Subir Póliza de Seguro"
+                  />
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Fecha de Vencimiento</label>
                     <Input type="date" {...register('seguro_vencimiento')} />
@@ -475,10 +483,13 @@ export default function CamionFormPage() {
                     VTV (Verificación Técnica Vehicular)
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">URL del Documento</label>
-                      <Input {...register('vtv_url')} placeholder="https://..." />
-                    </div>
+                    <FileUpload
+                      value={watch('vtv_url')}
+                      onChange={(url) => setValue('vtv_url', url || '')}
+                      onUpload={(file) => uploadService.uploadDocumento(file, 'vtv')}
+                      accept="image/*,.pdf"
+                      placeholder="Subir VTV"
+                    />
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Fecha de Vencimiento</label>
                       <Input type="date" {...register('vtv_vencimiento')} />
@@ -494,10 +505,13 @@ export default function CamionFormPage() {
                     <FileText className="h-4 w-4 text-purple-600" />
                     Cédula Verde/Azul
                   </h3>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">URL del Documento</label>
-                    <Input {...register('cedula_url')} placeholder="https://..." />
-                  </div>
+                  <FileUpload
+                    value={watch('cedula_url')}
+                    onChange={(url) => setValue('cedula_url', url || '')}
+                    onUpload={(file) => uploadService.uploadDocumento(file, 'cedula')}
+                    accept="image/*,.pdf"
+                    placeholder="Subir Cédula"
+                  />
                 </div>
               )}
             </CardContent>

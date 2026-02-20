@@ -10,7 +10,8 @@ from app.api.v1.endpoints import (
     combustible,
     dashboard,
     empresas,
-    finanzas
+    finanzas,
+    upload
 )
 
 # Crear router principal de la API v1
@@ -34,3 +35,4 @@ api_router.include_router(combustible.router, prefix="/combustible", tags=["Comb
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(empresas.router, prefix="/empresas", tags=["Empresas"])
 api_router.include_router(finanzas.router, prefix="/finanzas", tags=["Finanzas"])
+api_router.include_router(upload.router, prefix="/upload", tags=["Upload"])
