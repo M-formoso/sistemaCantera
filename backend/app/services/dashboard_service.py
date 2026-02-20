@@ -57,9 +57,15 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
     # ===== ESTADO DE CAMIONES =====
     camiones = db.query(Camion).filter(Camion.activo == True).all()
 
-    camiones_operativos = sum(1 for c in camiones if c.estado.value == 'operativo')
-    camiones_en_servicio = sum(1 for c in camiones if c.estado.value == 'en_servicio')
-    camiones_fuera_servicio = sum(1 for c in camiones if c.estado.value == 'fuera_servicio')
+    def get_estado_value(estado):
+        """Obtiene el valor del estado ya sea enum o string"""
+        if hasattr(estado, 'value'):
+            return estado.value
+        return str(estado) if estado else 'operativo'
+
+    camiones_operativos = sum(1 for c in camiones if get_estado_value(c.estado) == 'operativo')
+    camiones_en_servicio = sum(1 for c in camiones if get_estado_value(c.estado) == 'en_servicio')
+    camiones_fuera_servicio = sum(1 for c in camiones if get_estado_value(c.estado) == 'fuera_servicio')
 
     # ===== ALERTAS =====
     # Repuestos bajo stock
@@ -87,13 +93,23 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         Servicio.fecha <= proximos_7_dias
     ).order_by(Servicio.fecha).limit(5).all()
 
+    def get_equipo_identificador(equipo):
+        """Obtiene identificador del equipo (patente o nombre)"""
+        return equipo.patente or equipo.nombre or equipo.codigo_interno or "Sin identificar"
+
+    def get_tipo_value(tipo):
+        """Obtiene el valor del tipo ya sea enum o string"""
+        if hasattr(tipo, 'value'):
+            return tipo.value
+        return str(tipo) if tipo else 'otro'
+
     servicios_proximos_lista = [
         {
             "id": str(s.id),
-            "camion_patente": s.camion.patente,
+            "camion_patente": get_equipo_identificador(s.camion) if s.camion else "Sin equipo",
             "fecha": s.fecha.isoformat(),
-            "tipo": s.tipo.value,
-            "descripcion": s.descripcion[:100]  # Truncar descripción
+            "tipo": get_tipo_value(s.tipo),
+            "descripcion": s.descripcion[:100] if s.descripcion else ""  # Truncar descripción
         }
         for s in servicios_proximos
     ]
@@ -106,7 +122,7 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
             "id": str(p.id),
             "numero_pesaje": p.numero_pesaje,
             "fecha": p.fecha.isoformat(),
-            "camion_patente": p.camion.patente if p.camion else (p.patente_externa or "Externo"),
+            "camion_patente": get_equipo_identificador(p.camion) if p.camion else (p.patente_externa or "Externo"),
             "material": p.material or "No especificado",
             "peso_neto": float(p.peso_neto),
             "cliente_destino": (p.cliente.nombre if p.cliente else None) or p.cliente_nombre or "No especificado"
@@ -143,7 +159,7 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         "camiones_requieren_servicio": [
             {
                 "id": str(c.id),
-                "patente": c.patente,
+                "patente": get_equipo_identificador(c),
                 "km_actual": c.kilometraje_actual,
                 "proximo_servicio_km": c.proximo_servicio_km,
                 "proximo_servicio_fecha": c.proximo_servicio_fecha.isoformat() if c.proximo_servicio_fecha else None,

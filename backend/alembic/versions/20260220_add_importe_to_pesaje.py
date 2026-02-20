@@ -1,7 +1,7 @@
 """Add importe field to pesajes and link with finanzas
 
 Revision ID: 20260220_importe
-Revises: 20260219_add_maquinas_docs_finanzas
+Revises: add_maquinas_finanzas
 Create Date: 2026-02-20 10:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers, used by Alembic.
 revision = '20260220_importe'
-down_revision = '20260219_add_maquinas_docs_finanzas'
+down_revision = 'add_maquinas_finanzas'
 branch_labels = None
 depends_on = None
 
