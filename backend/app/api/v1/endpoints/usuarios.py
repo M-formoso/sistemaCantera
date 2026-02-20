@@ -118,7 +118,17 @@ async def create_usuario(
         nombre=usuario_data.nombre,
         rol=usuario_data.rol,
         password_hash=password_hash,
-        activo=True
+        activo=True,
+        # Permisos por módulo
+        permiso_dashboard=usuario_data.permiso_dashboard,
+        permiso_camiones=usuario_data.permiso_camiones,
+        permiso_empresas=usuario_data.permiso_empresas,
+        permiso_repuestos=usuario_data.permiso_repuestos,
+        permiso_pesajes=usuario_data.permiso_pesajes,
+        permiso_combustible=usuario_data.permiso_combustible,
+        permiso_finanzas=usuario_data.permiso_finanzas,
+        permiso_usuarios=usuario_data.permiso_usuarios,
+        permiso_reportes=usuario_data.permiso_reportes,
     )
 
     db.add(nuevo_usuario)

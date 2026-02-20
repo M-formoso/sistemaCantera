@@ -24,6 +24,18 @@ class Usuario(BaseModel):
     activo = Column(Boolean, default=True, nullable=False)
     ultimo_acceso = Column(DateTime, nullable=True)
 
+    # Permisos por módulo (True = tiene acceso, False = no tiene acceso)
+    # Por defecto todos en True para no romper usuarios existentes
+    permiso_dashboard = Column(Boolean, default=True, nullable=False)
+    permiso_camiones = Column(Boolean, default=True, nullable=False)
+    permiso_empresas = Column(Boolean, default=True, nullable=False)
+    permiso_repuestos = Column(Boolean, default=True, nullable=False)
+    permiso_pesajes = Column(Boolean, default=True, nullable=False)
+    permiso_combustible = Column(Boolean, default=True, nullable=False)
+    permiso_finanzas = Column(Boolean, default=True, nullable=False)
+    permiso_usuarios = Column(Boolean, default=False, nullable=False)  # Solo admin por defecto
+    permiso_reportes = Column(Boolean, default=True, nullable=False)
+
     # Relaciones
     servicios_creados = relationship("Servicio", back_populates="creador", foreign_keys="Servicio.created_by")
     pesajes_creados = relationship("Pesaje", back_populates="creador", foreign_keys="Pesaje.created_by")

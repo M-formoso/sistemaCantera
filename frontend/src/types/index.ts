@@ -11,7 +11,19 @@ export interface TokenResponse {
   token_type: string
 }
 
-export interface User {
+export interface PermisosModulos {
+  permiso_dashboard: boolean
+  permiso_camiones: boolean
+  permiso_empresas: boolean
+  permiso_repuestos: boolean
+  permiso_pesajes: boolean
+  permiso_combustible: boolean
+  permiso_finanzas: boolean
+  permiso_usuarios: boolean
+  permiso_reportes: boolean
+}
+
+export interface User extends PermisosModulos {
   id: string
   email: string
   nombre: string
@@ -27,6 +39,16 @@ export interface UsuarioCreate {
   nombre: string
   rol: 'administrador' | 'operador' | 'solo_lectura'
   password: string
+  // Permisos por módulo
+  permiso_dashboard?: boolean
+  permiso_camiones?: boolean
+  permiso_empresas?: boolean
+  permiso_repuestos?: boolean
+  permiso_pesajes?: boolean
+  permiso_combustible?: boolean
+  permiso_finanzas?: boolean
+  permiso_usuarios?: boolean
+  permiso_reportes?: boolean
 }
 
 export interface UsuarioUpdate {
@@ -34,6 +56,16 @@ export interface UsuarioUpdate {
   nombre?: string
   rol?: 'administrador' | 'operador' | 'solo_lectura'
   activo?: boolean
+  // Permisos por módulo
+  permiso_dashboard?: boolean
+  permiso_camiones?: boolean
+  permiso_empresas?: boolean
+  permiso_repuestos?: boolean
+  permiso_pesajes?: boolean
+  permiso_combustible?: boolean
+  permiso_finanzas?: boolean
+  permiso_usuarios?: boolean
+  permiso_reportes?: boolean
 }
 
 export interface PaginatedResponse<T> {

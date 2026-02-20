@@ -20,7 +20,30 @@ const usuarioSchema = z.object({
   }),
   password: z.string().optional(),
   activo: z.boolean().optional(),
+  // Permisos por módulo
+  permiso_dashboard: z.boolean().optional(),
+  permiso_camiones: z.boolean().optional(),
+  permiso_empresas: z.boolean().optional(),
+  permiso_repuestos: z.boolean().optional(),
+  permiso_pesajes: z.boolean().optional(),
+  permiso_combustible: z.boolean().optional(),
+  permiso_finanzas: z.boolean().optional(),
+  permiso_usuarios: z.boolean().optional(),
+  permiso_reportes: z.boolean().optional(),
 })
+
+// Configuración de módulos para mostrar en el formulario
+const MODULOS_CONFIG = [
+  { key: 'permiso_dashboard', label: 'Dashboard', descripcion: 'Ver el panel principal con resumen y estadísticas' },
+  { key: 'permiso_camiones', label: 'Camiones/Equipos', descripcion: 'Gestionar flota de camiones y maquinaria' },
+  { key: 'permiso_empresas', label: 'Clientes/Transportistas', descripcion: 'Gestionar empresas, clientes y transportistas' },
+  { key: 'permiso_repuestos', label: 'Repuestos', descripcion: 'Control de stock de repuestos y servicios' },
+  { key: 'permiso_pesajes', label: 'Pesajes', descripcion: 'Registrar pesajes, remitos y órdenes de entrega' },
+  { key: 'permiso_combustible', label: 'Combustible', descripcion: 'Gestionar cisternas y suministros de combustible' },
+  { key: 'permiso_finanzas', label: 'Finanzas', descripcion: 'Ingresos, egresos y cuenta corriente' },
+  { key: 'permiso_usuarios', label: 'Usuarios', descripcion: 'Administrar usuarios del sistema' },
+  { key: 'permiso_reportes', label: 'Reportes', descripcion: 'Generar y exportar reportes' },
+] as const
 
 type UsuarioFormData = z.infer<typeof usuarioSchema>
 
@@ -43,6 +66,16 @@ export default function UsuarioFormPage() {
     ),
     defaultValues: {
       activo: true,
+      // Permisos por defecto
+      permiso_dashboard: true,
+      permiso_camiones: true,
+      permiso_empresas: true,
+      permiso_repuestos: true,
+      permiso_pesajes: true,
+      permiso_combustible: true,
+      permiso_finanzas: true,
+      permiso_usuarios: false,
+      permiso_reportes: true,
     },
   })
 
@@ -61,6 +94,16 @@ export default function UsuarioFormPage() {
         nombre: usuario.nombre,
         rol: usuario.rol,
         activo: usuario.activo,
+        // Permisos
+        permiso_dashboard: usuario.permiso_dashboard,
+        permiso_camiones: usuario.permiso_camiones,
+        permiso_empresas: usuario.permiso_empresas,
+        permiso_repuestos: usuario.permiso_repuestos,
+        permiso_pesajes: usuario.permiso_pesajes,
+        permiso_combustible: usuario.permiso_combustible,
+        permiso_finanzas: usuario.permiso_finanzas,
+        permiso_usuarios: usuario.permiso_usuarios,
+        permiso_reportes: usuario.permiso_reportes,
       })
     }
   }, [usuario, reset])
@@ -266,6 +309,42 @@ export default function UsuarioFormPage() {
                 </label>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Permisos por módulo */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Permisos por Módulo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              Seleccione los módulos a los que el usuario tendrá acceso. Los módulos no seleccionados no aparecerán en el menú del usuario.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {MODULOS_CONFIG.map((modulo) => (
+                <div
+                  key={modulo.key}
+                  className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <input
+                    id={modulo.key}
+                    type="checkbox"
+                    {...register(modulo.key as keyof UsuarioFormData)}
+                    className="h-4 w-4 mt-1 rounded border-gray-300"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor={modulo.key} className="text-sm font-medium cursor-pointer">
+                      {modulo.label}
+                    </label>
+                    <p className="text-xs text-gray-500">{modulo.descripcion}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 

@@ -26,60 +26,66 @@ const menuItems = [
     title: 'Dashboard',
     icon: LayoutDashboard,
     path: '/dashboard',
+    permiso: 'permiso_dashboard' as const,
   },
   {
     title: 'Camiones',
     icon: Truck,
     path: '/camiones',
+    permiso: 'permiso_camiones' as const,
   },
   {
     title: 'Clientes/Transportistas',
     icon: Building2,
     path: '/empresas',
+    permiso: 'permiso_empresas' as const,
   },
   {
     title: 'Repuestos',
     icon: Wrench,
     path: '/repuestos',
+    permiso: 'permiso_repuestos' as const,
   },
   {
     title: 'Pesajes',
     icon: Scale,
     path: '/pesajes-remitos',
+    permiso: 'permiso_pesajes' as const,
   },
   {
     title: 'Combustible',
     icon: Fuel,
     path: '/combustible',
+    permiso: 'permiso_combustible' as const,
   },
   {
     title: 'Finanzas',
     icon: DollarSign,
     path: '/finanzas',
+    permiso: 'permiso_finanzas' as const,
   },
   {
     title: 'Usuarios',
     icon: Users,
     path: '/usuarios',
-    adminOnly: true,
+    permiso: 'permiso_usuarios' as const,
   },
   {
     title: 'Reportes',
     icon: BarChart3,
     path: '/reportes',
+    permiso: 'permiso_reportes' as const,
   },
 ]
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuthStore()
-  const isAdmin = user?.rol === 'administrador'
 
-  // Filtrar items según el rol del usuario
+  // Filtrar items según los permisos del usuario
   const filteredMenuItems = menuItems.filter((item) => {
-    if (item.adminOnly && !isAdmin) {
-      return false
-    }
-    return true
+    if (!user) return false
+    // Verificar si el usuario tiene el permiso para este módulo
+    return user[item.permiso] === true
   })
 
   return (

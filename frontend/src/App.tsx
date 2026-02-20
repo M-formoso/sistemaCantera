@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from '@/pages/auth/LoginPage'
 import MainLayout from '@/components/layout/MainLayout'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
+import PermisoRoute from '@/components/shared/PermisoRoute'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 
 // Camiones
@@ -54,51 +55,51 @@ function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="dashboard" element={<PermisoRoute permiso="permiso_dashboard"><DashboardPage /></PermisoRoute>} />
 
           {/* Camiones */}
-          <Route path="camiones" element={<CamionesPage />} />
-          <Route path="camiones/nuevo" element={<CamionFormPage />} />
-          <Route path="camiones/:id" element={<CamionDetailPage />} />
-          <Route path="camiones/:id/editar" element={<CamionFormPage />} />
+          <Route path="camiones" element={<PermisoRoute permiso="permiso_camiones"><CamionesPage /></PermisoRoute>} />
+          <Route path="camiones/nuevo" element={<PermisoRoute permiso="permiso_camiones"><CamionFormPage /></PermisoRoute>} />
+          <Route path="camiones/:id" element={<PermisoRoute permiso="permiso_camiones"><CamionDetailPage /></PermisoRoute>} />
+          <Route path="camiones/:id/editar" element={<PermisoRoute permiso="permiso_camiones"><CamionFormPage /></PermisoRoute>} />
 
           {/* Empresas (Clientes/Transportistas) */}
-          <Route path="empresas" element={<EmpresasPage />} />
+          <Route path="empresas" element={<PermisoRoute permiso="permiso_empresas"><EmpresasPage /></PermisoRoute>} />
 
           {/* Repuestos */}
-          <Route path="repuestos" element={<RepuestosPage />} />
-          <Route path="repuestos/nuevo" element={<RepuestoFormPage />} />
-          <Route path="repuestos/:id/editar" element={<RepuestoFormPage />} />
+          <Route path="repuestos" element={<PermisoRoute permiso="permiso_repuestos"><RepuestosPage /></PermisoRoute>} />
+          <Route path="repuestos/nuevo" element={<PermisoRoute permiso="permiso_repuestos"><RepuestoFormPage /></PermisoRoute>} />
+          <Route path="repuestos/:id/editar" element={<PermisoRoute permiso="permiso_repuestos"><RepuestoFormPage /></PermisoRoute>} />
 
-          {/* Servicios */}
-          <Route path="servicios" element={<ServiciosPage />} />
-          <Route path="servicios/nuevo" element={<ServicioFormPage />} />
-          <Route path="servicios/:id/editar" element={<ServicioFormPage />} />
+          {/* Servicios - usa permiso de repuestos */}
+          <Route path="servicios" element={<PermisoRoute permiso="permiso_repuestos"><ServiciosPage /></PermisoRoute>} />
+          <Route path="servicios/nuevo" element={<PermisoRoute permiso="permiso_repuestos"><ServicioFormPage /></PermisoRoute>} />
+          <Route path="servicios/:id/editar" element={<PermisoRoute permiso="permiso_repuestos"><ServicioFormPage /></PermisoRoute>} />
 
           {/* Pesajes y Remitos (unificados) */}
-          <Route path="pesajes-remitos" element={<PesajesRemitosPage />} />
-          <Route path="pesajes-remitos/nuevo" element={<PesajeFormPage />} />
-          <Route path="pesajes-remitos/:id/editar" element={<PesajeFormPage />} />
+          <Route path="pesajes-remitos" element={<PermisoRoute permiso="permiso_pesajes"><PesajesRemitosPage /></PermisoRoute>} />
+          <Route path="pesajes-remitos/nuevo" element={<PermisoRoute permiso="permiso_pesajes"><PesajeFormPage /></PermisoRoute>} />
+          <Route path="pesajes-remitos/:id/editar" element={<PermisoRoute permiso="permiso_pesajes"><PesajeFormPage /></PermisoRoute>} />
 
           {/* Rutas legacy para compatibilidad */}
           <Route path="pesajes" element={<Navigate to="/pesajes-remitos" replace />} />
           <Route path="remitos" element={<Navigate to="/pesajes-remitos" replace />} />
 
           {/* Combustible */}
-          <Route path="combustible" element={<CombustiblePage />} />
-          <Route path="combustible/carga-nueva" element={<CargaFormPage />} />
-          <Route path="combustible/suministro-nuevo" element={<SuministroFormPage />} />
+          <Route path="combustible" element={<PermisoRoute permiso="permiso_combustible"><CombustiblePage /></PermisoRoute>} />
+          <Route path="combustible/carga-nueva" element={<PermisoRoute permiso="permiso_combustible"><CargaFormPage /></PermisoRoute>} />
+          <Route path="combustible/suministro-nuevo" element={<PermisoRoute permiso="permiso_combustible"><SuministroFormPage /></PermisoRoute>} />
 
           {/* Usuarios */}
-          <Route path="usuarios" element={<UsuariosPage />} />
-          <Route path="usuarios/nuevo" element={<UsuarioFormPage />} />
-          <Route path="usuarios/:id/editar" element={<UsuarioFormPage />} />
+          <Route path="usuarios" element={<PermisoRoute permiso="permiso_usuarios"><UsuariosPage /></PermisoRoute>} />
+          <Route path="usuarios/nuevo" element={<PermisoRoute permiso="permiso_usuarios"><UsuarioFormPage /></PermisoRoute>} />
+          <Route path="usuarios/:id/editar" element={<PermisoRoute permiso="permiso_usuarios"><UsuarioFormPage /></PermisoRoute>} />
 
           {/* Finanzas */}
-          <Route path="finanzas" element={<FinanzasPage />} />
+          <Route path="finanzas" element={<PermisoRoute permiso="permiso_finanzas"><FinanzasPage /></PermisoRoute>} />
 
-          {/* Pendientes */}
-          <Route path="reportes" element={<div className="p-4">Módulo de Reportes (en desarrollo)</div>} />
+          {/* Reportes */}
+          <Route path="reportes" element={<PermisoRoute permiso="permiso_reportes"><div className="p-4">Módulo de Reportes (en desarrollo)</div></PermisoRoute>} />
         </Route>
 
         {/* Ruta 404 */}
