@@ -84,8 +84,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Filtrar items según los permisos del usuario
   const filteredMenuItems = menuItems.filter((item) => {
     if (!user) return false
-    // Verificar si el usuario tiene el permiso para este módulo
-    return user[item.permiso] === true
+    // Si el permiso no está definido (undefined), asumir acceso (usuarios antes de migración)
+    // Si está definido, verificar que sea true
+    const permiso = user[item.permiso]
+    return permiso === undefined || permiso === true
   })
 
   return (
