@@ -86,6 +86,38 @@ def create_admin_user():
         db.close()
 
 
+def fix_admin_permissions():
+    """Asegurar que todos los administradores tengan permiso_usuarios = True"""
+    print("Verificando permisos de administradores...")
+
+    engine = create_engine(settings.DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = SessionLocal()
+
+    try:
+        # Buscar todos los administradores
+        admins = db.query(Usuario).filter(Usuario.rol == "administrador").all()
+        updated = 0
+
+        for admin in admins:
+            # Verificar si tiene el atributo (columna existe)
+            if hasattr(admin, 'permiso_usuarios') and not admin.permiso_usuarios:
+                admin.permiso_usuarios = True
+                updated += 1
+
+        if updated > 0:
+            db.commit()
+            print(f"Permisos actualizados para {updated} administrador(es)")
+        else:
+            print("Todos los administradores ya tienen permisos correctos")
+
+    except Exception as e:
+        print(f"Error actualizando permisos: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def create_default_cisterna():
     """Crear cisterna por defecto si no existe"""
     print("Verificando cisterna de combustible...")
@@ -126,6 +158,7 @@ if __name__ == "__main__":
 
     run_migrations()
     create_admin_user()
+    fix_admin_permissions()
     create_default_cisterna()
 
     print("=" * 50)
