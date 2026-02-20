@@ -1,7 +1,7 @@
 """Add ordenes_entrega table
 
 Revision ID: add_ordenes_entrega
-Revises: 20260220_add_cuenta_corriente
+Revises: add_cuenta_corriente
 Create Date: 2026-02-20
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_ordenes_entrega'
-down_revision = '20260220_add_cuenta_corriente'
+down_revision = 'add_cuenta_corriente'
 branch_labels = None
 depends_on = None
 
