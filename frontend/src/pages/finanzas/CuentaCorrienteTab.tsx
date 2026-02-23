@@ -26,7 +26,7 @@ export default function CuentaCorrienteTab() {
 
   const { data: todosClientes = [] } = useQuery({
     queryKey: ['empresas-clientes'],
-    queryFn: () => empresasService.getAll('cliente'),
+    queryFn: () => empresasService.getClientes(),
   })
 
   const { data: resumen } = useQuery({
