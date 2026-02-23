@@ -30,9 +30,15 @@ export default function PermisoRoute({ children, permiso }: PermisoRouteProps) {
     return null
   }
 
-  // Si el permiso no está definido (undefined), asumir que tiene acceso
-  // Esto maneja usuarios existentes antes de la migración
-  const tienePermiso = user[permiso] === undefined ? true : user[permiso]
+  // Los administradores siempre tienen acceso a todo
+  if (user.rol === 'administrador') {
+    return <>{children}</>
+  }
+
+  // Para otros usuarios, verificar permisos
+  // Si el permiso no está definido (undefined/null), asumir que tiene acceso
+  const permisoValue = user[permiso]
+  const tienePermiso = permisoValue === undefined || permisoValue === null || permisoValue === true
 
   // Verificar si tiene el permiso
   if (!tienePermiso) {
