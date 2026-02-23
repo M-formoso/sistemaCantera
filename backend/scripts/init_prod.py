@@ -87,35 +87,32 @@ def create_admin_user():
 
 
 def fix_admin_permissions():
-    """Asegurar que todos los administradores tengan permiso_usuarios = True"""
+    """Asegurar que todos los administradores tengan todos los permisos = True"""
     print("Verificando permisos de administradores...")
 
     engine = create_engine(settings.DATABASE_URL)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = SessionLocal()
 
     try:
-        # Buscar todos los administradores
-        admins = db.query(Usuario).filter(Usuario.rol == "administrador").all()
-        updated = 0
-
-        for admin in admins:
-            # Verificar si tiene el atributo (columna existe)
-            if hasattr(admin, 'permiso_usuarios') and not admin.permiso_usuarios:
-                admin.permiso_usuarios = True
-                updated += 1
-
-        if updated > 0:
-            db.commit()
-            print(f"Permisos actualizados para {updated} administrador(es)")
-        else:
-            print("Todos los administradores ya tienen permisos correctos")
-
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            # Actualizar todos los permisos a True para administradores
+            result = conn.execute(text("""
+                UPDATE usuarios
+                SET permiso_dashboard = true,
+                    permiso_camiones = true,
+                    permiso_empresas = true,
+                    permiso_repuestos = true,
+                    permiso_pesajes = true,
+                    permiso_combustible = true,
+                    permiso_finanzas = true,
+                    permiso_usuarios = true,
+                    permiso_reportes = true
+                WHERE rol = 'administrador'
+            """))
+            conn.commit()
+            print(f"Permisos actualizados para administradores (filas: {result.rowcount})")
     except Exception as e:
-        print(f"Error actualizando permisos: {e}")
-        db.rollback()
-    finally:
-        db.close()
+        print(f"Error actualizando permisos (puede que las columnas no existan aún): {e}")
 
 
 def create_default_cisterna():
