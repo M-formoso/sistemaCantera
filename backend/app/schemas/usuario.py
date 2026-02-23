@@ -75,16 +75,16 @@ class UsuarioSchema(ResponseBase, UsuarioBase):
 
     activo: bool
     ultimo_acceso: Optional[datetime] = None
-    # Permisos por módulo
-    permiso_dashboard: bool = True
-    permiso_camiones: bool = True
-    permiso_empresas: bool = True
-    permiso_repuestos: bool = True
-    permiso_pesajes: bool = True
-    permiso_combustible: bool = True
-    permiso_finanzas: bool = True
-    permiso_usuarios: bool = False
-    permiso_reportes: bool = True
+    # Permisos por módulo - Optional para retrocompatibilidad con BD sin columnas
+    permiso_dashboard: Optional[bool] = True
+    permiso_camiones: Optional[bool] = True
+    permiso_empresas: Optional[bool] = True
+    permiso_repuestos: Optional[bool] = True
+    permiso_pesajes: Optional[bool] = True
+    permiso_combustible: Optional[bool] = True
+    permiso_finanzas: Optional[bool] = True
+    permiso_usuarios: Optional[bool] = True  # True por defecto para admins existentes
+    permiso_reportes: Optional[bool] = True
 
 
 class UsuarioInDB(UsuarioSchema):

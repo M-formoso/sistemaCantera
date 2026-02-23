@@ -153,7 +153,8 @@ if __name__ == "__main__":
     print("Inicializando Sistema Cantera La Rufina")
     print("=" * 50)
 
-    run_migrations()
+    # No correr migraciones aquí - ya se corren en start.sh
+    # run_migrations()
     create_admin_user()
     fix_admin_permissions()
     create_default_cisterna()
