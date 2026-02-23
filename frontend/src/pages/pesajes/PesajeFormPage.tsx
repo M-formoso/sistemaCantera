@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck, DollarSign, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Save, Calculator, Printer, CheckCircle, Truck, Building2, Plus, UserCheck, DollarSign, ClipboardList, Scale, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { pesajesService } from '@/services/pesajesService'
 import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
 import { ordenEntregaService } from '@/services/ordenEntregaService'
+import { balanzaService } from '@/services/balanzaService'
 import { formatNumber } from '@/lib/utils'
 import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
 
@@ -99,6 +100,10 @@ export default function PesajeFormPage() {
   const [showNuevaEmpresaModal, setShowNuevaEmpresaModal] = useState(false)
   const [nuevaEmpresaTipo, setNuevaEmpresaTipo] = useState<'cliente' | 'transportista'>('cliente')
   const [nuevaEmpresaNombre, setNuevaEmpresaNombre] = useState('')
+
+  // Estado para la balanza
+  const [leyendoBalanza, setLeyendoBalanza] = useState<'bruto' | 'tara' | null>(null)
+  const [balanzaError, setBalanzaError] = useState<string | null>(null)
 
   const { data: pesaje } = useQuery({
     queryKey: ['pesaje', id],
@@ -340,6 +345,43 @@ export default function PesajeFormPage() {
       await pesajesService.downloadTicketPDF(createdPesaje.id, createdPesaje.numero_pesaje)
     } catch (error) {
       alert('Error al descargar el ticket PDF')
+    }
+  }
+
+  // Leer peso de la balanza
+  const leerBalanza = async (tipo: 'bruto' | 'tara') => {
+    setLeyendoBalanza(tipo)
+    setBalanzaError(null)
+
+    try {
+      const resultado = await balanzaService.getPeso()
+
+      if (resultado.error) {
+        setBalanzaError(resultado.error)
+        return
+      }
+
+      if (!resultado.conectado) {
+        setBalanzaError('Balanza no conectada. Verifique que el servidor de balanza esté ejecutándose.')
+        return
+      }
+
+      if (resultado.peso <= 0) {
+        setBalanzaError('El peso leído es 0. Verifique que el camión esté sobre la balanza.')
+        return
+      }
+
+      // Asignar el peso al campo correspondiente
+      if (tipo === 'bruto') {
+        setValue('peso_bruto', resultado.peso)
+      } else {
+        setValue('peso_tara', resultado.peso)
+      }
+
+    } catch (error) {
+      setBalanzaError('Error al conectar con la balanza')
+    } finally {
+      setLeyendoBalanza(null)
     }
   }
 
@@ -764,22 +806,47 @@ export default function PesajeFormPage() {
 
                 {/* Sección: Pesos */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                    <Scale className="h-4 w-4" />
                     Pesos
                   </h3>
+
+                  {/* Error de balanza */}
+                  {balanzaError && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
+                      {balanzaError}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Peso Bruto */}
                     <div className="space-y-2">
                       <label htmlFor="peso_bruto" className="text-sm font-medium">
                         Peso Bruto (kg) <span className="text-red-500">*</span>
                       </label>
-                      <Input
-                        id="peso_bruto"
-                        type="number"
-                        step="1"
-                        {...register('peso_bruto', { valueAsNumber: true })}
-                        placeholder="53540"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="peso_bruto"
+                          type="number"
+                          step="1"
+                          {...register('peso_bruto', { valueAsNumber: true })}
+                          placeholder="53540"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => leerBalanza('bruto')}
+                          disabled={leyendoBalanza !== null}
+                          title="Leer peso de la balanza"
+                        >
+                          {leyendoBalanza === 'bruto' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Scale className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                       {errors.peso_bruto && (
                         <p className="text-sm text-red-600">{errors.peso_bruto.message}</p>
                       )}
@@ -790,18 +857,38 @@ export default function PesajeFormPage() {
                       <label htmlFor="peso_tara" className="text-sm font-medium">
                         Peso Tara (kg) <span className="text-red-500">*</span>
                       </label>
-                      <Input
-                        id="peso_tara"
-                        type="number"
-                        step="1"
-                        {...register('peso_tara', { valueAsNumber: true })}
-                        placeholder="16920"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="peso_tara"
+                          type="number"
+                          step="1"
+                          {...register('peso_tara', { valueAsNumber: true })}
+                          placeholder="16920"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => leerBalanza('tara')}
+                          disabled={leyendoBalanza !== null}
+                          title="Leer peso de la balanza"
+                        >
+                          {leyendoBalanza === 'tara' ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Scale className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                       {errors.peso_tara && (
                         <p className="text-sm text-red-600">{errors.peso_tara.message}</p>
                       )}
                     </div>
                   </div>
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    Use el botón de balanza para capturar el peso automáticamente (requiere servidor de balanza activo)
+                  </p>
                 </div>
 
                 {/* Sección: Operación */}
