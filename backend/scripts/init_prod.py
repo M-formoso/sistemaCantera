@@ -153,10 +153,13 @@ if __name__ == "__main__":
     print("Inicializando Sistema Cantera La Rufina")
     print("=" * 50)
 
-    # No correr migraciones aquí - ya se corren en start.sh
-    # run_migrations()
-    create_admin_user()
+    # No crear usuario admin por defecto - el cliente ya tiene sus propios usuarios
+    # create_admin_user()
+
+    # Asegurar que los administradores tengan todos los permisos
     fix_admin_permissions()
+
+    # Crear cisterna por defecto si no existe
     create_default_cisterna()
 
     print("=" * 50)
