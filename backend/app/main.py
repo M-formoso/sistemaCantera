@@ -1,13 +1,33 @@
 import os
-import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware que intercepta redirects y fuerza HTTPS.
+    Esto evita el error de Mixed Content cuando FastAPI hace redirect de trailing slashes.
+    """
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Si es un redirect (307 o 308), forzar HTTPS en la URL de destino
+        if response.status_code in (307, 308):
+            location = response.headers.get("location", "")
+            if location.startswith("http://"):
+                # Cambiar http:// por https://
+                new_location = "https://" + location[7:]
+                return RedirectResponse(
+                    url=new_location,
+                    status_code=response.status_code
+                )
+
+        return response
+
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -18,15 +38,22 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
 
-# Configurar CORS - siempre permitir todos los orígenes para evitar problemas
-# En producción con Railway esto es necesario porque los dominios son dinámicos
-logger.info(f"RAILWAY_ENVIRONMENT: {os.environ.get('RAILWAY_ENVIRONMENT')}")
-logger.info(f"RAILWAY_PROJECT_ID: {os.environ.get('RAILWAY_PROJECT_ID')}")
+# Middleware para forzar HTTPS en redirects (debe ir ANTES de CORS)
+app.add_middleware(HTTPSRedirectMiddleware)
+
+# Configurar CORS - en producción (Railway) permitir todos los orígenes
+cors_origins = settings.BACKEND_CORS_ORIGINS.copy()
+allow_creds = True
+
+if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"):
+    # En Railway, permitir todos los orígenes (sin credentials para compatibilidad)
+    cors_origins = ["*"]
+    allow_creds = False
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # No usar credentials con wildcard origin
+    allow_origins=cors_origins,
+    allow_credentials=allow_creds,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
