@@ -38,11 +38,27 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-  })
+  // Crear AbortController con timeout de 30 segundos
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      signal: controller.signal,
+    })
+  } catch (fetchError: any) {
+    clearTimeout(timeoutId)
+    console.error('[API] Fetch error:', fetchError.name, fetchError.message)
+    if (fetchError.name === 'AbortError') {
+      throw new Error('La solicitud tardó demasiado tiempo')
+    }
+    throw fetchError
+  }
+  clearTimeout(timeoutId)
 
   // Manejar 401 - token expirado
   if (response.status === 401 && !endpoint.includes('/auth/login')) {

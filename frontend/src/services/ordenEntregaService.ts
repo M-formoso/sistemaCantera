@@ -101,11 +101,9 @@ export const getOrdenConPesajes = async (id: string): Promise<OrdenEntregaConPes
   return data
 }
 
-// Crear orden - usar el cliente api con trailing slash
+// Crear orden - IMPORTANTE: usar trailing slash para evitar redirect 307
 export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntrega> => {
-  console.log('[crearOrden] Creando orden con datos:', orden)
   const { data } = await api.post<OrdenEntrega>('/ordenes-entrega/', orden)
-  console.log('[crearOrden] Orden creada:', data)
   return data
 }
 
