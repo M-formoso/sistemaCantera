@@ -33,19 +33,27 @@ async def listar_ordenes(
     current_user: Usuario = Depends(get_current_active_user)
 ):
     """Lista todas las órdenes de entrega con filtros opcionales"""
-    ordenes = orden_entrega_service.obtener_todas(
-        db, estado, fecha_desde, fecha_hasta, skip, limit
-    )
+    from fastapi import HTTPException
+    import traceback
 
-    result = []
-    for orden in ordenes:
-        data = OrdenEntregaSchema.model_validate(orden)
-        data.cliente_nombre_completo = orden.cliente_nombre_completo
-        data.cargas_pendientes = orden.cargas_pendientes
-        data.porcentaje_completado = orden.porcentaje_completado
-        result.append(data)
+    try:
+        ordenes = orden_entrega_service.obtener_todas(
+            db, estado, fecha_desde, fecha_hasta, skip, limit
+        )
 
-    return result
+        result = []
+        for orden in ordenes:
+            data = OrdenEntregaSchema.model_validate(orden)
+            data.cliente_nombre_completo = orden.cliente_nombre_completo
+            data.cargas_pendientes = orden.cargas_pendientes
+            data.porcentaje_completado = orden.porcentaje_completado
+            result.append(data)
+
+        return result
+    except Exception as e:
+        print(f"[listar_ordenes] ERROR: {type(e).__name__}: {str(e)}")
+        print(f"[listar_ordenes] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
 @router.get("/pendientes", response_model=List[OrdenEntregaSchema])
