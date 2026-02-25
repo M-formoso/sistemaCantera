@@ -30,9 +30,6 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
   const url = buildUrl(endpoint, config?.params)
 
   console.log('[API] Fetching:', method, url)
-  if (data) {
-    console.log('[API] Body:', JSON.stringify(data))
-  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -41,18 +38,11 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-      redirect: 'follow',
-    })
-  } catch (networkError) {
-    console.error('[API] Network error:', networkError)
-    throw new Error('Error de conexión. Verifique su conexión a internet.')
-  }
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+  })
 
   // Manejar 401 - token expirado
   if (response.status === 401 && !endpoint.includes('/auth/login')) {
