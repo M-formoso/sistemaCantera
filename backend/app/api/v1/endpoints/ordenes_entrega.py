@@ -22,7 +22,7 @@ from app.services import orden_entrega_service
 router = APIRouter()
 
 
-@router.get("/", response_model=List[OrdenEntregaSchema])
+@router.get("", response_model=List[OrdenEntregaSchema])
 async def listar_ordenes(
     estado: Optional[str] = None,
     fecha_desde: Optional[date] = None,
@@ -127,7 +127,7 @@ async def obtener_orden_con_pesajes(
     return data
 
 
-@router.post("/", response_model=OrdenEntregaSchema, status_code=201)
+@router.post("", response_model=OrdenEntregaSchema, status_code=201)
 async def crear_orden(
     orden: OrdenEntregaCreate,
     db: Session = Depends(get_db),
