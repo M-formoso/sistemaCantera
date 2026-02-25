@@ -381,8 +381,6 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaj
 def eliminar(db: Session, pesaje_id: UUID) -> dict:
     """
     Elimina un pesaje
-
-    No permite eliminar si ya tiene remito generado
     """
     db_pesaje = obtener_por_id(db, pesaje_id)
 
@@ -392,11 +390,9 @@ def eliminar(db: Session, pesaje_id: UUID) -> dict:
             detail="Pesaje no encontrado"
         )
 
-    if db_pesaje.remito_generado:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede eliminar un pesaje que tiene remito generado"
-        )
+    # Si tiene orden de entrega asociada, desasociar primero
+    if db_pesaje.orden_entrega_id:
+        db_pesaje.orden_entrega_id = None
 
     db.delete(db_pesaje)
     db.commit()
