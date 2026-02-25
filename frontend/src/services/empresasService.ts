@@ -34,7 +34,7 @@ export const empresasService = {
    * Busca empresas por nombre (para autocompletado)
    */
   async buscar(nombre: string, tipo?: 'cliente' | 'transportista'): Promise<Empresa[]> {
-    const params: Record<string, any> = { nombre }
+    const params: Record<string, any> = { q: nombre }
     if (tipo) {
       params.tipo = tipo
     }

@@ -307,13 +307,36 @@ export default function PesajeFormPage() {
   const onSubmit = async (data: PesajeFormData) => {
     try {
       // Limpiar campos según tipo de entrega
-      const cleanData = { ...data }
+      const cleanData: any = { ...data }
+
       if (data.tipo_entrega === 'propio') {
-        cleanData.transportista_id = undefined
-        cleanData.patente_externa = undefined
-        cleanData.transportista = undefined
+        delete cleanData.transportista_id
+        delete cleanData.patente_externa
+        delete cleanData.transportista
       } else {
-        cleanData.camion_id = undefined
+        delete cleanData.camion_id
+      }
+
+      // Limpiar campos UUID vacíos para evitar errores de validación
+      if (!cleanData.cliente_id || cleanData.cliente_id === '') {
+        delete cleanData.cliente_id
+      }
+      if (!cleanData.transportista_id || cleanData.transportista_id === '') {
+        delete cleanData.transportista_id
+      }
+      if (!cleanData.camion_id || cleanData.camion_id === '') {
+        delete cleanData.camion_id
+      }
+      if (!cleanData.orden_entrega_id || cleanData.orden_entrega_id === '') {
+        delete cleanData.orden_entrega_id
+      }
+
+      // Limpiar campos numéricos que son 0 o NaN (opcionales)
+      if (!cleanData.precio_unitario || cleanData.precio_unitario === 0 || isNaN(cleanData.precio_unitario)) {
+        delete cleanData.precio_unitario
+      }
+      if (!cleanData.importe_total || cleanData.importe_total === 0 || isNaN(cleanData.importe_total)) {
+        delete cleanData.importe_total
       }
 
       if (isEditing) {
