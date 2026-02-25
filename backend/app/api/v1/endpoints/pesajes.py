@@ -121,10 +121,17 @@ async def eliminar_pesaje(
     Elimina un pesaje
 
     **Requiere rol:** Administrador u Operador
-
-    NOTA: No se puede eliminar si ya tiene remito generado
     """
-    return pesaje_service.eliminar(db, pesaje_id)
+    from fastapi import HTTPException
+    import traceback
+    try:
+        return pesaje_service.eliminar(db, pesaje_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[eliminar_pesaje] ERROR: {type(e).__name__}: {str(e)}")
+        print(f"[eliminar_pesaje] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error al eliminar: {str(e)}")
 
 
 @router.get("/estadisticas/periodo")
