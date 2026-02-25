@@ -41,27 +41,15 @@ app = FastAPI(
 # Middleware para forzar HTTPS en redirects (debe ir ANTES de CORS)
 app.add_middleware(HTTPSRedirectMiddleware)
 
-# Configurar CORS - agregar dominios de producción
-cors_origins = settings.BACKEND_CORS_ORIGINS.copy()
-
-# Agregar dominio de producción personalizado
-cors_origins.extend([
-    "https://sistema.canteralarufina.com.ar",
-    "https://canteralarufina.com.ar",
-])
-
-# En Railway, también permitir cualquier subdominio de railway.app
-if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"):
-    cors_origins.extend([
-        "https://frontend-production-d4d3.up.railway.app",
-    ])
-
+# Configurar CORS - permitir todos los orígenes para debugging
+# TODO: Restringir a dominios específicos después de resolver el problema
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Incluir routers
