@@ -134,13 +134,28 @@ async def crear_orden(
     current_user: Usuario = Depends(require_admin_or_operador)
 ):
     """Crea una nueva orden de entrega"""
-    nueva_orden = orden_entrega_service.crear(db, orden, current_user.id)
+    import logging
+    logger = logging.getLogger(__name__)
 
-    data = OrdenEntregaSchema.model_validate(nueva_orden)
-    data.cliente_nombre_completo = nueva_orden.cliente_nombre_completo
-    data.cargas_pendientes = nueva_orden.cargas_pendientes
-    data.porcentaje_completado = nueva_orden.porcentaje_completado
-    return data
+    try:
+        logger.info(f"[crear_orden] Iniciando creación de orden: {orden}")
+        logger.info(f"[crear_orden] Usuario: {current_user.id} ({current_user.nombre})")
+
+        nueva_orden = orden_entrega_service.crear(db, orden, current_user.id)
+        logger.info(f"[crear_orden] Orden creada: {nueva_orden.id}")
+
+        data = OrdenEntregaSchema.model_validate(nueva_orden)
+        data.cliente_nombre_completo = nueva_orden.cliente_nombre_completo
+        data.cargas_pendientes = nueva_orden.cargas_pendientes
+        data.porcentaje_completado = nueva_orden.porcentaje_completado
+
+        logger.info(f"[crear_orden] Respuesta preparada correctamente")
+        return data
+    except Exception as e:
+        logger.error(f"[crear_orden] ERROR: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"[crear_orden] Traceback: {traceback.format_exc()}")
+        raise
 
 
 @router.put("/{orden_id}", response_model=OrdenEntregaSchema)

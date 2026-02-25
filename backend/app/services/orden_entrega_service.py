@@ -116,18 +116,30 @@ def obtener_con_pesajes(db: Session, orden_id: UUID) -> Optional[OrdenEntrega]:
 
 def crear(db: Session, orden_data: OrdenEntregaCreate, usuario_id: UUID) -> OrdenEntrega:
     """Crea una nueva orden de entrega"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"[crear] Iniciando creación de orden")
+    logger.info(f"[crear] Datos recibidos: fecha={orden_data.fecha_entrega}, material={orden_data.material}, cargas={orden_data.cantidad_cargas}")
+    logger.info(f"[crear] cliente_id={orden_data.cliente_id}, usuario_id={usuario_id}")
+
     # Verificar cliente si se proporciona
     cliente_empresa = None
     if orden_data.cliente_id:
+        logger.info(f"[crear] Buscando cliente con ID: {orden_data.cliente_id}")
         cliente_empresa = db.query(Empresa).filter(Empresa.id == orden_data.cliente_id).first()
         if not cliente_empresa:
+            logger.error(f"[crear] Cliente no encontrado: {orden_data.cliente_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cliente no encontrado"
             )
+        logger.info(f"[crear] Cliente encontrado: {cliente_empresa.nombre}")
 
     # Obtener próximo número
+    logger.info("[crear] Obteniendo próximo número de orden...")
     numero_orden = _obtener_proximo_numero(db)
+    logger.info(f"[crear] Próximo número: {numero_orden}")
 
     # Calcular peso total estimado
     peso_total_estimado = None
@@ -135,6 +147,7 @@ def crear(db: Session, orden_data: OrdenEntregaCreate, usuario_id: UUID) -> Orde
         peso_total_estimado = orden_data.peso_estimado_carga * orden_data.cantidad_cargas
 
     # Crear orden
+    logger.info("[crear] Creando objeto OrdenEntrega...")
     db_orden = OrdenEntrega(
         numero_orden=numero_orden,
         fecha_entrega=orden_data.fecha_entrega,
@@ -154,10 +167,14 @@ def crear(db: Session, orden_data: OrdenEntregaCreate, usuario_id: UUID) -> Orde
         observaciones=orden_data.observaciones,
         created_by=usuario_id
     )
+    logger.info("[crear] Objeto creado, agregando a la sesión...")
 
     db.add(db_orden)
+    logger.info("[crear] Ejecutando commit...")
     db.commit()
+    logger.info("[crear] Commit exitoso, refrescando...")
     db.refresh(db_orden)
+    logger.info(f"[crear] Orden guardada con ID: {db_orden.id}")
 
     # Agregar campos calculados para respuesta
     db_orden.cargas_pendientes = db_orden.cantidad_cargas

@@ -1,7 +1,7 @@
 """
 Schemas Pydantic para Orden de Entrega
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime
@@ -29,6 +29,14 @@ class OrdenEntregaBase(BaseModel):
     telefono_contacto: Optional[str] = None
     direccion_entrega: Optional[str] = None
     observaciones: Optional[str] = None
+
+    @field_validator('cliente_id', mode='before')
+    @classmethod
+    def empty_string_to_none(cls, v):
+        """Convertir strings vacíos a None para UUIDs"""
+        if v == '' or v is None:
+            return None
+        return v
 
 
 class OrdenEntregaCreate(OrdenEntregaBase):
