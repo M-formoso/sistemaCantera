@@ -79,7 +79,7 @@ export const getOrdenes = async (
   if (fechaDesde) params.fecha_desde = fechaDesde
   if (fechaHasta) params.fecha_hasta = fechaHasta
 
-  const { data } = await api.get<OrdenEntrega[]>('/ordenes-entrega/', { params })
+  const { data } = await api.get<OrdenEntrega[]>('/ordenes-entrega', { params })
   return data
 }
 
@@ -103,7 +103,7 @@ export const getOrdenConPesajes = async (id: string): Promise<OrdenEntregaConPes
 
 // Crear orden
 export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntrega> => {
-  const { data } = await api.post<OrdenEntrega>('/ordenes-entrega/', orden)
+  const { data } = await api.post<OrdenEntrega>('/ordenes-entrega', orden)
   return data
 }
 
