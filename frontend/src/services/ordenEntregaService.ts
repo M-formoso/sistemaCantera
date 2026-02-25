@@ -101,53 +101,12 @@ export const getOrdenConPesajes = async (id: string): Promise<OrdenEntregaConPes
   return data
 }
 
-// Crear orden - IMPORTANTE: usar trailing slash para evitar redirect 307
+// Crear orden - usar el cliente api con trailing slash
 export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntrega> => {
-  const url = 'https://backend-production-ee51.up.railway.app/api/v1/ordenes-entrega/'
-  const token = localStorage.getItem('access_token')
-
-  console.log('[crearOrden] 1. Iniciando...')
-  console.log('[crearOrden] 2. URL:', url)
-  console.log('[crearOrden] 3. Token exists:', !!token)
-  console.log('[crearOrden] 4. Token value (primeros 20 chars):', token?.substring(0, 20))
-  console.log('[crearOrden] 5. Body:', JSON.stringify(orden))
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  }
-  console.log('[crearOrden] 6. Headers:', JSON.stringify(headers))
-
-  console.log('[crearOrden] 7. A punto de ejecutar fetch...')
-
-  try {
-    console.log('[crearOrden] 8. Dentro del try, ejecutando fetch AHORA')
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(orden),
-    })
-
-    console.log('[crearOrden] 9. Fetch completado!')
-    console.log('[crearOrden] 10. Response status:', response.status)
-    console.log('[crearOrden] 11. Response ok:', response.ok)
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }))
-      console.error('[crearOrden] Error response:', errorData)
-      throw new Error(errorData.detail || `HTTP ${response.status}`)
-    }
-
-    const data = await response.json()
-    console.log('[crearOrden] 12. Success:', data)
-    return data
-  } catch (error: any) {
-    console.error('[crearOrden] CATCH - Error:', error)
-    console.error('[crearOrden] CATCH - Error.name:', error?.name)
-    console.error('[crearOrden] CATCH - Error.message:', error?.message)
-    throw error
-  }
+  console.log('[crearOrden] Creando orden con datos:', orden)
+  const { data } = await api.post<OrdenEntrega>('/ordenes-entrega/', orden)
+  console.log('[crearOrden] Orden creada:', data)
+  return data
 }
 
 // Actualizar orden
