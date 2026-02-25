@@ -30,9 +30,6 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
   const url = buildUrl(endpoint, config?.params)
 
   console.log('[API] Fetching:', method, url)
-  if (data) {
-    console.log('[API] Body:', JSON.stringify(data))
-  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -41,18 +38,11 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-      mode: 'cors',
-    })
-  } catch (err) {
-    console.error('[API] Fetch error:', err)
-    throw err
-  }
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+  })
 
   // Manejar 401 - token expirado
   if (response.status === 401 && !endpoint.includes('/auth/login')) {
