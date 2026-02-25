@@ -15,12 +15,12 @@ import {
 export const getCategorias = async (tipo?: TipoMovimiento) => {
   const params = new URLSearchParams()
   if (tipo) params.append('tipo', tipo)
-  const { data } = await api.get<CategoriaFinanzas[]>(`/finanzas/categorias?${params.toString()}`)
+  const { data } = await api.get<CategoriaFinanzas[]>(`/finanzas/categorias/?${params.toString()}`)
   return data
 }
 
 export const createCategoria = async (categoria: CategoriaFinanzasCreate) => {
-  const { data } = await api.post<CategoriaFinanzas>('/finanzas/categorias', categoria)
+  const { data } = await api.post<CategoriaFinanzas>('/finanzas/categorias/', categoria)
   return data
 }
 
@@ -50,7 +50,7 @@ export const getMovimientos = async (filters: MovimientosFilters = {}) => {
       params.append(key, String(value))
     }
   })
-  const { data } = await api.get<MovimientoFinanciero[]>(`/finanzas/movimientos?${params.toString()}`)
+  const { data } = await api.get<MovimientoFinanciero[]>(`/finanzas/movimientos/?${params.toString()}`)
   return data
 }
 
@@ -60,7 +60,7 @@ export const getMovimiento = async (id: string) => {
 }
 
 export const createMovimiento = async (movimiento: MovimientoFinancieroCreate) => {
-  const { data } = await api.post<MovimientoFinanciero>('/finanzas/movimientos', movimiento)
+  const { data } = await api.post<MovimientoFinanciero>('/finanzas/movimientos/', movimiento)
   return data
 }
 
@@ -80,7 +80,7 @@ export const getResumen = async (fechaDesde?: string, fechaHasta?: string) => {
   const params = new URLSearchParams()
   if (fechaDesde) params.append('fecha_desde', fechaDesde)
   if (fechaHasta) params.append('fecha_hasta', fechaHasta)
-  const { data } = await api.get<ResumenFinanciero>(`/finanzas/resumen?${params.toString()}`)
+  const { data } = await api.get<ResumenFinanciero>(`/finanzas/resumen/?${params.toString()}`)
   return data
 }
 
@@ -93,19 +93,19 @@ export const getResumenPorCategoria = async (
   if (tipo) params.append('tipo', tipo)
   if (fechaDesde) params.append('fecha_desde', fechaDesde)
   if (fechaHasta) params.append('fecha_hasta', fechaHasta)
-  const { data } = await api.get<ResumenPorCategoria[]>(`/finanzas/resumen/categorias?${params.toString()}`)
+  const { data } = await api.get<ResumenPorCategoria[]>(`/finanzas/resumen/categorias/?${params.toString()}`)
   return data
 }
 
 export const getResumenDiario = async (dias: number = 30) => {
-  const { data } = await api.get<{ fecha: string; ingresos: number; egresos: number }[]>(`/finanzas/resumen/diario?dias=${dias}`)
+  const { data } = await api.get<{ fecha: string; ingresos: number; egresos: number }[]>(`/finanzas/resumen/diario/?dias=${dias}`)
   return data
 }
 
 // ==================== CUENTAS BANCARIAS ====================
 
 export const getCuentas = async () => {
-  const { data } = await api.get<CuentaBancaria[]>('/finanzas/cuentas')
+  const { data } = await api.get<CuentaBancaria[]>('/finanzas/cuentas/')
   return data
 }
 
@@ -115,7 +115,7 @@ export const getCuenta = async (id: string) => {
 }
 
 export const createCuenta = async (cuenta: Partial<CuentaBancaria>) => {
-  const { data } = await api.post<CuentaBancaria>('/finanzas/cuentas', cuenta)
+  const { data } = await api.post<CuentaBancaria>('/finanzas/cuentas/', cuenta)
   return data
 }
 
