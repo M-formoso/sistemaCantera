@@ -103,8 +103,42 @@ export const getOrdenConPesajes = async (id: string): Promise<OrdenEntregaConPes
 
 // Crear orden
 export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntrega> => {
-  const { data } = await api.post<OrdenEntrega>('/ordenes-entrega', orden)
-  return data
+  const url = 'https://backend-production-ee51.up.railway.app/api/v1/ordenes-entrega'
+  const token = localStorage.getItem('access_token')
+
+  console.log('[crearOrden] URL:', url)
+  console.log('[crearOrden] Token exists:', !!token)
+  console.log('[crearOrden] Body:', JSON.stringify(orden))
+
+  // Intentar con fetch directo para debug
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(orden),
+    })
+
+    console.log('[crearOrden] Response status:', response.status)
+    console.log('[crearOrden] Response ok:', response.ok)
+    console.log('[crearOrden] Response headers:', Object.fromEntries(response.headers.entries()))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[crearOrden] Error response:', errorText)
+      throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log('[crearOrden] Success:', data)
+    return data
+  } catch (error: any) {
+    console.error('[crearOrden] Fetch failed:', error)
+    console.error('[crearOrden] Error type:', error?.constructor?.name)
+    throw error
+  }
 }
 
 // Actualizar orden

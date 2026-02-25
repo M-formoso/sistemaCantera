@@ -51,11 +51,28 @@ export default function OrdenesEntregaTab() {
 
   // Mutations
   const crearMutation = useMutation({
-    mutationFn: (data: OrdenEntregaCreate) => ordenEntregaService.crearOrden(data),
+    mutationFn: async (data: OrdenEntregaCreate) => {
+      console.log('[OrdenEntrega] Intentando crear orden con datos:', JSON.stringify(data, null, 2))
+      try {
+        const result = await ordenEntregaService.crearOrden(data)
+        console.log('[OrdenEntrega] Orden creada exitosamente:', result)
+        return result
+      } catch (error: any) {
+        console.error('[OrdenEntrega] Error al crear orden:', error)
+        console.error('[OrdenEntrega] Error name:', error?.name)
+        console.error('[OrdenEntrega] Error message:', error?.message)
+        console.error('[OrdenEntrega] Error stack:', error?.stack)
+        throw error
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes-pendientes'] })
       queryClient.invalidateQueries({ queryKey: ['ordenes-todas'] })
       setShowModal(false)
+    },
+    onError: (error: any) => {
+      console.error('[OrdenEntrega] Mutation error:', error)
+      alert(`Error al crear orden: ${error?.message || 'Error desconocido'}`)
     },
   })
 
