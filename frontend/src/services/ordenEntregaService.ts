@@ -79,7 +79,7 @@ export const getOrdenes = async (
   if (fechaDesde) params.fecha_desde = fechaDesde
   if (fechaHasta) params.fecha_hasta = fechaHasta
 
-  const { data } = await api.get<OrdenEntrega[]>('/ordenes-entrega', { params })
+  const { data } = await api.get<OrdenEntrega[]>('/ordenes-entrega/', { params })
   return data
 }
 
@@ -101,16 +101,15 @@ export const getOrdenConPesajes = async (id: string): Promise<OrdenEntregaConPes
   return data
 }
 
-// Crear orden
+// Crear orden - IMPORTANTE: usar trailing slash para evitar redirect 307
 export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntrega> => {
-  const url = 'https://backend-production-ee51.up.railway.app/api/v1/ordenes-entrega'
+  const url = 'https://backend-production-ee51.up.railway.app/api/v1/ordenes-entrega/'
   const token = localStorage.getItem('access_token')
 
   console.log('[crearOrden] URL:', url)
   console.log('[crearOrden] Token exists:', !!token)
   console.log('[crearOrden] Body:', JSON.stringify(orden))
 
-  // Intentar con fetch directo para debug
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -123,12 +122,11 @@ export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntreg
 
     console.log('[crearOrden] Response status:', response.status)
     console.log('[crearOrden] Response ok:', response.ok)
-    console.log('[crearOrden] Response headers:', Object.fromEntries(response.headers.entries()))
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[crearOrden] Error response:', errorText)
-      throw new Error(`HTTP ${response.status}: ${errorText}`)
+      const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }))
+      console.error('[crearOrden] Error response:', errorData)
+      throw new Error(errorData.detail || `HTTP ${response.status}`)
     }
 
     const data = await response.json()
@@ -136,7 +134,6 @@ export const crearOrden = async (orden: OrdenEntregaCreate): Promise<OrdenEntreg
     return data
   } catch (error: any) {
     console.error('[crearOrden] Fetch failed:', error)
-    console.error('[crearOrden] Error type:', error?.constructor?.name)
     throw error
   }
 }
