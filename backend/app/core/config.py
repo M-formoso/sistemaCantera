@@ -43,6 +43,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://localhost:5180",
         "http://localhost:3000",
+        "https://frontend-production-d4d3.up.railway.app",
+        "https://sistemacantera.up.railway.app",
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

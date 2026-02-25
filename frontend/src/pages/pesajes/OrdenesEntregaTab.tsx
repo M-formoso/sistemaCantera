@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ordenEntregaService, OrdenEntregaCreate } from '@/services/ordenEntregaService'
 import { empresasService } from '@/services/empresasService'
+import { usuariosService } from '@/services/usuariosService'
 import { formatDate, formatNumber } from '@/lib/utils'
 
 const MATERIALES = ['10.30', '6.19', '0.20', '6.12', 'relleno', 'binder', '0.6']
@@ -41,6 +42,12 @@ export default function OrdenesEntregaTab() {
     queryKey: ['empresas-clientes'],
     queryFn: () => empresasService.getAll('cliente'),
   })
+
+  const { data: usuariosData } = useQuery({
+    queryKey: ['usuarios-activos'],
+    queryFn: () => usuariosService.getAll({ activo: true, limit: 100 }),
+  })
+  const usuarios = usuariosData?.items || []
 
   // Mutations
   const crearMutation = useMutation({
@@ -381,6 +388,7 @@ export default function OrdenesEntregaTab() {
       {showModal && (
         <NuevaOrdenModal
           clientes={clientes}
+          usuarios={usuarios}
           onClose={() => setShowModal(false)}
           onSubmit={async (data) => {
             await crearMutation.mutateAsync(data)
@@ -395,11 +403,13 @@ export default function OrdenesEntregaTab() {
 // Modal para crear nueva orden
 function NuevaOrdenModal({
   clientes,
+  usuarios,
   onClose,
   onSubmit,
   isLoading
 }: {
   clientes: any[]
+  usuarios: any[]
   onClose: () => void
   onSubmit: (data: OrdenEntregaCreate) => Promise<void>
   isLoading: boolean
@@ -532,11 +542,16 @@ function NuevaOrdenModal({
             {/* Solicitante */}
             <div>
               <label className="text-sm font-medium mb-1 block">Solicitado por</label>
-              <Input
+              <select
                 value={formData.solicitante || ''}
                 onChange={(e) => setFormData({ ...formData, solicitante: e.target.value })}
-                placeholder="Ej: Martín, Vero..."
-              />
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Seleccionar usuario...</option>
+                {usuarios.map((u: any) => (
+                  <option key={u.id} value={u.nombre}>{u.nombre}</option>
+                ))}
+              </select>
             </div>
 
             {/* Dirección */}
