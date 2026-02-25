@@ -380,8 +380,11 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaj
 
 def eliminar(db: Session, pesaje_id: UUID) -> dict:
     """
-    Elimina un pesaje
+    Elimina un pesaje y sus referencias relacionadas
     """
+    from app.models.remito import Remito
+    from app.models.cuenta_corriente import MovimientoCuentaCorriente
+
     db_pesaje = obtener_por_id(db, pesaje_id)
 
     if not db_pesaje:
@@ -393,6 +396,14 @@ def eliminar(db: Session, pesaje_id: UUID) -> dict:
     # Si tiene orden de entrega asociada, desasociar primero
     if db_pesaje.orden_entrega_id:
         db_pesaje.orden_entrega_id = None
+
+    # Eliminar remitos asociados
+    db.query(Remito).filter(Remito.pesaje_id == pesaje_id).delete()
+
+    # Desasociar movimientos de cuenta corriente (no eliminarlos, solo quitar la referencia)
+    db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.pesaje_id == pesaje_id
+    ).update({MovimientoCuentaCorriente.pesaje_id: None})
 
     db.delete(db_pesaje)
     db.commit()
