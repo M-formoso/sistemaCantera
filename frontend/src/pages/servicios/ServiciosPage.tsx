@@ -18,10 +18,12 @@ import { Input } from '@/components/ui/input'
 import { serviciosService } from '@/services/serviciosService'
 import { Servicio } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function ServiciosPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [showOnlyProgramados, setShowOnlyProgramados] = useState(false)
@@ -135,15 +137,17 @@ export default function ServiciosPage() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDelete(servicio.id, servicio.camion_patente || 'N/A')}
-              disabled={deleteMutation.isPending}
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4 text-red-600" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDelete(servicio.id, servicio.camion_patente || 'N/A')}
+                disabled={deleteMutation.isPending}
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            )}
           </div>
         )
       },

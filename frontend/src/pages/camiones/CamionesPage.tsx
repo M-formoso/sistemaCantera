@@ -18,10 +18,12 @@ import { Input } from '@/components/ui/input'
 import { camionesService } from '@/services/camionesService'
 import { Camion } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function CamionesPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
@@ -156,15 +158,17 @@ export default function CamionesPage() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDelete(camion.id, camion.patente || camion.nombre || 'este equipo')}
-              disabled={deleteMutation.isPending}
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4 text-red-600" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDelete(camion.id, camion.patente || camion.nombre || 'este equipo')}
+                disabled={deleteMutation.isPending}
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            )}
           </div>
         )
       },

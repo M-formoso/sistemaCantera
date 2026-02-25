@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/input'
 import { camionesService } from '@/services/camionesService'
 import { serviciosService } from '@/services/serviciosService'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function CamionDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [showProximoServicio, setShowProximoServicio] = useState(false)
   const [proximoServicioFecha, setProximoServicioFecha] = useState('')
   const [proximoServicioKm, setProximoServicioKm] = useState('')
@@ -325,15 +327,17 @@ export default function CamionDetailPage() {
                           {servicio.kilometraje_servicio.toLocaleString('es-AR')} km
                         </p>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteServicio(servicio.id)}
-                        disabled={deleteServicioMutation.isPending}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteServicio(servicio.id)}
+                          disabled={deleteServicioMutation.isPending}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

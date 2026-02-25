@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/data-table'
 import { repuestosService } from '@/services/repuestosService'
 import { Repuesto, MovimientoStock } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 interface MovimientoModal {
   repuesto: Repuesto | null
@@ -19,6 +20,7 @@ interface MovimientoModal {
 export default function RepuestosPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [showOnlyBajoStock, setShowOnlyBajoStock] = useState(false)
   const [movimientoModal, setMovimientoModal] = useState<MovimientoModal>({ repuesto: null, tipo: null })
   const [cantidad, setCantidad] = useState('')
@@ -224,15 +226,17 @@ export default function RepuestosPage() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDelete(repuesto.id, repuesto.nombre)}
-              disabled={deleteMutation.isPending}
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4 text-red-600" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDelete(repuesto.id, repuesto.nombre)}
+                disabled={deleteMutation.isPending}
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            )}
           </div>
         )
       },

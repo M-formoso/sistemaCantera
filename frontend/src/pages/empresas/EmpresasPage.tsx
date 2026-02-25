@@ -16,9 +16,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { empresasService } from '@/services/empresasService'
 import { Empresa, EmpresaCreate, TipoEmpresa } from '@/types'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function EmpresasPage() {
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [filtroTipo, setFiltroTipo] = useState<TipoEmpresa | 'todos'>('todos')
@@ -224,15 +226,17 @@ export default function EmpresasPage() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(empresa.id, empresa.nombre)}
-              className="text-red-600 hover:text-red-700"
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(empresa.id, empresa.nombre)}
+                className="text-red-600 hover:text-red-700"
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )
       },

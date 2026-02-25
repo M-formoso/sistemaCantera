@@ -8,10 +8,12 @@ import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
 import { Pesaje } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function PesajesTab() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
 
   // Query para pesajes
   const { data: pesajes = [], isLoading } = useQuery({
@@ -140,15 +142,17 @@ export default function PesajesTab() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDelete(pesaje.id, pesaje.numero_pesaje)}
-              disabled={deleteMutation.isPending}
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4 text-red-600" />
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDelete(pesaje.id, pesaje.numero_pesaje)}
+                disabled={deleteMutation.isPending}
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            )}
           </div>
         )
       },
