@@ -43,16 +43,13 @@ def obtener_todas(
 
     ordenes = query.order_by(desc(OrdenEntrega.fecha_entrega), desc(OrdenEntrega.numero_orden)).offset(skip).limit(limit).all()
 
-    # Enriquecer con nombre del cliente
+    # Enriquecer con nombre del cliente (no asignar a properties calculadas)
     for orden in ordenes:
         if orden.cliente_id and orden.cliente:
             orden.cliente_nombre_completo = orden.cliente.nombre
         else:
             orden.cliente_nombre_completo = orden.cliente_nombre
-
-        # Calcular campos
-        orden.cargas_pendientes = orden.cantidad_cargas - orden.cargas_entregadas
-        orden.porcentaje_completado = (orden.cargas_entregadas / orden.cantidad_cargas * 100) if orden.cantidad_cargas > 0 else 0
+        # cargas_pendientes y porcentaje_completado son @property, se calculan automáticamente
 
     return ordenes
 
@@ -71,9 +68,7 @@ def obtener_pendientes(db: Session) -> List[OrdenEntrega]:
             orden.cliente_nombre_completo = orden.cliente.nombre
         else:
             orden.cliente_nombre_completo = orden.cliente_nombre
-
-        orden.cargas_pendientes = orden.cantidad_cargas - orden.cargas_entregadas
-        orden.porcentaje_completado = (orden.cargas_entregadas / orden.cantidad_cargas * 100) if orden.cantidad_cargas > 0 else 0
+        # cargas_pendientes y porcentaje_completado son @property
 
     return ordenes
 
@@ -87,9 +82,7 @@ def obtener_por_id(db: Session, orden_id: UUID) -> Optional[OrdenEntrega]:
             orden.cliente_nombre_completo = orden.cliente.nombre
         else:
             orden.cliente_nombre_completo = orden.cliente_nombre
-
-        orden.cargas_pendientes = orden.cantidad_cargas - orden.cargas_entregadas
-        orden.porcentaje_completado = (orden.cargas_entregadas / orden.cantidad_cargas * 100) if orden.cantidad_cargas > 0 else 0
+        # cargas_pendientes y porcentaje_completado son @property
 
     return orden
 
@@ -176,9 +169,7 @@ def crear(db: Session, orden_data: OrdenEntregaCreate, usuario_id: UUID) -> Orde
     db.refresh(db_orden)
     logger.info(f"[crear] Orden guardada con ID: {db_orden.id}")
 
-    # Agregar campos calculados para respuesta
-    db_orden.cargas_pendientes = db_orden.cantidad_cargas
-    db_orden.porcentaje_completado = 0
+    # Solo asignar cliente_nombre_completo (cargas_pendientes y porcentaje_completado son @property)
     db_orden.cliente_nombre_completo = db_orden.cliente_nombre
 
     return db_orden
