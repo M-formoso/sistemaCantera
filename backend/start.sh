@@ -28,7 +28,7 @@ echo ""
 echo "Ejecutando migraciones de base de datos..."
 alembic upgrade head || {
     echo "Advertencia: Las migraciones fallaron, intentando crear tablas directamente..."
-    python -c "from app.db.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
+    python -c "from app.models import *; from app.db.base import Base; from app.db.session import engine; Base.metadata.create_all(bind=engine)"
 }
 
 echo ""
