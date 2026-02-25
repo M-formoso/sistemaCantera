@@ -148,6 +148,76 @@ def create_default_cisterna():
         db.close()
 
 
+def ensure_ordenes_entrega_table():
+    """Asegurar que la tabla ordenes_entrega existe"""
+    print("Verificando tabla ordenes_entrega...")
+
+    engine = create_engine(settings.DATABASE_URL)
+
+    try:
+        from sqlalchemy import text, inspect
+
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+
+        if 'ordenes_entrega' not in tables:
+            print("Tabla ordenes_entrega no existe, creando...")
+            with engine.connect() as conn:
+                # Crear tabla ordenes_entrega
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS ordenes_entrega (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        numero_orden INTEGER NOT NULL UNIQUE,
+                        fecha_entrega DATE NOT NULL,
+                        cliente_id UUID REFERENCES empresas(id),
+                        cliente_nombre VARCHAR(255),
+                        material VARCHAR(100) NOT NULL,
+                        cantidad_cargas INTEGER NOT NULL,
+                        cargas_entregadas INTEGER NOT NULL DEFAULT 0,
+                        peso_estimado_carga NUMERIC(10, 2),
+                        peso_total_estimado NUMERIC(12, 2),
+                        peso_total_entregado NUMERIC(12, 2) DEFAULT 0,
+                        estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+                        solicitante VARCHAR(100),
+                        contacto_cliente VARCHAR(100),
+                        telefono_contacto VARCHAR(50),
+                        direccion_entrega TEXT,
+                        observaciones TEXT,
+                        created_by UUID NOT NULL REFERENCES usuarios(id),
+                        created_at TIMESTAMP NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMP NOT NULL DEFAULT now()
+                    )
+                """))
+
+                # Crear índices
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ordenes_entrega_numero_orden ON ordenes_entrega(numero_orden)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ordenes_entrega_fecha_entrega ON ordenes_entrega(fecha_entrega)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ordenes_entrega_estado ON ordenes_entrega(estado)"))
+
+                conn.commit()
+                print("Tabla ordenes_entrega creada correctamente")
+        else:
+            print("Tabla ordenes_entrega ya existe")
+
+        # Verificar columna orden_entrega_id en pesajes
+        pesajes_columns = [col['name'] for col in inspector.get_columns('pesajes')]
+        if 'orden_entrega_id' not in pesajes_columns:
+            print("Agregando columna orden_entrega_id a pesajes...")
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    ALTER TABLE pesajes
+                    ADD COLUMN IF NOT EXISTS orden_entrega_id UUID REFERENCES ordenes_entrega(id)
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pesajes_orden_entrega_id ON pesajes(orden_entrega_id)"))
+                conn.commit()
+                print("Columna orden_entrega_id agregada")
+        else:
+            print("Columna orden_entrega_id ya existe en pesajes")
+
+    except Exception as e:
+        print(f"Error verificando ordenes_entrega: {e}")
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("Inicializando Sistema Cantera La Rufina")
@@ -161,6 +231,9 @@ if __name__ == "__main__":
 
     # Crear cisterna por defecto si no existe
     create_default_cisterna()
+
+    # Asegurar que la tabla ordenes_entrega existe
+    ensure_ordenes_entrega_table()
 
     print("=" * 50)
     print("Inicialización completada!")

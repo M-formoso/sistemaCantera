@@ -420,7 +420,27 @@ function NuevaOrdenModal({
       alert('Ingrese al menos 1 carga')
       return
     }
-    await onSubmit(formData)
+
+    // Limpiar campos vacíos antes de enviar
+    const cleanData: OrdenEntregaCreate = {
+      ...formData,
+    }
+
+    // Eliminar cliente_id si está vacío
+    if (!cleanData.cliente_id || cleanData.cliente_id === '') {
+      delete cleanData.cliente_id
+    }
+
+    // Eliminar campos opcionales vacíos
+    if (!cleanData.cliente_nombre) delete cleanData.cliente_nombre
+    if (!cleanData.solicitante) delete cleanData.solicitante
+    if (!cleanData.direccion_entrega) delete cleanData.direccion_entrega
+    if (!cleanData.observaciones) delete cleanData.observaciones
+    if (!cleanData.contacto_cliente) delete cleanData.contacto_cliente
+    if (!cleanData.telefono_contacto) delete cleanData.telefono_contacto
+    if (!cleanData.peso_estimado_carga) delete cleanData.peso_estimado_carga
+
+    await onSubmit(cleanData)
   }
 
   return (
