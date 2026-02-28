@@ -13,6 +13,12 @@ class Pesaje(BaseModel):
     numero_pesaje = Column(Integer, unique=True, nullable=False, index=True)
     fecha = Column(DateTime, nullable=False)
 
+    # Estado del pesaje: 'pendiente' (solo tara) o 'completado' (tara + bruto)
+    estado = Column(String(20), default="completado", nullable=False, index=True)
+
+    # Fecha del segundo pesaje (cuando se completa)
+    fecha_completado = Column(DateTime, nullable=True)
+
     # Tipo de entrega: 'propio' (camión de la cantera) o 'transportista' (externo)
     tipo_entrega = Column(String(20), default="propio")
 
@@ -33,9 +39,9 @@ class Pesaje(BaseModel):
     chofer = Column(String(100))
 
     # Pesos
-    peso_tara = Column(Numeric(10, 2), nullable=False)  # kg
-    peso_bruto = Column(Numeric(10, 2), nullable=False)  # kg
-    peso_neto = Column(Numeric(10, 2))  # Calculado: bruto - tara
+    peso_tara = Column(Numeric(10, 2), nullable=True)  # kg - se registra primero
+    peso_bruto = Column(Numeric(10, 2), nullable=True)  # kg - se registra después
+    peso_neto = Column(Numeric(10, 2), nullable=True)  # Calculado: bruto - tara
 
     # Material
     material = Column(String(100))

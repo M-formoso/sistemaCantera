@@ -1,6 +1,70 @@
 import api from './api'
 import { Pesaje, PesajeCreate } from '@/types'
 
+// Tipos para flujo de doble pesaje
+export interface PesajeIniciarCreate {
+  tipo_entrega: 'propio' | 'transportista'
+  camion_id?: string
+  transportista_id?: string
+  patente_externa?: string
+  transportista?: string
+  cliente_id?: string
+  cliente_nombre?: string
+  acoplado?: string
+  chofer?: string
+  peso_tara: number
+  material?: string
+  operario?: string
+  observaciones?: string
+  orden_entrega_id?: string
+  fecha?: string
+}
+
+export interface PesajeCompletarCreate {
+  peso_bruto: number
+  material?: string
+  chofer?: string
+  observaciones?: string
+  precio_unitario?: number
+  importe_total?: number
+  orden_entrega_id?: string
+}
+
+export interface PesajePendiente {
+  id: string
+  numero_pesaje: number
+  fecha: string
+  estado: 'pendiente'
+  tipo_entrega: 'propio' | 'transportista'
+  camion_id?: string
+  camion_patente?: string
+  patente_externa?: string
+  cliente_id?: string
+  cliente_nombre?: string
+  transportista_id?: string
+  transportista_nombre?: string
+  peso_tara: number
+  material?: string
+  chofer?: string
+  acoplado?: string
+  minutos_esperando?: number
+}
+
+export interface BusquedaPatenteResult {
+  encontrado: boolean
+  tipo?: 'propio' | 'transportista'
+  camion_id?: string
+  camion_patente?: string
+  camion_marca?: string
+  camion_modelo?: string
+  cliente_id?: string
+  cliente_nombre?: string
+  pesaje_pendiente_id?: string
+  pesaje_pendiente_numero?: number
+  pesaje_pendiente_tara?: number
+  pesaje_pendiente_fecha?: string
+}
+
 export const pesajesService = {
   /**
    * Obtiene todos los pesajes
@@ -94,5 +158,46 @@ export const pesajesService = {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
+  },
+
+  // ============== FLUJO DOBLE PESAJE ==============
+
+  /**
+   * Obtiene pesajes pendientes (solo tara registrada)
+   */
+  async getPendientes(): Promise<PesajePendiente[]> {
+    const response = await api.get<PesajePendiente[]>('/pesajes/pendientes')
+    return response.data
+  },
+
+  /**
+   * Busca información por patente del camión
+   */
+  async buscarPorPatente(patente: string): Promise<BusquedaPatenteResult> {
+    const response = await api.get<BusquedaPatenteResult>(`/pesajes/buscar-patente/${encodeURIComponent(patente)}`)
+    return response.data
+  },
+
+  /**
+   * Inicia un nuevo pesaje (solo tara - camión vacío)
+   */
+  async iniciarPesaje(data: PesajeIniciarCreate): Promise<Pesaje> {
+    const response = await api.post<Pesaje>('/pesajes/iniciar', data)
+    return response.data
+  },
+
+  /**
+   * Completa un pesaje pendiente (peso bruto - camión cargado)
+   */
+  async completarPesaje(pesajeId: string, data: PesajeCompletarCreate): Promise<Pesaje> {
+    const response = await api.post<Pesaje>(`/pesajes/${pesajeId}/completar`, data)
+    return response.data
+  },
+
+  /**
+   * Cancela un pesaje pendiente
+   */
+  async cancelarPendiente(pesajeId: string): Promise<void> {
+    await api.delete(`/pesajes/${pesajeId}/cancelar`)
   },
 }

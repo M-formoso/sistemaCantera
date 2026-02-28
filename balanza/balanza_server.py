@@ -219,7 +219,8 @@ def main():
     if len(sys.argv) > 1:
         puerto_com = sys.argv[1]
     else:
-        puerto_com = detectar_puerto_serial()
+        # Puerto por defecto: COM2
+        puerto_com = "COM2"
 
         if not puerto_com:
             print("=" * 50)

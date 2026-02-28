@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from uuid import UUID
-from typing import Optional, Union, Literal
+from typing import Optional, Union, Literal, List
 from decimal import Decimal
 from datetime import datetime, date
 
@@ -17,6 +17,9 @@ MATERIALES_DISPONIBLES = [
     "binder",
     "0.6"
 ]
+
+# Estados de pesaje
+ESTADOS_PESAJE = ["pendiente", "completado"]
 
 
 class PesajeBase(BaseModel):
@@ -126,6 +129,8 @@ class PesajeSchema(ResponseBase):
 
     numero_pesaje: int
     fecha: datetime
+    estado: str = "completado"
+    fecha_completado: Optional[datetime] = None
     tipo_entrega: str = "propio"
 
     # Camión propio
@@ -147,9 +152,9 @@ class PesajeSchema(ResponseBase):
     chofer: Optional[str] = None
 
     # Pesos
-    peso_tara: Decimal
-    peso_bruto: Decimal
-    peso_neto: Decimal
+    peso_tara: Optional[Decimal] = None
+    peso_bruto: Optional[Decimal] = None
+    peso_neto: Optional[Decimal] = None
 
     # Material
     material: Optional[str] = None
@@ -183,3 +188,140 @@ class PesajeStats(BaseModel):
 class MaterialesDisponibles(BaseModel):
     """Lista de materiales disponibles"""
     materiales: list[str] = MATERIALES_DISPONIBLES
+
+
+# ============== SCHEMAS PARA FLUJO DOBLE PESAJE ==============
+
+class PesajeIniciarCreate(BaseModel):
+    """Schema para iniciar un pesaje (solo tara - camión vacío)"""
+
+    # Tipo de entrega
+    tipo_entrega: Literal["propio", "transportista"] = "propio"
+
+    # Camión propio (requerido si tipo_entrega = "propio")
+    camion_id: Optional[UUID] = None
+
+    # Transportista externo (requerido si tipo_entrega = "transportista")
+    transportista_id: Optional[UUID] = None
+    patente_externa: Optional[str] = Field(None, max_length=20)
+    transportista: Optional[str] = Field(None, max_length=100)
+
+    # Cliente destino
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = Field(None, max_length=255)
+
+    # Datos del transporte
+    acoplado: Optional[str] = Field(None, max_length=20)
+    chofer: Optional[str] = Field(None, max_length=100)
+
+    # Peso tara (camión vacío)
+    peso_tara: Decimal = Field(..., gt=0, description="Peso del camión vacío en kg")
+
+    # Material (opcional al iniciar)
+    material: Optional[str] = Field(None, max_length=100)
+
+    # Operación
+    operario: Optional[str] = Field(None, max_length=100)
+
+    observaciones: Optional[str] = None
+
+    # Orden de entrega
+    orden_entrega_id: Optional[UUID] = None
+
+    fecha: Union[datetime, date, str] = Field(default_factory=datetime.utcnow)
+
+    @field_validator('fecha', mode='before')
+    @classmethod
+    def parse_fecha(cls, v):
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    return datetime.strptime(v, '%Y-%m-%d')
+                except ValueError:
+                    raise ValueError('Formato de fecha inválido')
+        return v
+
+    @model_validator(mode='after')
+    def validar_tipo_entrega(self):
+        if self.tipo_entrega == "propio" and not self.camion_id:
+            raise ValueError('Debe seleccionar un camión propio')
+        if self.tipo_entrega == "transportista":
+            if not self.transportista_id and not self.transportista:
+                raise ValueError('Debe seleccionar o ingresar un transportista')
+            if not self.patente_externa:
+                raise ValueError('Debe ingresar la patente del camión externo')
+        return self
+
+
+class PesajeCompletarCreate(BaseModel):
+    """Schema para completar un pesaje (peso bruto - camión cargado)"""
+
+    peso_bruto: Decimal = Field(..., gt=0, description="Peso del camión cargado en kg")
+
+    # Datos opcionales que se pueden actualizar al completar
+    material: Optional[str] = Field(None, max_length=100)
+    chofer: Optional[str] = Field(None, max_length=100)
+    observaciones: Optional[str] = None
+
+    # Importe (opcional)
+    precio_unitario: Optional[Decimal] = Field(None, ge=0, description="Precio por tonelada")
+    importe_total: Optional[Decimal] = Field(None, ge=0, description="Importe total")
+
+    # Orden de entrega
+    orden_entrega_id: Optional[UUID] = None
+
+
+class PesajePendienteSchema(ResponseBase):
+    """Schema para listar pesajes pendientes (solo tara registrada)"""
+
+    numero_pesaje: int
+    fecha: datetime
+    estado: str = "pendiente"
+
+    # Identificación del camión
+    tipo_entrega: str
+    camion_id: Optional[UUID] = None
+    camion_patente: Optional[str] = None
+    patente_externa: Optional[str] = None
+
+    # Cliente
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = None
+
+    # Transportista
+    transportista_id: Optional[UUID] = None
+    transportista_nombre: Optional[str] = None
+
+    # Datos
+    peso_tara: Decimal
+    material: Optional[str] = None
+    chofer: Optional[str] = None
+    acoplado: Optional[str] = None
+
+    # Tiempo esperando
+    minutos_esperando: Optional[int] = None
+
+
+class BusquedaPatenteResult(BaseModel):
+    """Resultado de búsqueda por patente"""
+
+    encontrado: bool
+    tipo: Optional[Literal["propio", "transportista"]] = None
+
+    # Si es camión propio
+    camion_id: Optional[UUID] = None
+    camion_patente: Optional[str] = None
+    camion_marca: Optional[str] = None
+    camion_modelo: Optional[str] = None
+
+    # Cliente asociado (si existe)
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = None
+
+    # Pesaje pendiente (si existe)
+    pesaje_pendiente_id: Optional[UUID] = None
+    pesaje_pendiente_numero: Optional[int] = None
+    pesaje_pendiente_tara: Optional[Decimal] = None
+    pesaje_pendiente_fecha: Optional[datetime] = None

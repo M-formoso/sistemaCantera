@@ -10,7 +10,11 @@ from datetime import date
 
 from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
 from app.models.usuario import Usuario
-from app.schemas.pesaje import PesajeSchema, PesajeCreate, PesajeUpdate
+from app.schemas.pesaje import (
+    PesajeSchema, PesajeCreate, PesajeUpdate,
+    PesajeIniciarCreate, PesajeCompletarCreate,
+    PesajePendienteSchema, BusquedaPatenteResult
+)
 from app.services import pesaje_service
 
 router = APIRouter()
@@ -20,11 +24,34 @@ router = APIRouter()
 async def listar_pesajes(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    estado: Optional[str] = Query(None, description="Filtrar por estado: pendiente o completado"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
     """Lista todos los pesajes con paginación"""
     return pesaje_service.obtener_todos(db, skip, limit)
+
+
+@router.get("/pendientes", response_model=List[PesajePendienteSchema])
+async def listar_pesajes_pendientes(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """Lista pesajes pendientes (solo tara registrada, esperando peso bruto)"""
+    return pesaje_service.obtener_pendientes(db)
+
+
+@router.get("/buscar-patente/{patente}", response_model=BusquedaPatenteResult)
+async def buscar_por_patente(
+    patente: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Busca información por patente del camión.
+    Retorna datos del camión, cliente asociado y pesaje pendiente si existe.
+    """
+    return pesaje_service.buscar_por_patente(db, patente)
 
 
 @router.get("/por-fecha")
@@ -65,7 +92,7 @@ async def crear_pesaje(
     current_user: Usuario = Depends(require_admin_or_operador)
 ):
     """
-    Crea un nuevo pesaje
+    Crea un nuevo pesaje completo (modo tradicional)
 
     **Requiere rol:** Administrador u Operador
 
@@ -73,6 +100,58 @@ async def crear_pesaje(
     - El peso neto se calcula automáticamente (bruto - tara)
     """
     return pesaje_service.crear(db, pesaje, current_user.id)
+
+
+@router.post("/iniciar", response_model=PesajeSchema, status_code=201)
+async def iniciar_pesaje(
+    pesaje: PesajeIniciarCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Inicia un nuevo pesaje registrando solo la tara (camión vacío)
+
+    **Requiere rol:** Administrador u Operador
+
+    El pesaje queda en estado 'pendiente' hasta que se complete
+    con el peso bruto cuando el camión vuelva cargado.
+    """
+    return pesaje_service.iniciar_pesaje(db, pesaje, current_user.id)
+
+
+@router.post("/{pesaje_id}/completar", response_model=PesajeSchema)
+async def completar_pesaje(
+    pesaje_id: UUID,
+    pesaje: PesajeCompletarCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Completa un pesaje pendiente registrando el peso bruto (camión cargado)
+
+    **Requiere rol:** Administrador u Operador
+
+    - Calcula automáticamente el peso neto (bruto - tara)
+    - Genera remito automáticamente
+    - Actualiza cuenta corriente si hay importe
+    """
+    return pesaje_service.completar_pesaje(db, pesaje_id, pesaje, current_user.id)
+
+
+@router.delete("/{pesaje_id}/cancelar")
+async def cancelar_pesaje_pendiente(
+    pesaje_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Cancela un pesaje pendiente (elimina sin generar remito)
+
+    **Requiere rol:** Administrador u Operador
+
+    Solo funciona para pesajes en estado 'pendiente'
+    """
+    return pesaje_service.cancelar_pesaje_pendiente(db, pesaje_id)
 
 
 @router.get("/{pesaje_id}", response_model=PesajeSchema)

@@ -17,6 +17,7 @@ import RepuestoFormPage from '@/pages/repuestos/RepuestoFormPage'
 // Pesajes y Remitos (unificados)
 import PesajesRemitosPage from '@/pages/pesajes/PesajesRemitosPage'
 import PesajeFormPage from '@/pages/pesajes/PesajeFormPage'
+import NuevoPesajePage from '@/pages/pesajes/NuevoPesajePage'
 
 // Servicios
 import ServiciosPage from '@/pages/servicios/ServiciosPage'
@@ -78,7 +79,8 @@ function App() {
 
           {/* Pesajes y Remitos (unificados) */}
           <Route path="pesajes-remitos" element={<PermisoRoute permiso="permiso_pesajes"><PesajesRemitosPage /></PermisoRoute>} />
-          <Route path="pesajes-remitos/nuevo" element={<PermisoRoute permiso="permiso_pesajes"><PesajeFormPage /></PermisoRoute>} />
+          <Route path="pesajes-remitos/nuevo" element={<PermisoRoute permiso="permiso_pesajes"><NuevoPesajePage /></PermisoRoute>} />
+          <Route path="pesajes-remitos/nuevo-clasico" element={<PermisoRoute permiso="permiso_pesajes"><PesajeFormPage /></PermisoRoute>} />
           <Route path="pesajes-remitos/:id/editar" element={<PermisoRoute permiso="permiso_pesajes"><PesajeFormPage /></PermisoRoute>} />
 
           {/* Rutas legacy para compatibilidad */}

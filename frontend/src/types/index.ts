@@ -304,10 +304,14 @@ export interface EmpresaCreate {
 
 export type TipoEntrega = 'propio' | 'transportista'
 
+export type EstadoPesaje = 'pendiente' | 'completado'
+
 export interface Pesaje {
   id: string
   numero_pesaje: number
   fecha: string
+  estado: EstadoPesaje
+  fecha_completado?: string
   tipo_entrega: TipoEntrega
   // Camión propio
   camion_id?: string
@@ -324,9 +328,9 @@ export interface Pesaje {
   acoplado?: string
   chofer?: string
   // Pesos
-  peso_tara: number
-  peso_bruto: number
-  peso_neto: number
+  peso_tara?: number
+  peso_bruto?: number
+  peso_neto?: number
   // Material
   material?: string
   // Operación

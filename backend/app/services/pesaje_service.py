@@ -2,7 +2,7 @@
 Servicio de lógica de negocio para Pesajes
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from uuid import UUID
 from typing import List, Optional
 from decimal import Decimal
@@ -12,9 +12,10 @@ from fastapi import HTTPException, status
 from app.models.pesaje import Pesaje
 from app.models.remito import Remito
 from app.models.empresa import Empresa
+from app.models.camion import Camion
 from app.models.cuenta_corriente import MovimientoCuentaCorriente
 from app.models.orden_entrega import OrdenEntrega, EstadoOrdenEntrega
-from app.schemas.pesaje import PesajeCreate, PesajeUpdate
+from app.schemas.pesaje import PesajeCreate, PesajeUpdate, PesajeIniciarCreate, PesajeCompletarCreate
 from app.services import camion_service
 
 
@@ -459,3 +460,322 @@ def obtener_estadisticas_periodo(
         "promedio_peso_neto": round(promedio, 2),
         "materiales": materiales
     }
+
+
+# ============== FUNCIONES PARA FLUJO DOBLE PESAJE ==============
+
+def obtener_pendientes(db: Session) -> List[Pesaje]:
+    """
+    Obtiene todos los pesajes en estado pendiente (solo tara registrada)
+    Ordenados por fecha (más antiguos primero)
+    """
+    pesajes = db.query(Pesaje).filter(
+        Pesaje.estado == "pendiente"
+    ).order_by(Pesaje.fecha).all()
+
+    # Enriquecer con datos
+    for p in pesajes:
+        if p.camion_id:
+            camion = db.query(Camion).filter(Camion.id == p.camion_id).first()
+            if camion:
+                p.camion_patente = camion.patente
+
+        if p.transportista_id:
+            transportista = db.query(Empresa).filter(Empresa.id == p.transportista_id).first()
+            if transportista:
+                p.transportista_nombre = transportista.nombre
+
+        if p.cliente_id:
+            cliente = db.query(Empresa).filter(Empresa.id == p.cliente_id).first()
+            if cliente:
+                p.cliente_nombre = cliente.nombre
+
+        # Calcular minutos esperando
+        if p.fecha:
+            delta = datetime.utcnow() - p.fecha
+            p.minutos_esperando = int(delta.total_seconds() / 60)
+
+    return pesajes
+
+
+def buscar_por_patente(db: Session, patente: str) -> dict:
+    """
+    Busca información por patente del camión.
+    Retorna datos del camión, cliente asociado y pesaje pendiente si existe.
+    """
+    patente = patente.upper().strip()
+
+    result = {
+        "encontrado": False,
+        "tipo": None,
+        "camion_id": None,
+        "camion_patente": None,
+        "camion_marca": None,
+        "camion_modelo": None,
+        "cliente_id": None,
+        "cliente_nombre": None,
+        "pesaje_pendiente_id": None,
+        "pesaje_pendiente_numero": None,
+        "pesaje_pendiente_tara": None,
+        "pesaje_pendiente_fecha": None,
+    }
+
+    # Buscar en camiones propios
+    camion = db.query(Camion).filter(
+        func.upper(Camion.patente) == patente
+    ).first()
+
+    if camion:
+        result["encontrado"] = True
+        result["tipo"] = "propio"
+        result["camion_id"] = camion.id
+        result["camion_patente"] = camion.patente
+        result["camion_marca"] = camion.marca
+        result["camion_modelo"] = camion.modelo
+
+        # Buscar pesaje pendiente para este camión
+        pesaje_pendiente = db.query(Pesaje).filter(
+            Pesaje.camion_id == camion.id,
+            Pesaje.estado == "pendiente"
+        ).first()
+
+        if pesaje_pendiente:
+            result["pesaje_pendiente_id"] = pesaje_pendiente.id
+            result["pesaje_pendiente_numero"] = pesaje_pendiente.numero_pesaje
+            result["pesaje_pendiente_tara"] = pesaje_pendiente.peso_tara
+            result["pesaje_pendiente_fecha"] = pesaje_pendiente.fecha
+
+            # Cliente del pesaje pendiente
+            if pesaje_pendiente.cliente_id:
+                cliente = db.query(Empresa).filter(Empresa.id == pesaje_pendiente.cliente_id).first()
+                if cliente:
+                    result["cliente_id"] = cliente.id
+                    result["cliente_nombre"] = cliente.nombre
+
+        return result
+
+    # Buscar en pesajes con patente externa (transportista)
+    pesaje_externo = db.query(Pesaje).filter(
+        func.upper(Pesaje.patente_externa) == patente,
+        Pesaje.estado == "pendiente"
+    ).first()
+
+    if pesaje_externo:
+        result["encontrado"] = True
+        result["tipo"] = "transportista"
+        result["camion_patente"] = pesaje_externo.patente_externa
+        result["pesaje_pendiente_id"] = pesaje_externo.id
+        result["pesaje_pendiente_numero"] = pesaje_externo.numero_pesaje
+        result["pesaje_pendiente_tara"] = pesaje_externo.peso_tara
+        result["pesaje_pendiente_fecha"] = pesaje_externo.fecha
+
+        if pesaje_externo.cliente_id:
+            cliente = db.query(Empresa).filter(Empresa.id == pesaje_externo.cliente_id).first()
+            if cliente:
+                result["cliente_id"] = cliente.id
+                result["cliente_nombre"] = cliente.nombre
+
+        return result
+
+    # No encontrado - puede ser patente nueva de transportista
+    return result
+
+
+def iniciar_pesaje(db: Session, pesaje_data: PesajeIniciarCreate, usuario_id: UUID) -> Pesaje:
+    """
+    Inicia un nuevo pesaje registrando solo la tara (camión vacío).
+    El pesaje queda en estado 'pendiente' hasta que se complete con el peso bruto.
+    """
+    camion = None
+    transportista_empresa = None
+    cliente_empresa = None
+
+    # Validar según tipo de entrega
+    if pesaje_data.tipo_entrega == "propio":
+        if not pesaje_data.camion_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debe seleccionar un camión propio"
+            )
+        camion = camion_service.obtener_por_id(db, pesaje_data.camion_id)
+        if not camion:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Camión no encontrado"
+            )
+
+        # Verificar que no tenga un pesaje pendiente
+        pesaje_existente = db.query(Pesaje).filter(
+            Pesaje.camion_id == pesaje_data.camion_id,
+            Pesaje.estado == "pendiente"
+        ).first()
+        if pesaje_existente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Este camión ya tiene un pesaje pendiente (#{pesaje_existente.numero_pesaje})"
+            )
+    else:  # transportista
+        if pesaje_data.transportista_id:
+            transportista_empresa = db.query(Empresa).filter(Empresa.id == pesaje_data.transportista_id).first()
+            if not transportista_empresa:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Transportista no encontrado"
+                )
+
+        # Verificar que no tenga un pesaje pendiente con esa patente
+        if pesaje_data.patente_externa:
+            pesaje_existente = db.query(Pesaje).filter(
+                func.upper(Pesaje.patente_externa) == pesaje_data.patente_externa.upper(),
+                Pesaje.estado == "pendiente"
+            ).first()
+            if pesaje_existente:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Esta patente ya tiene un pesaje pendiente (#{pesaje_existente.numero_pesaje})"
+                )
+
+    # Verificar cliente si se proporciona
+    if pesaje_data.cliente_id:
+        cliente_empresa = db.query(Empresa).filter(Empresa.id == pesaje_data.cliente_id).first()
+        if not cliente_empresa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente no encontrado"
+            )
+
+    # Obtener próximo número de pesaje
+    numero_pesaje = _obtener_proximo_numero(db)
+
+    # Preparar datos
+    pesaje_dict = pesaje_data.model_dump(exclude={'cliente_nombre'})
+
+    # Crear pesaje en estado pendiente
+    db_pesaje = Pesaje(
+        **pesaje_dict,
+        numero_pesaje=numero_pesaje,
+        estado="pendiente",
+        peso_bruto=None,
+        peso_neto=None,
+        created_by=usuario_id
+    )
+
+    db.add(db_pesaje)
+    db.commit()
+    db.refresh(db_pesaje)
+
+    # Agregar info para respuesta
+    if camion:
+        db_pesaje.camion_patente = camion.patente
+    if transportista_empresa:
+        db_pesaje.transportista_nombre = transportista_empresa.nombre
+    if cliente_empresa:
+        db_pesaje.cliente_nombre = cliente_empresa.nombre
+
+    return db_pesaje
+
+
+def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarCreate, usuario_id: UUID) -> Pesaje:
+    """
+    Completa un pesaje pendiente registrando el peso bruto (camión cargado).
+    Calcula el peso neto y genera remito.
+    """
+    db_pesaje = db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
+
+    if not db_pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado"
+        )
+
+    if db_pesaje.estado != "pendiente":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este pesaje ya fue completado"
+        )
+
+    # Validar que el peso bruto sea mayor que la tara
+    if pesaje_data.peso_bruto <= db_pesaje.peso_tara:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El peso bruto debe ser mayor que el peso tara"
+        )
+
+    # Calcular peso neto
+    peso_neto = pesaje_data.peso_bruto - db_pesaje.peso_tara
+
+    # Actualizar pesaje
+    db_pesaje.peso_bruto = pesaje_data.peso_bruto
+    db_pesaje.peso_neto = peso_neto
+    db_pesaje.estado = "completado"
+    db_pesaje.fecha_completado = datetime.utcnow()
+
+    # Actualizar campos opcionales
+    if pesaje_data.material:
+        db_pesaje.material = pesaje_data.material
+    if pesaje_data.chofer:
+        db_pesaje.chofer = pesaje_data.chofer
+    if pesaje_data.observaciones:
+        db_pesaje.observaciones = pesaje_data.observaciones
+    if pesaje_data.precio_unitario:
+        db_pesaje.precio_unitario = pesaje_data.precio_unitario
+    if pesaje_data.importe_total:
+        db_pesaje.importe_total = pesaje_data.importe_total
+    if pesaje_data.orden_entrega_id:
+        db_pesaje.orden_entrega_id = pesaje_data.orden_entrega_id
+
+    db.commit()
+    db.refresh(db_pesaje)
+
+    # Generar remito automáticamente
+    _generar_remito_automatico(db, db_pesaje, usuario_id)
+
+    # Si hay importe y cliente, registrar en cuenta corriente
+    if db_pesaje.importe_total and db_pesaje.importe_total > 0 and db_pesaje.cliente_id:
+        _registrar_en_cuenta_corriente(db, db_pesaje, usuario_id)
+
+    # Si está asociado a una orden de entrega, actualizar la orden
+    if db_pesaje.orden_entrega_id:
+        _actualizar_orden_entrega(db, db_pesaje.orden_entrega_id, db_pesaje.peso_neto)
+
+    # Enriquecer respuesta
+    if db_pesaje.camion_id:
+        camion = db.query(Camion).filter(Camion.id == db_pesaje.camion_id).first()
+        if camion:
+            db_pesaje.camion_patente = camion.patente
+
+    if db_pesaje.transportista_id:
+        transportista = db.query(Empresa).filter(Empresa.id == db_pesaje.transportista_id).first()
+        if transportista:
+            db_pesaje.transportista_nombre = transportista.nombre
+
+    if db_pesaje.cliente_id:
+        cliente = db.query(Empresa).filter(Empresa.id == db_pesaje.cliente_id).first()
+        if cliente:
+            db_pesaje.cliente_nombre = cliente.nombre
+
+    return db_pesaje
+
+
+def cancelar_pesaje_pendiente(db: Session, pesaje_id: UUID) -> dict:
+    """
+    Cancela un pesaje pendiente (elimina sin generar remito)
+    """
+    db_pesaje = db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
+
+    if not db_pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado"
+        )
+
+    if db_pesaje.estado != "pendiente":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se pueden cancelar pesajes pendientes"
+        )
+
+    db.delete(db_pesaje)
+    db.commit()
+
+    return {"message": "Pesaje pendiente cancelado correctamente"}
