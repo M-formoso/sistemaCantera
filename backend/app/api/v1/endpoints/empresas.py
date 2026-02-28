@@ -1,15 +1,19 @@
 """
 Endpoints API para Empresas (Clientes y Transportistas)
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional, Literal
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin
+from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
 from app.models.usuario import Usuario
-from app.schemas.empresa import EmpresaSchema, EmpresaCreate, EmpresaUpdate
-from app.services import empresa_service
+from app.schemas.empresa import (
+    EmpresaSchema, EmpresaCreate, EmpresaUpdate,
+    EmpresaConCamionesSchema,
+    CamionClienteSchema, CamionClienteCreate, CamionClienteUpdate
+)
+from app.services import empresa_service, camion_cliente_service
 
 router = APIRouter()
 
@@ -127,3 +131,83 @@ async def eliminar_empresa(
     **Requiere rol:** Administrador
     """
     return empresa_service.eliminar(db, empresa_id)
+
+
+# ============== ENDPOINTS PARA CAMIONES DE CLIENTES ==============
+
+@router.get("/{empresa_id}/camiones", response_model=List[CamionClienteSchema])
+async def listar_camiones_cliente(
+    empresa_id: UUID,
+    solo_activos: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Lista todos los camiones/patentes de un cliente
+    """
+    return camion_cliente_service.obtener_por_cliente(db, empresa_id, solo_activos)
+
+
+@router.post("/{empresa_id}/camiones", response_model=CamionClienteSchema, status_code=201)
+async def crear_camion_cliente(
+    empresa_id: UUID,
+    camion: CamionClienteCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Agrega un nuevo camión/patente a un cliente
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return camion_cliente_service.crear(db, empresa_id, camion)
+
+
+@router.put("/camiones/{camion_id}", response_model=CamionClienteSchema)
+async def actualizar_camion_cliente(
+    camion_id: UUID,
+    camion_data: CamionClienteUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Actualiza un camión de cliente
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return camion_cliente_service.actualizar(db, camion_id, camion_data)
+
+
+@router.delete("/camiones/{camion_id}")
+async def eliminar_camion_cliente(
+    camion_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Elimina (desactiva) un camión de cliente
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return camion_cliente_service.eliminar(db, camion_id)
+
+
+@router.get("/camiones/buscar-patente/{patente}")
+async def buscar_cliente_por_patente(
+    patente: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Busca un cliente por la patente de uno de sus camiones.
+    Retorna datos del cliente y del camión si se encuentra.
+    """
+    resultado = camion_cliente_service.obtener_cliente_por_patente(db, patente)
+
+    if not resultado:
+        return {"encontrado": False}
+
+    return {
+        "encontrado": True,
+        **resultado
+    }

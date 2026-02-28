@@ -10,11 +10,11 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Building2, Plus, Pencil, Trash2, Truck, UserCheck } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Truck, UserCheck, Car, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { empresasService } from '@/services/empresasService'
+import { empresasService, CamionCliente, CamionClienteCreate } from '@/services/empresasService'
 import { Empresa, EmpresaCreate, TipoEmpresa } from '@/types'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 
@@ -34,6 +34,17 @@ export default function EmpresasPage() {
     telefono: '',
     email: '',
     contacto: '',
+  })
+
+  // Estado para gestión de camiones de clientes
+  const [selectedCliente, setSelectedCliente] = useState<Empresa | null>(null)
+  const [showCamionesModal, setShowCamionesModal] = useState(false)
+  const [showCamionForm, setShowCamionForm] = useState(false)
+  const [editingCamion, setEditingCamion] = useState<CamionCliente | null>(null)
+  const [camionFormData, setCamionFormData] = useState<CamionClienteCreate>({
+    patente: '',
+    descripcion: '',
+    chofer_habitual: '',
   })
 
   const { data: empresas, isLoading } = useQuery({
@@ -65,6 +76,39 @@ export default function EmpresasPage() {
     mutationFn: (id: string) => empresasService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['empresas'] })
+    },
+  })
+
+  // Query para camiones del cliente seleccionado
+  const { data: camiones, isLoading: loadingCamiones } = useQuery({
+    queryKey: ['camiones', selectedCliente?.id],
+    queryFn: () => empresasService.getCamiones(selectedCliente!.id),
+    enabled: !!selectedCliente && showCamionesModal,
+  })
+
+  // Mutations para camiones
+  const createCamionMutation = useMutation({
+    mutationFn: (data: CamionClienteCreate) =>
+      empresasService.agregarCamion(selectedCliente!.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['camiones', selectedCliente?.id] })
+      closeCamionForm()
+    },
+  })
+
+  const updateCamionMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CamionClienteCreate> }) =>
+      empresasService.actualizarCamion(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['camiones', selectedCliente?.id] })
+      closeCamionForm()
+    },
+  })
+
+  const deleteCamionMutation = useMutation({
+    mutationFn: (id: string) => empresasService.eliminarCamion(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['camiones', selectedCliente?.id] })
     },
   })
 
@@ -108,6 +152,79 @@ export default function EmpresasPage() {
       email: '',
       contacto: '',
     })
+  }
+
+  // Funciones para modal de camiones
+  const openCamionesModal = (empresa: Empresa) => {
+    setSelectedCliente(empresa)
+    setShowCamionesModal(true)
+  }
+
+  const closeCamionesModal = () => {
+    setShowCamionesModal(false)
+    setSelectedCliente(null)
+    closeCamionForm()
+  }
+
+  const openCamionCreateForm = () => {
+    setEditingCamion(null)
+    setCamionFormData({
+      patente: '',
+      descripcion: '',
+      chofer_habitual: '',
+    })
+    setShowCamionForm(true)
+  }
+
+  const openCamionEditForm = (camion: CamionCliente) => {
+    setEditingCamion(camion)
+    setCamionFormData({
+      patente: camion.patente,
+      descripcion: camion.descripcion || '',
+      chofer_habitual: camion.chofer_habitual || '',
+    })
+    setShowCamionForm(true)
+  }
+
+  const closeCamionForm = () => {
+    setShowCamionForm(false)
+    setEditingCamion(null)
+    setCamionFormData({
+      patente: '',
+      descripcion: '',
+      chofer_habitual: '',
+    })
+  }
+
+  const handleCamionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!camionFormData.patente.trim()) {
+      alert('La patente es requerida')
+      return
+    }
+
+    try {
+      if (editingCamion) {
+        await updateCamionMutation.mutateAsync({
+          id: editingCamion.id,
+          data: camionFormData,
+        })
+      } else {
+        await createCamionMutation.mutateAsync(camionFormData)
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Error al guardar camión')
+    }
+  }
+
+  const handleDeleteCamion = async (camion: CamionCliente) => {
+    if (window.confirm(`¿Eliminar patente "${camion.patente}"?`)) {
+      try {
+        await deleteCamionMutation.mutateAsync(camion.id)
+      } catch (error: any) {
+        alert(error.response?.data?.detail || 'Error al eliminar')
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -218,6 +335,17 @@ export default function EmpresasPage() {
         const empresa = row.original
         return (
           <div className="flex items-center gap-2">
+            {empresa.tipo === 'cliente' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openCamionesModal(empresa)}
+                title="Ver Camiones/Patentes"
+                className="text-blue-600 hover:text-blue-700"
+              >
+                <Car className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -512,6 +640,187 @@ export default function EmpresasPage() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de camiones del cliente */}
+      {showCamionesModal && selectedCliente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Camiones de {selectedCliente.nombre}
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Patentes asociadas a este cliente
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={closeCamionesModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Botón agregar camión */}
+              {!showCamionForm && (
+                <Button onClick={openCamionCreateForm} className="mb-4">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Patente
+                </Button>
+              )}
+
+              {/* Formulario de camión */}
+              {showCamionForm && (
+                <Card className="mb-4 bg-gray-50">
+                  <CardContent className="pt-4">
+                    <form onSubmit={handleCamionSubmit} className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Patente *
+                          </label>
+                          <Input
+                            value={camionFormData.patente}
+                            onChange={(e) =>
+                              setCamionFormData({
+                                ...camionFormData,
+                                patente: e.target.value.toUpperCase(),
+                              })
+                            }
+                            placeholder="ABC123"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Descripción
+                          </label>
+                          <Input
+                            value={camionFormData.descripcion}
+                            onChange={(e) =>
+                              setCamionFormData({
+                                ...camionFormData,
+                                descripcion: e.target.value,
+                              })
+                            }
+                            placeholder="Camión volcador"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Chofer Habitual
+                          </label>
+                          <Input
+                            value={camionFormData.chofer_habitual}
+                            onChange={(e) =>
+                              setCamionFormData({
+                                ...camionFormData,
+                                chofer_habitual: e.target.value,
+                              })
+                            }
+                            placeholder="Juan Pérez"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={closeCamionForm}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={
+                            createCamionMutation.isPending ||
+                            updateCamionMutation.isPending
+                          }
+                        >
+                          {createCamionMutation.isPending ||
+                          updateCamionMutation.isPending
+                            ? 'Guardando...'
+                            : editingCamion
+                            ? 'Actualizar'
+                            : 'Agregar'}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lista de camiones */}
+              {loadingCamiones ? (
+                <div className="text-center py-8 text-gray-500">
+                  Cargando camiones...
+                </div>
+              ) : camiones && camiones.length > 0 ? (
+                <div className="space-y-2">
+                  {camiones.map((camion) => (
+                    <div
+                      key={camion.id}
+                      className="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded">
+                          <Car className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{camion.patente}</div>
+                          <div className="text-sm text-gray-500">
+                            {camion.descripcion || 'Sin descripción'}
+                            {camion.chofer_habitual && (
+                              <span className="ml-2">
+                                • Chofer: {camion.chofer_habitual}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openCamionEditForm(camion)}
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCamion(camion)}
+                          className="text-red-600 hover:text-red-700"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 border rounded-lg">
+                  <Car className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No hay patentes registradas</p>
+                  <p className="text-sm">
+                    Agregue las patentes de los camiones de este cliente
+                  </p>
+                </div>
+              )}
+
+              {/* Botón cerrar */}
+              <div className="flex justify-end mt-4 pt-4 border-t">
+                <Button variant="outline" onClick={closeCamionesModal}>
+                  Cerrar
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

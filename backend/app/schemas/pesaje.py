@@ -308,17 +308,22 @@ class BusquedaPatenteResult(BaseModel):
     """Resultado de búsqueda por patente"""
 
     encontrado: bool
-    tipo: Optional[Literal["propio", "transportista"]] = None
+    # Tipo: 'propio' (cantera), 'cliente' (camión de cliente), 'transportista' (externo)
+    tipo: Optional[Literal["propio", "cliente", "transportista"]] = None
 
-    # Si es camión propio
+    # Datos del camión
     camion_id: Optional[UUID] = None
     camion_patente: Optional[str] = None
     camion_marca: Optional[str] = None
     camion_modelo: Optional[str] = None
+    camion_descripcion: Optional[str] = None  # Para camiones de clientes
 
     # Cliente asociado (si existe)
     cliente_id: Optional[UUID] = None
     cliente_nombre: Optional[str] = None
+
+    # Chofer habitual (si está registrado)
+    chofer_habitual: Optional[str] = None
 
     # Pesaje pendiente (si existe)
     pesaje_pendiente_id: Optional[UUID] = None

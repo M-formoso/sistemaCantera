@@ -167,7 +167,7 @@ export default function PesajesPage() {
     )
   }
 
-  const totalToneladas = pesajes.reduce((sum, p) => sum + p.peso_neto / 1000, 0)
+  const totalToneladas = pesajes.reduce((sum, p) => sum + (p.peso_neto || 0) / 1000, 0)
 
   return (
     <div className="space-y-6">

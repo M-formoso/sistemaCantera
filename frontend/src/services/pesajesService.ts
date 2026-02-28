@@ -52,13 +52,15 @@ export interface PesajePendiente {
 
 export interface BusquedaPatenteResult {
   encontrado: boolean
-  tipo?: 'propio' | 'transportista'
+  tipo?: 'propio' | 'cliente' | 'transportista'
   camion_id?: string
   camion_patente?: string
   camion_marca?: string
   camion_modelo?: string
+  camion_descripcion?: string
   cliente_id?: string
   cliente_nombre?: string
+  chofer_habitual?: string
   pesaje_pendiente_id?: string
   pesaje_pendiente_numero?: number
   pesaje_pendiente_tara?: number

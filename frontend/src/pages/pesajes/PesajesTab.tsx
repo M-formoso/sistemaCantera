@@ -167,7 +167,7 @@ export default function PesajesTab() {
     )
   }
 
-  const totalToneladas = pesajes.reduce((sum, p) => sum + p.peso_neto / 1000, 0)
+  const totalToneladas = pesajes.reduce((sum, p) => sum + (p.peso_neto || 0) / 1000, 0)
   const promedioToneladas = pesajes.length > 0 ? totalToneladas / pesajes.length : 0
   const totalIngresos = pesajes.reduce((sum, p) => sum + (p.importe_total || 0), 0)
 

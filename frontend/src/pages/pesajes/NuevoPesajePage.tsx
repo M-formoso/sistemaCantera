@@ -18,7 +18,7 @@ import { empresasService } from '@/services/empresasService'
 import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { balanzaService } from '@/services/balanzaService'
 import { formatNumber } from '@/lib/utils'
-import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
+import { Pesaje, Empresa, EmpresaCreate } from '@/types'
 
 // Lista de materiales disponibles
 const MATERIALES_DISPONIBLES = [
@@ -193,8 +193,8 @@ export default function NuevoPesajePage() {
         if (pesaje.material) {
           brutoForm.setValue('material', pesaje.material)
         }
-      } else if (resultado.encontrado) {
-        // Camión propio encontrado, sin pesaje pendiente - modo nueva tara
+      } else if (resultado.encontrado && resultado.tipo === 'propio') {
+        // Camión propio de la cantera - modo nueva tara
         setModo('nueva_tara')
         taraForm.setValue('tipo_entrega', 'propio')
         taraForm.setValue('camion_id', resultado.camion_id!)
@@ -204,6 +204,23 @@ export default function NuevoPesajePage() {
           taraForm.setValue('cliente_id', resultado.cliente_id)
           taraForm.setValue('cliente_nombre', resultado.cliente_nombre)
           setClienteBusqueda(resultado.cliente_nombre)
+        }
+      } else if (resultado.encontrado && resultado.tipo === 'cliente') {
+        // Camión de un cliente - modo nueva tara como transportista con datos del cliente
+        setModo('nueva_tara')
+        taraForm.setValue('tipo_entrega', 'transportista')
+        taraForm.setValue('patente_externa', resultado.camion_patente!)
+
+        // Auto-completar cliente (esto es lo importante!)
+        if (resultado.cliente_id && resultado.cliente_nombre) {
+          taraForm.setValue('cliente_id', resultado.cliente_id)
+          taraForm.setValue('cliente_nombre', resultado.cliente_nombre)
+          setClienteBusqueda(resultado.cliente_nombre)
+        }
+
+        // Auto-completar chofer si existe
+        if (resultado.chofer_habitual) {
+          taraForm.setValue('chofer', resultado.chofer_habitual)
         }
       } else {
         // Patente no encontrada - modo nueva tara como transportista

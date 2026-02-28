@@ -1,8 +1,43 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from uuid import UUID
 from datetime import datetime
 
+
+# ============== CAMION CLIENTE ==============
+
+class CamionClienteBase(BaseModel):
+    """Schema base para camión de cliente"""
+    patente: str = Field(..., max_length=20)
+    descripcion: Optional[str] = Field(None, max_length=100)
+    chofer_habitual: Optional[str] = Field(None, max_length=100)
+
+
+class CamionClienteCreate(CamionClienteBase):
+    """Schema para crear camión de cliente"""
+    pass
+
+
+class CamionClienteUpdate(BaseModel):
+    """Schema para actualizar camión de cliente"""
+    patente: Optional[str] = Field(None, max_length=20)
+    descripcion: Optional[str] = Field(None, max_length=100)
+    chofer_habitual: Optional[str] = Field(None, max_length=100)
+    activo: Optional[bool] = None
+
+
+class CamionClienteSchema(CamionClienteBase):
+    """Schema de respuesta de camión de cliente"""
+    id: UUID
+    cliente_id: UUID
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ============== EMPRESA ==============
 
 class EmpresaBase(BaseModel):
     """Schema base de Empresa"""
@@ -35,7 +70,13 @@ class EmpresaSchema(EmpresaBase):
     """Schema de respuesta de Empresa"""
     id: UUID
     activo: bool
+    saldo_cuenta_corriente: Optional[float] = 0
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EmpresaConCamionesSchema(EmpresaSchema):
+    """Schema de empresa con sus camiones"""
+    camiones: List[CamionClienteSchema] = []

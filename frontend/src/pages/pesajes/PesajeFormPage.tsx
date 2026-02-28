@@ -453,7 +453,7 @@ export default function PesajeFormPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Peso Neto:</span>
                 <span className="font-bold text-green-600">
-                  {formatNumber(createdPesaje.peso_neto)} kg ({formatNumber(createdPesaje.peso_neto / 1000, 2)} t)
+                  {formatNumber(createdPesaje.peso_neto || 0)} kg ({formatNumber((createdPesaje.peso_neto || 0) / 1000, 2)} t)
                 </span>
               </div>
               {createdPesaje.importe_total && createdPesaje.importe_total > 0 && (
