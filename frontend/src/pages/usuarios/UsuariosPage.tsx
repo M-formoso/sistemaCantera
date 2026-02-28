@@ -11,7 +11,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Users, Plus, Pencil, Trash2, Key, Shield, Eye, Edit } from 'lucide-react'
+import { Users, Plus, Pencil, Trash2, Key, Shield, Eye, EyeOff, Edit } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,7 @@ export default function UsuariosPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [showResetPassword, setShowResetPassword] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [showPasswordVisible, setShowPasswordVisible] = useState(false)
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -327,12 +328,27 @@ export default function UsuariosPage() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Nueva Contraseña</label>
-                <Input
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    type={showPasswordVisible ? 'text' : 'password'}
+                    placeholder="Mínimo 8 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordVisible(!showPasswordVisible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    tabIndex={-1}
+                  >
+                    {showPasswordVisible ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button
@@ -340,6 +356,7 @@ export default function UsuariosPage() {
                   onClick={() => {
                     setShowResetPassword(null)
                     setNewPassword('')
+                    setShowPasswordVisible(false)
                   }}
                 >
                   Cancelar

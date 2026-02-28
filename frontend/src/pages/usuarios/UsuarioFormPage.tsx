@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save, Shield, Edit, Eye } from 'lucide-react'
+import { ArrowLeft, Save, Shield, Edit, Eye, EyeOff } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +52,7 @@ export default function UsuarioFormPage() {
   const { id } = useParams()
   const queryClient = useQueryClient()
   const isEditing = Boolean(id)
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -271,12 +272,27 @@ export default function UsuarioFormPage() {
                 <label htmlFor="password" className="text-sm font-medium">
                   Contraseña <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  {...register('password')}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 8 caracteres"
+                    {...register('password')}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 {errors.password && (
                   <p className="text-sm text-red-500">{errors.password.message}</p>
                 )}
