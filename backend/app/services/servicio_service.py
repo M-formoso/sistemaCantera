@@ -153,6 +153,10 @@ def crear_con_repuestos(
         db.add(servicio_repuesto)
 
         # Descontar stock usando el servicio de repuestos
+        # Usar identificador correcto según tipo de equipo
+        equipo_identificador = camion.nombre or camion.codigo_interno if camion.categoria == 'maquina' else camion.patente
+        equipo_label = "Máquina" if camion.categoria == 'maquina' else "Camión"
+
         repuesto_service.ajustar_stock(
             db=db,
             repuesto_id=repuesto.id,
@@ -161,7 +165,7 @@ def crear_con_repuestos(
             usuario_id=usuario_id,
             referencia_tipo="servicio",
             referencia_id=db_servicio.id,
-            observaciones=f"Servicio {db_servicio.tipo.value} - Camión {camion.patente}"
+            observaciones=f"Servicio {db_servicio.tipo.value} - {equipo_label} {equipo_identificador}"
         )
 
         costo_repuestos += subtotal
@@ -179,14 +183,22 @@ def crear_con_repuestos(
     # 4. Calcular costo total
     db_servicio.costo_total = servicio_data.costo_mano_obra + costo_repuestos
 
-    # 5. Actualizar datos del camión
+    # 5. Actualizar datos del equipo (camión o máquina)
     camion.ultimo_servicio = servicio_data.fecha
     if servicio_data.kilometraje_servicio:
-        camion.ultimo_servicio_km = servicio_data.kilometraje_servicio
-        camion.kilometraje_actual = servicio_data.kilometraje_servicio
-        # Calcular próximo servicio basado en intervalo
-        if camion.intervalo_servicio_km:
-            camion.proximo_servicio_km = servicio_data.kilometraje_servicio + camion.intervalo_servicio_km
+        # Para máquinas, se usa el horómetro en lugar del kilometraje
+        if camion.categoria == 'maquina':
+            camion.ultimo_servicio_horas = servicio_data.kilometraje_servicio
+            camion.horometro_actual = servicio_data.kilometraje_servicio
+            # Calcular próximo mantenimiento basado en intervalo de horas
+            if camion.intervalo_servicio_horas:
+                camion.proximo_servicio_horas = servicio_data.kilometraje_servicio + camion.intervalo_servicio_horas
+        else:
+            camion.ultimo_servicio_km = servicio_data.kilometraje_servicio
+            camion.kilometraje_actual = servicio_data.kilometraje_servicio
+            # Calcular próximo servicio basado en intervalo
+            if camion.intervalo_servicio_km:
+                camion.proximo_servicio_km = servicio_data.kilometraje_servicio + camion.intervalo_servicio_km
 
     db.commit()
     db.refresh(db_servicio)

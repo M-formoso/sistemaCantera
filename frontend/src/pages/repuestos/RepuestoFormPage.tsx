@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { repuestosService } from '@/services/repuestosService'
+import { camionesService } from '@/services/camionesService'
+import { Camion } from '@/types'
 
 const repuestoSchema = z.object({
   codigo: z.string().min(2, 'El código debe tener al menos 2 caracteres'),
@@ -19,6 +21,7 @@ const repuestoSchema = z.object({
   stock_actual: z.number().min(0, 'El stock debe ser positivo'),
   stock_minimo: z.number().min(0, 'El stock mínimo debe ser positivo'),
   ubicacion: z.string().optional(),
+  camion_id: z.string().optional(),
 })
 
 type RepuestoFormData = z.infer<typeof repuestoSchema>
@@ -33,6 +36,12 @@ export default function RepuestoFormPage() {
     queryKey: ['repuesto', id],
     queryFn: () => repuestosService.getById(id!),
     enabled: isEditing,
+  })
+
+  // Cargar todos los equipos (camiones y máquinas)
+  const { data: equipos = [] } = useQuery({
+    queryKey: ['equipos-todos'],
+    queryFn: () => camionesService.getAll(),
   })
 
   const {
@@ -60,9 +69,14 @@ export default function RepuestoFormPage() {
         stock_actual: repuesto.stock_actual,
         stock_minimo: repuesto.stock_minimo,
         ubicacion: repuesto.ubicacion || '',
+        camion_id: repuesto.camion_id || '',
       })
     }
   }, [repuesto, reset])
+
+  // Separar camiones y máquinas
+  const camiones = equipos.filter((e: Camion) => e.categoria === 'camion' && e.activo)
+  const maquinas = equipos.filter((e: Camion) => e.categoria === 'maquina' && e.activo)
 
   const createMutation = useMutation({
     mutationFn: (data: RepuestoFormData) => repuestosService.create(data),
@@ -83,10 +97,15 @@ export default function RepuestoFormPage() {
 
   const onSubmit = async (data: RepuestoFormData) => {
     try {
+      // Convertir camion_id vacío a undefined
+      const submitData = {
+        ...data,
+        camion_id: data.camion_id || undefined,
+      }
       if (isEditing) {
-        await updateMutation.mutateAsync(data)
+        await updateMutation.mutateAsync(submitData)
       } else {
-        await createMutation.mutateAsync(data)
+        await createMutation.mutateAsync(submitData)
       }
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Error al guardar el repuesto')
@@ -238,6 +257,41 @@ export default function RepuestoFormPage() {
                 {errors.ubicacion && (
                   <p className="text-sm text-red-600">{errors.ubicacion.message}</p>
                 )}
+              </div>
+
+              {/* Asignación a Equipo */}
+              <div className="space-y-2">
+                <label htmlFor="camion_id" className="text-sm font-medium">
+                  Asignar a Equipo (opcional)
+                </label>
+                <select
+                  id="camion_id"
+                  {...register('camion_id')}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">Sin asignar (uso general)</option>
+                  {camiones.length > 0 && (
+                    <optgroup label="🚛 Camiones">
+                      {camiones.map((camion: Camion) => (
+                        <option key={camion.id} value={camion.id}>
+                          {camion.patente || camion.codigo_interno} - {camion.marca} {camion.modelo}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {maquinas.length > 0 && (
+                    <optgroup label="⚙️ Máquinas">
+                      {maquinas.map((maquina: Camion) => (
+                        <option key={maquina.id} value={maquina.id}>
+                          {maquina.nombre || maquina.codigo_interno} - {maquina.marca} {maquina.modelo}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Si asigna el repuesto a un equipo, solo aparecerá disponible para ese equipo al registrar servicios.
+                </p>
               </div>
             </div>
 

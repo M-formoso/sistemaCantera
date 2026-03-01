@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Numeric, Boolean
+from sqlalchemy import Column, String, Numeric, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -20,9 +21,13 @@ class Repuesto(BaseModel):
     ubicacion_deposito = Column(String(100))
     activo = Column(Boolean, default=True, nullable=False)
 
+    # Asignación a equipo específico (opcional)
+    camion_id = Column(UUID(as_uuid=True), ForeignKey("camiones.id"), nullable=True, index=True)
+
     # Relaciones
     servicios_repuestos = relationship("ServicioRepuesto", back_populates="repuesto")
     movimientos = relationship("MovimientoStock", back_populates="repuesto")
+    camion = relationship("Camion", backref="repuestos_asignados")
 
     def __repr__(self):
         return f"<Repuesto {self.nombre} ({self.codigo})>"

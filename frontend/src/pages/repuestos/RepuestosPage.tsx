@@ -188,6 +188,21 @@ export default function RepuestosPage() {
       },
     },
     {
+      id: 'equipo_asignado',
+      header: 'Equipo',
+      cell: ({ row }) => {
+        const repuesto = row.original
+        if (!repuesto.camion_patente) {
+          return <span className="text-xs text-muted-foreground italic">General</span>
+        }
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+            {repuesto.camion_patente}
+          </span>
+        )
+      },
+    },
+    {
       id: 'actions',
       header: 'Acciones',
       cell: ({ row }) => {

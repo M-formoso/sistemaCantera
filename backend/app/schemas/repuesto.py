@@ -16,6 +16,7 @@ class RepuestoBase(BaseModel):
     precio_unitario: Optional[Decimal] = Field(None, ge=0)
     proveedor: Optional[str] = Field(None, max_length=255)
     ubicacion_deposito: Optional[str] = Field(None, max_length=100)
+    camion_id: Optional[UUID] = Field(None, description="ID del equipo asignado (opcional)")
 
 
 class RepuestoCreate(RepuestoBase):
@@ -38,6 +39,7 @@ class RepuestoUpdate(BaseModel):
     proveedor: Optional[str] = Field(None, max_length=255)
     ubicacion_deposito: Optional[str] = Field(None, max_length=100)
     activo: Optional[bool] = None
+    camion_id: Optional[UUID] = Field(None, description="ID del equipo asignado")
 
 
 class RepuestoSchema(ResponseBase, RepuestoBase):
@@ -46,6 +48,7 @@ class RepuestoSchema(ResponseBase, RepuestoBase):
     stock_actual: Decimal
     stock_minimo: Decimal
     activo: bool
+    camion_patente: Optional[str] = None  # Patente del equipo asignado
 
 
 class RepuestoStockBajo(BaseModel):

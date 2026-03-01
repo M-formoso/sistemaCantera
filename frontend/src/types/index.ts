@@ -194,6 +194,8 @@ export interface Repuesto {
   precio_unitario: number
   ubicacion?: string
   activo: boolean
+  camion_id?: string
+  camion_patente?: string
   created_at: string
   updated_at: string
 }
@@ -207,6 +209,7 @@ export interface RepuestoCreate {
   stock_minimo: number
   precio_unitario: number
   ubicacion?: string
+  camion_id?: string
 }
 
 export interface MovimientoStock {

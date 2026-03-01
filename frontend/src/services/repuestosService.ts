@@ -88,4 +88,15 @@ export const repuestosService = {
     })
     return response.data
   },
+
+  /**
+   * Obtiene repuestos disponibles para un equipo
+   * Incluye los asignados al equipo y los generales (sin asignación)
+   */
+  async getByEquipo(camionId: string, incluirGenerales: boolean = true): Promise<Repuesto[]> {
+    const response = await api.get<Repuesto[]>(`/repuestos/por-equipo/${camionId}`, {
+      params: { incluir_generales: incluirGenerales },
+    })
+    return response.data
+  },
 }

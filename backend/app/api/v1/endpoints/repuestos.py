@@ -27,11 +27,12 @@ async def listar_repuestos(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     solo_activos: bool = Query(True),
+    camion_id: UUID | None = Query(None, description="Filtrar por equipo asignado"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
     """Lista todos los repuestos con paginación"""
-    return repuesto_service.obtener_todos(db, skip, limit, solo_activos)
+    return repuesto_service.obtener_todos(db, skip, limit, solo_activos, camion_id)
 
 
 @router.get("/stock-bajo", response_model=List[RepuestoSchema])
@@ -41,6 +42,20 @@ async def listar_stock_bajo(
 ):
     """Obtiene repuestos con stock bajo (stock_actual <= stock_minimo)"""
     return repuesto_service.obtener_stock_bajo(db)
+
+
+@router.get("/por-equipo/{camion_id}", response_model=List[RepuestoSchema])
+async def listar_repuestos_por_equipo(
+    camion_id: UUID,
+    incluir_generales: bool = Query(True, description="Incluir repuestos sin asignación"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Obtiene repuestos asignados a un equipo específico.
+    Si incluir_generales=True, también devuelve repuestos sin asignación (camion_id=null).
+    """
+    return repuesto_service.obtener_por_equipo(db, camion_id, incluir_generales)
 
 
 @router.post("/", response_model=RepuestoSchema, status_code=201)

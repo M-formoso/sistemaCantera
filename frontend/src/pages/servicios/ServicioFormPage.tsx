@@ -55,11 +55,6 @@ export default function ServicioFormPage() {
     queryFn: () => camionesService.getAll(true),
   })
 
-  const { data: repuestos = [] } = useQuery({
-    queryKey: ['repuestos'],
-    queryFn: () => repuestosService.getAll(true),
-  })
-
   const {
     register,
     handleSubmit,
@@ -75,7 +70,22 @@ export default function ServicioFormPage() {
     },
   })
 
+  // Cargar repuestos filtrados por equipo seleccionado
+  const camionIdSeleccionado = watch('camion_id')
   const costoManoObra = watch('costo_mano_obra')
+
+  const { data: repuestos = [] } = useQuery({
+    queryKey: ['repuestos-por-equipo', camionIdSeleccionado],
+    queryFn: () =>
+      camionIdSeleccionado
+        ? repuestosService.getByEquipo(camionIdSeleccionado, true)
+        : repuestosService.getAll(true),
+    enabled: true,
+  })
+
+  // Obtener datos del equipo seleccionado para adaptar labels
+  const equipoSeleccionado = camiones.find(c => c.id === camionIdSeleccionado)
+  const esMaquina = equipoSeleccionado?.categoria === 'maquina'
 
   // Pre-seleccionar camión si viene del parámetro
   useEffect(() => {
@@ -233,22 +243,31 @@ export default function ServicioFormPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Camión */}
+                {/* Equipo (Camión o Máquina) */}
                 <div className="space-y-2">
                   <label htmlFor="camion_id" className="text-sm font-medium">
-                    Camión <span className="text-red-500">*</span>
+                    Equipo <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="camion_id"
                     {...register('camion_id')}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    <option value="">Seleccionar camión</option>
-                    {camiones.map((camion) => (
-                      <option key={camion.id} value={camion.id}>
-                        {camion.patente} - {camion.marca} {camion.modelo}
-                      </option>
-                    ))}
+                    <option value="">Seleccionar equipo</option>
+                    <optgroup label="🚛 Camiones">
+                      {camiones.filter(c => c.categoria === 'camion' && c.activo).map((camion) => (
+                        <option key={camion.id} value={camion.id}>
+                          {camion.patente || camion.codigo_interno} - {camion.marca} {camion.modelo}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="⚙️ Máquinas">
+                      {camiones.filter(c => c.categoria === 'maquina' && c.activo).map((maquina) => (
+                        <option key={maquina.id} value={maquina.id}>
+                          {maquina.nombre || maquina.codigo_interno} - {maquina.marca} {maquina.modelo}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                   {errors.camion_id && (
                     <p className="text-sm text-red-600">{errors.camion_id.message}</p>
@@ -306,17 +325,20 @@ export default function ServicioFormPage() {
                   )}
                 </div>
 
-                {/* Kilometraje del Servicio */}
+                {/* Kilometraje/Horómetro del Servicio */}
                 <div className="space-y-2">
                   <label htmlFor="kilometraje_servicio" className="text-sm font-medium">
-                    Kilometraje del Servicio
+                    {esMaquina ? 'Horómetro del Servicio' : 'Kilometraje del Servicio'}
                   </label>
                   <Input
                     id="kilometraje_servicio"
                     type="number"
                     {...register('kilometraje_servicio', { valueAsNumber: true })}
-                    placeholder="50000"
+                    placeholder={esMaquina ? '5000' : '50000'}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {esMaquina ? 'Horas de uso al momento del mantenimiento' : 'Km al momento del servicio'}
+                  </p>
                 </div>
 
                 {/* Mecánico */}
@@ -387,13 +409,37 @@ export default function ServicioFormPage() {
                     e.target.value = ''
                   }}
                   defaultValue=""
+                  disabled={!camionIdSeleccionado}
                 >
-                  <option value="">Seleccionar repuesto...</option>
-                  {repuestos.map((repuesto) => (
-                    <option key={repuesto.id} value={repuesto.id}>
-                      {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
-                    </option>
-                  ))}
+                  <option value="">
+                    {camionIdSeleccionado
+                      ? 'Seleccionar repuesto...'
+                      : 'Primero seleccione un equipo'}
+                  </option>
+                  {/* Repuestos asignados al equipo */}
+                  {repuestos.filter(r => r.camion_id === camionIdSeleccionado).length > 0 && (
+                    <optgroup label="📦 Asignados a este equipo">
+                      {repuestos
+                        .filter(r => r.camion_id === camionIdSeleccionado)
+                        .map((repuesto) => (
+                          <option key={repuesto.id} value={repuesto.id}>
+                            {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  {/* Repuestos generales */}
+                  {repuestos.filter(r => !r.camion_id).length > 0 && (
+                    <optgroup label="🔧 Repuestos generales">
+                      {repuestos
+                        .filter(r => !r.camion_id)
+                        .map((repuesto) => (
+                          <option key={repuesto.id} value={repuesto.id}>
+                            {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
                 </select>
                 <Button
                   type="button"
@@ -403,6 +449,11 @@ export default function ServicioFormPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {camionIdSeleccionado && repuestos.length === 0 && (
+                <p className="text-sm text-muted-foreground italic">
+                  No hay repuestos disponibles para este equipo
+                </p>
+              )}
 
               {/* Lista de repuestos seleccionados */}
               {repuestosSeleccionados.length === 0 ? (

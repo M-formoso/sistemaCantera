@@ -17,15 +17,52 @@ def obtener_todos(
     db: Session,
     skip: int = 0,
     limit: int = 100,
-    solo_activos: bool = True
-) -> List[Repuesto]:
+    solo_activos: bool = True,
+    camion_id: Optional[UUID] = None
+) -> List[dict]:
     """Obtiene todos los repuestos con paginación"""
     query = db.query(Repuesto)
 
     if solo_activos:
         query = query.filter(Repuesto.activo == True)
 
-    return query.order_by(desc(Repuesto.created_at)).offset(skip).limit(limit).all()
+    if camion_id:
+        query = query.filter(Repuesto.camion_id == camion_id)
+
+    repuestos = query.order_by(desc(Repuesto.created_at)).offset(skip).limit(limit).all()
+
+    # Agregar camion_patente a cada repuesto
+    return [_repuesto_con_patente(r) for r in repuestos]
+
+
+def _repuesto_con_patente(repuesto: Repuesto) -> dict:
+    """Convierte un repuesto a dict incluyendo la patente del camión"""
+    data = {
+        "id": repuesto.id,
+        "codigo": repuesto.codigo,
+        "nombre": repuesto.nombre,
+        "categoria": repuesto.categoria,
+        "stock_actual": repuesto.stock_actual,
+        "stock_minimo": repuesto.stock_minimo,
+        "unidad": repuesto.unidad,
+        "precio_unitario": repuesto.precio_unitario,
+        "proveedor": repuesto.proveedor,
+        "ubicacion_deposito": repuesto.ubicacion_deposito,
+        "activo": repuesto.activo,
+        "camion_id": repuesto.camion_id,
+        "camion_patente": None,
+        "created_at": repuesto.created_at,
+        "updated_at": repuesto.updated_at,
+    }
+
+    if repuesto.camion:
+        # Para máquinas usa nombre o código interno, para camiones usa patente
+        if repuesto.camion.categoria == 'maquina':
+            data["camion_patente"] = repuesto.camion.nombre or repuesto.camion.codigo_interno
+        else:
+            data["camion_patente"] = repuesto.camion.patente or repuesto.camion.codigo_interno
+
+    return data
 
 
 def obtener_por_id(db: Session, repuesto_id: UUID) -> Optional[Repuesto]:
@@ -38,17 +75,53 @@ def obtener_por_codigo(db: Session, codigo: str) -> Optional[Repuesto]:
     return db.query(Repuesto).filter(Repuesto.codigo == codigo).first()
 
 
-def obtener_stock_bajo(db: Session) -> List[Repuesto]:
+def obtener_stock_bajo(db: Session) -> List[dict]:
     """
     Obtiene repuestos con stock bajo (stock_actual <= stock_minimo)
 
     Returns:
         Lista de repuestos con stock bajo
     """
-    return db.query(Repuesto).filter(
+    repuestos = db.query(Repuesto).filter(
         Repuesto.stock_actual <= Repuesto.stock_minimo,
         Repuesto.activo == True
     ).order_by(Repuesto.stock_actual).all()
+
+    return [_repuesto_con_patente(r) for r in repuestos]
+
+
+def obtener_por_equipo(
+    db: Session,
+    camion_id: UUID,
+    incluir_generales: bool = True
+) -> List[dict]:
+    """
+    Obtiene repuestos asignados a un equipo específico.
+
+    Args:
+        db: Sesión de base de datos
+        camion_id: ID del equipo
+        incluir_generales: Si True, incluye también repuestos sin asignación (camion_id=null)
+
+    Returns:
+        Lista de repuestos
+    """
+    from sqlalchemy import or_
+
+    query = db.query(Repuesto).filter(Repuesto.activo == True)
+
+    if incluir_generales:
+        query = query.filter(
+            or_(
+                Repuesto.camion_id == camion_id,
+                Repuesto.camion_id.is_(None)
+            )
+        )
+    else:
+        query = query.filter(Repuesto.camion_id == camion_id)
+
+    repuestos = query.order_by(Repuesto.nombre).all()
+    return [_repuesto_con_patente(r) for r in repuestos]
 
 
 def crear(db: Session, repuesto_data: RepuestoCreate) -> Repuesto:
