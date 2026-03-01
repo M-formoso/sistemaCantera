@@ -85,7 +85,7 @@ async def startup_event():
     """
     Evento de inicio: verifica y crea columnas faltantes en la BD
     """
-    from app.core.database import engine
+    from app.db.session import engine
     from sqlalchemy import text, inspect
 
     try:

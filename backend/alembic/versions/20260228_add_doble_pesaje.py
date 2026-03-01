@@ -1,7 +1,7 @@
 """Add estado and fecha_completado to pesajes for double weighing flow
 
 Revision ID: add_doble_pesaje
-Revises: add_ordenes_entrega
+Revises: add_permisos_usuario
 Create Date: 2026-02-28
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_doble_pesaje'
-down_revision = 'add_ordenes_entrega'
+down_revision = 'add_permisos_usuario'
 branch_labels = None
 depends_on = None
 
