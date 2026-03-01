@@ -83,7 +83,7 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """
-    Evento de inicio: verifica y crea columnas faltantes en la BD
+    Evento de inicio: verifica y crea columnas/tablas faltantes en la BD
     """
     from app.db.session import engine
     from sqlalchemy import text, inspect
@@ -91,20 +91,64 @@ async def startup_event():
     try:
         with engine.connect() as conn:
             inspector = inspect(engine)
+            tablas_existentes = inspector.get_table_names()
 
             # Verificar si existe la columna camion_id en repuestos
-            columns = [col['name'] for col in inspector.get_columns('repuestos')]
-            if 'camion_id' not in columns:
-                print("⚠️ Columna camion_id no existe en repuestos, creándola...")
+            if 'repuestos' in tablas_existentes:
+                columns = [col['name'] for col in inspector.get_columns('repuestos')]
+                if 'camion_id' not in columns:
+                    print("⚠️ Columna camion_id no existe en repuestos, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE repuestos
+                        ADD COLUMN camion_id UUID REFERENCES camiones(id)
+                    """))
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS ix_repuestos_camion_id ON repuestos(camion_id)
+                    """))
+                    conn.commit()
+                    print("✅ Columna camion_id creada exitosamente")
+
+            # Crear tabla trabajos si no existe
+            if 'trabajos' not in tablas_existentes:
+                print("⚠️ Tabla trabajos no existe, creándola...")
                 conn.execute(text("""
-                    ALTER TABLE repuestos
-                    ADD COLUMN camion_id UUID REFERENCES camiones(id)
+                    CREATE TABLE trabajos (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        camion_id UUID NOT NULL REFERENCES camiones(id),
+                        fecha DATE NOT NULL,
+                        descripcion TEXT NOT NULL,
+                        responsable VARCHAR(100),
+                        costo_mano_obra NUMERIC(12,2) DEFAULT 0,
+                        costo_total NUMERIC(12,2) DEFAULT 0,
+                        observaciones TEXT,
+                        created_by UUID NOT NULL REFERENCES usuarios(id),
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
                 """))
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS ix_repuestos_camion_id ON repuestos(camion_id)
-                """))
+                conn.execute(text("CREATE INDEX ix_trabajos_camion_id ON trabajos(camion_id)"))
+                conn.execute(text("CREATE INDEX ix_trabajos_fecha ON trabajos(fecha)"))
                 conn.commit()
-                print("✅ Columna camion_id creada exitosamente")
+                print("✅ Tabla trabajos creada exitosamente")
+
+            # Crear tabla trabajos_repuestos si no existe
+            if 'trabajos_repuestos' not in tablas_existentes:
+                print("⚠️ Tabla trabajos_repuestos no existe, creándola...")
+                conn.execute(text("""
+                    CREATE TABLE trabajos_repuestos (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        trabajo_id UUID NOT NULL REFERENCES trabajos(id) ON DELETE CASCADE,
+                        repuesto_id UUID NOT NULL REFERENCES repuestos(id),
+                        cantidad NUMERIC(10,2) NOT NULL DEFAULT 1,
+                        precio_unitario NUMERIC(12,2),
+                        subtotal NUMERIC(12,2),
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                conn.execute(text("CREATE INDEX ix_trabajos_repuestos_trabajo_id ON trabajos_repuestos(trabajo_id)"))
+                conn.commit()
+                print("✅ Tabla trabajos_repuestos creada exitosamente")
 
     except Exception as e:
-        print(f"⚠️ Error en startup verificando columnas: {e}")
+        print(f"⚠️ Error en startup verificando BD: {e}")

@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     camiones,
     repuestos,
     servicios,
+    trabajos,
     pesajes,
     remitos,
     combustible,
@@ -31,6 +32,7 @@ api_router.include_router(usuarios.router, prefix="/usuarios", tags=["Usuarios"]
 api_router.include_router(camiones.router, prefix="/camiones", tags=["Camiones"])
 api_router.include_router(repuestos.router, prefix="/repuestos", tags=["Repuestos"])
 api_router.include_router(servicios.router, prefix="/servicios", tags=["Servicios"])
+api_router.include_router(trabajos.router, prefix="/trabajos", tags=["Trabajos"])
 api_router.include_router(pesajes.router, prefix="/pesajes", tags=["Pesajes"])
 api_router.include_router(remitos.router, prefix="/remitos", tags=["Remitos"])
 api_router.include_router(combustible.router, prefix="/combustible", tags=["Combustible"])

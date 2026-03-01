@@ -613,3 +613,42 @@ export interface ResumenPorCategoria {
   cantidad: number
   color?: string
 }
+
+// ==================== TRABAJO/REPARACIÓN ====================
+
+export interface Trabajo {
+  id: string
+  camion_id: string
+  fecha: string
+  descripcion: string
+  responsable?: string
+  costo_mano_obra: number
+  costo_total: number
+  observaciones?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  camion_identificador?: string
+  usuario_nombre?: string
+  repuestos: TrabajoRepuesto[]
+}
+
+export interface TrabajoRepuesto {
+  id: string
+  repuesto_id: string
+  nombre: string
+  codigo?: string
+  cantidad: number
+  precio_unitario?: number
+  subtotal?: number
+}
+
+export interface TrabajoCreate {
+  camion_id: string
+  fecha: string
+  descripcion: string
+  responsable?: string
+  costo_mano_obra: number
+  observaciones?: string
+  repuestos: { repuesto_id: string; cantidad: number }[]
+}

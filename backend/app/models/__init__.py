@@ -13,6 +13,7 @@ from app.models.empresa import Empresa
 from app.models.finanzas import CategoriaFinanzas, MovimientoFinanciero, CuentaBancaria
 from app.models.orden_entrega import OrdenEntrega
 from app.models.camion_cliente import CamionCliente
+from app.models.trabajo import Trabajo, TrabajoRepuesto
 
 __all__ = [
     "BaseModel",
@@ -35,4 +36,6 @@ __all__ = [
     "CuentaBancaria",
     "OrdenEntrega",
     "CamionCliente",
+    "Trabajo",
+    "TrabajoRepuesto",
 ]
