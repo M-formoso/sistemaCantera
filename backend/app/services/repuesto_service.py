@@ -49,18 +49,22 @@ def _repuesto_con_patente(repuesto: Repuesto) -> dict:
         "proveedor": repuesto.proveedor,
         "ubicacion_deposito": repuesto.ubicacion_deposito,
         "activo": repuesto.activo,
-        "camion_id": repuesto.camion_id,
+        "camion_id": getattr(repuesto, 'camion_id', None),
         "camion_patente": None,
         "created_at": repuesto.created_at,
         "updated_at": repuesto.updated_at,
     }
 
-    if repuesto.camion:
-        # Para máquinas usa nombre o código interno, para camiones usa patente
-        if repuesto.camion.categoria == 'maquina':
-            data["camion_patente"] = repuesto.camion.nombre or repuesto.camion.codigo_interno
-        else:
-            data["camion_patente"] = repuesto.camion.patente or repuesto.camion.codigo_interno
+    # Intentar obtener la patente del camión de forma segura
+    try:
+        camion = getattr(repuesto, 'camion', None)
+        if camion:
+            if getattr(camion, 'categoria', None) == 'maquina':
+                data["camion_patente"] = camion.nombre or camion.codigo_interno
+            else:
+                data["camion_patente"] = camion.patente or camion.codigo_interno
+    except Exception:
+        pass  # Si falla, dejamos camion_patente como None
 
     return data
 

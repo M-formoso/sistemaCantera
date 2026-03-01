@@ -78,3 +78,33 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Evento de inicio: verifica y crea columnas faltantes en la BD
+    """
+    from app.core.database import engine
+    from sqlalchemy import text, inspect
+
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(engine)
+
+            # Verificar si existe la columna camion_id en repuestos
+            columns = [col['name'] for col in inspector.get_columns('repuestos')]
+            if 'camion_id' not in columns:
+                print("⚠️ Columna camion_id no existe en repuestos, creándola...")
+                conn.execute(text("""
+                    ALTER TABLE repuestos
+                    ADD COLUMN camion_id UUID REFERENCES camiones(id)
+                """))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS ix_repuestos_camion_id ON repuestos(camion_id)
+                """))
+                conn.commit()
+                print("✅ Columna camion_id creada exitosamente")
+
+    except Exception as e:
+        print(f"⚠️ Error en startup verificando columnas: {e}")
