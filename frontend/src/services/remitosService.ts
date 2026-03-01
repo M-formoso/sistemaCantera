@@ -51,10 +51,13 @@ export const remitosService = {
 
   /**
    * Descarga el PDF de un remito
+   * @param id ID del remito
+   * @param tipo Tipo de copia: "original", "duplicado" o "triplicado"
    */
-  async downloadPDF(id: string): Promise<Blob> {
+  async downloadPDF(id: string, tipo: 'original' | 'duplicado' | 'triplicado' = 'original'): Promise<Blob> {
     const response = await api.get<Blob>(`/remitos/${id}/pdf`, {
       responseType: 'blob',
+      params: { tipo },
     })
     return response.data
   },

@@ -16,12 +16,13 @@ from datetime import datetime
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'logo_la_rufina.png')
 
 
-def generar_ticket_pesaje_pdf(pesaje_data: dict) -> BytesIO:
+def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -> BytesIO:
     """
     Genera un PDF con el ticket de pesaje/control de pesada
 
     Args:
         pesaje_data: Diccionario con los datos del pesaje
+        tipo_copia: "original", "duplicado" o "triplicado"
 
     Returns:
         BytesIO con el PDF generado
@@ -74,7 +75,22 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict) -> BytesIO:
         leading=12
     )
 
+    # Estilo para tipo de copia (Original/Duplicado/Triplicado)
+    tipo_copia_style = ParagraphStyle(
+        'TipoCopiaStyle',
+        parent=styles['Normal'],
+        fontSize=11,
+        fontName='Helvetica-Bold',
+        alignment=TA_RIGHT,
+        textColor=colors.HexColor('#666666'),
+        spaceAfter=3*mm
+    )
+
     elements = []
+
+    # Tipo de copia en la esquina superior derecha
+    tipo_label = tipo_copia.upper()
+    elements.append(Paragraph(tipo_label, tipo_copia_style))
 
     # Logo más ancho
     if os.path.exists(LOGO_PATH):
@@ -89,6 +105,7 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict) -> BytesIO:
     # Encabezado
     elements.append(Paragraph("Canteras La Rufina – TBF SRL", title_style))
     elements.append(Paragraph("Ruta C45 – Km 11 – Falda del Carmen", subtitle_style))
+    elements.append(Paragraph("Tel: 351 537-2741", subtitle_style))
 
     # Título principal
     elements.append(Paragraph("CONTROL DE PESADA", header_style))

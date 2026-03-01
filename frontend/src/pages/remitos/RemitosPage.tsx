@@ -11,7 +11,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { FileText, Download, Trash2, Plus } from 'lucide-react'
+import { FileText, Download, Trash2, Plus, ChevronDown, Copy, FileCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,11 +19,15 @@ import { remitosService } from '@/services/remitosService'
 import { Remito } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
 
+type TipoCopia = 'original' | 'duplicado' | 'triplicado'
+
 export default function RemitosPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [showDropdown, setShowDropdown] = useState<string | null>(null)
 
   const { data: remitos = [], isLoading } = useQuery({
     queryKey: ['remitos'],
@@ -47,19 +51,23 @@ export default function RemitosPage() {
     }
   }
 
-  const handleDownloadPDF = async (id: string, numeroRemito: string) => {
+  const handleDownloadPDF = async (id: string, numeroRemito: string, tipo: TipoCopia) => {
+    setDownloadingId(id)
+    setShowDropdown(null)
     try {
-      const blob = await remitosService.downloadPDF(id)
+      const blob = await remitosService.downloadPDF(id, tipo)
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `remito-${numeroRemito}.pdf`
+      a.download = `remito-${numeroRemito}-${tipo}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
-      alert('Error al descargar el PDF. Esta función estará disponible próximamente.')
+      alert('Error al descargar el PDF')
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -136,16 +144,61 @@ export default function RemitosPage() {
       header: 'Acciones',
       cell: ({ row }) => {
         const remito = row.original
+        const isDownloading = downloadingId === remito.id
+        const isDropdownOpen = showDropdown === remito.id
+
         return (
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownloadPDF(remito.id, remito.numero_remito)}
-              title="Descargar PDF"
-            >
-              <Download className="h-4 w-4 text-blue-600" />
-            </Button>
+            {/* Dropdown de descarga */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDropdown(isDropdownOpen ? null : remito.id)}
+                disabled={isDownloading}
+                className="flex items-center gap-1"
+                title="Descargar PDF"
+              >
+                <Download className={`h-4 w-4 text-blue-600 ${isDownloading ? 'animate-pulse' : ''}`} />
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+
+              {isDropdownOpen && (
+                <>
+                  {/* Overlay para cerrar al hacer clic afuera */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowDropdown(null)}
+                  />
+
+                  {/* Menú dropdown */}
+                  <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-20">
+                    <button
+                      onClick={() => handleDownloadPDF(remito.id, remito.numero_remito, 'original')}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 text-left"
+                    >
+                      <FileCheck className="h-4 w-4 text-green-600" />
+                      Original
+                    </button>
+                    <button
+                      onClick={() => handleDownloadPDF(remito.id, remito.numero_remito, 'duplicado')}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 text-left"
+                    >
+                      <Copy className="h-4 w-4 text-blue-600" />
+                      Duplicado
+                    </button>
+                    <button
+                      onClick={() => handleDownloadPDF(remito.id, remito.numero_remito, 'triplicado')}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 text-left"
+                    >
+                      <Copy className="h-4 w-4 text-orange-600" />
+                      Triplicado
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             <Button
               variant="outline"
               size="sm"
