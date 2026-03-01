@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle, Cog } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ export default function CamionDetailPage() {
   const [showProximoServicio, setShowProximoServicio] = useState(false)
   const [proximoServicioFecha, setProximoServicioFecha] = useState('')
   const [proximoServicioKm, setProximoServicioKm] = useState('')
+  const [proximoServicioHoras, setProximoServicioHoras] = useState('')
 
   const { data: camion, isLoading: isLoadingCamion } = useQuery({
     queryKey: ['camion', id],
@@ -39,7 +40,7 @@ export default function CamionDetailPage() {
   })
 
   const updateCamionMutation = useMutation({
-    mutationFn: (data: { proximo_servicio_fecha?: string; proximo_servicio_km?: number }) =>
+    mutationFn: (data: { proximo_servicio_fecha?: string; proximo_servicio_km?: number; proximo_servicio_horas?: number }) =>
       camionesService.update(id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['camion', id] })
@@ -47,6 +48,7 @@ export default function CamionDetailPage() {
       setShowProximoServicio(false)
       setProximoServicioFecha('')
       setProximoServicioKm('')
+      setProximoServicioHoras('')
     },
   })
 
@@ -65,6 +67,7 @@ export default function CamionDetailPage() {
       await updateCamionMutation.mutateAsync({
         proximo_servicio_fecha: proximoServicioFecha || undefined,
         proximo_servicio_km: proximoServicioKm ? parseInt(proximoServicioKm) : undefined,
+        proximo_servicio_horas: proximoServicioHoras ? parseFloat(proximoServicioHoras) : undefined,
       })
     } catch (error) {
       alert('Error al guardar el próximo servicio')
@@ -74,7 +77,7 @@ export default function CamionDetailPage() {
   if (isLoadingCamion) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500">Cargando camión...</div>
+        <div className="text-gray-500">Cargando...</div>
       </div>
     )
   }
@@ -82,15 +85,23 @@ export default function CamionDetailPage() {
   if (!camion) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500">Camión no encontrado</div>
+        <div className="text-gray-500">Equipo no encontrado</div>
       </div>
     )
   }
+
+  const esMaquina = camion.categoria === 'maquina'
+  const IconoEquipo = esMaquina ? Cog : Truck
 
   const estadoColorClass =
     camion.estado === 'operativo' ? 'bg-green-100 text-green-700' :
     camion.estado === 'en_servicio' ? 'bg-orange-100 text-orange-700' :
     'bg-red-100 text-red-700'
+
+  // Para máquinas, calcular horas restantes
+  const horasActuales = Number(camion.horometro_actual) || 0
+  const proximoServicioHorasValue = Number(camion.proximo_servicio_horas) || 0
+  const horasRestantes = proximoServicioHorasValue - horasActuales
 
   return (
     <div className="space-y-6">
@@ -101,41 +112,64 @@ export default function CamionDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Truck className="h-8 w-8" />
-            {camion.patente}
+            <IconoEquipo className="h-8 w-8" />
+            {camion.patente || camion.nombre || camion.codigo_interno}
           </h1>
           <p className="text-gray-500 mt-1">
-            {camion.marca} {camion.modelo} - {camion.año}
+            {camion.marca} {camion.modelo} {camion.año ? `- ${camion.año}` : ''}
           </p>
         </div>
         <Button onClick={() => navigate(`/camiones/${id}/editar`)}>
-          Editar Camión
+          Editar {esMaquina ? 'Máquina' : 'Camión'}
         </Button>
       </div>
 
-      {/* Información del camión */}
+      {/* Información del equipo */}
       <Card>
         <CardHeader>
-          <CardTitle>Información del Camión</CardTitle>
+          <CardTitle>Información {esMaquina ? 'de la Máquina' : 'del Camión'}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Patente</p>
-              <p className="text-lg font-semibold">{camion.patente}</p>
-            </div>
+            {!esMaquina && camion.patente && (
+              <div>
+                <p className="text-sm text-muted-foreground">Patente</p>
+                <p className="text-lg font-semibold">{camion.patente}</p>
+              </div>
+            )}
+            {esMaquina && (
+              <div>
+                <p className="text-sm text-muted-foreground">Nombre / Código</p>
+                <p className="text-lg font-semibold">{camion.nombre || camion.codigo_interno}</p>
+              </div>
+            )}
+            {esMaquina && camion.tipo_maquina && (
+              <div>
+                <p className="text-sm text-muted-foreground">Tipo</p>
+                <p className="text-lg font-semibold capitalize">{camion.tipo_maquina.replace(/_/g, ' ')}</p>
+              </div>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">Marca y Modelo</p>
               <p className="text-lg font-semibold">{camion.marca} {camion.modelo}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Año</p>
-              <p className="text-lg font-semibold">{camion.año}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Kilometraje Actual</p>
-              <p className="text-lg font-semibold">{camion.kilometraje_actual != null ? `${camion.kilometraje_actual.toLocaleString('es-AR')} km` : '-'}</p>
-            </div>
+            {camion.año && (
+              <div>
+                <p className="text-sm text-muted-foreground">Año</p>
+                <p className="text-lg font-semibold">{camion.año}</p>
+              </div>
+            )}
+            {!esMaquina ? (
+              <div>
+                <p className="text-sm text-muted-foreground">Kilometraje Actual</p>
+                <p className="text-lg font-semibold">{camion.kilometraje_actual != null ? `${camion.kilometraje_actual.toLocaleString('es-AR')} km` : '-'}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-muted-foreground">Horómetro Actual</p>
+                <p className="text-lg font-semibold">{horasActuales > 0 ? `${horasActuales.toLocaleString('es-AR')} hs` : '-'}</p>
+              </div>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">Estado</p>
               <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${estadoColorClass}`}>
@@ -192,16 +226,30 @@ export default function CamionDetailPage() {
                   />
                   <p className="text-xs text-muted-foreground">Se alertará una semana antes</p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Kilometraje del próximo servicio</label>
-                  <Input
-                    type="number"
-                    placeholder={camion.kilometraje_actual ? `Ej: ${(camion.kilometraje_actual + 10000).toLocaleString()}` : ''}
-                    value={proximoServicioKm}
-                    onChange={(e) => setProximoServicioKm(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">Se alertará cuando falten 1000 km</p>
-                </div>
+                {!esMaquina ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Kilometraje del próximo servicio</label>
+                    <Input
+                      type="number"
+                      placeholder={camion.kilometraje_actual ? `Ej: ${(camion.kilometraje_actual + 10000).toLocaleString()}` : ''}
+                      value={proximoServicioKm}
+                      onChange={(e) => setProximoServicioKm(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Se alertará cuando falten 1000 km</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Horas del próximo servicio</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      placeholder={horasActuales ? `Ej: ${(horasActuales + 250).toLocaleString()}` : ''}
+                      value={proximoServicioHoras}
+                      onChange={(e) => setProximoServicioHoras(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Se alertará cuando falten 50 horas</p>
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleGuardarProximoServicio} disabled={updateCamionMutation.isPending}>
@@ -230,24 +278,44 @@ export default function CamionDetailPage() {
                   </p>
                 )}
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Por Kilometraje</p>
-                <p className="text-lg font-semibold">
-                  {camion.proximo_servicio_km ? `${camion.proximo_servicio_km.toLocaleString('es-AR')} km` : 'No programado'}
-                </p>
-                {camion.km_para_proximo_servicio != null && (
-                  <p className={`text-xs ${camion.km_para_proximo_servicio <= 0 ? 'text-red-600 font-semibold' : camion.km_para_proximo_servicio <= 1000 ? 'text-orange-600 font-semibold' : 'text-muted-foreground'}`}>
-                    {camion.km_para_proximo_servicio <= 0
-                      ? `¡Pasado por ${Math.abs(camion.km_para_proximo_servicio).toLocaleString('es-AR')} km!`
-                      : `Faltan ${camion.km_para_proximo_servicio.toLocaleString('es-AR')} km`
-                    }
+              {!esMaquina ? (
+                <div>
+                  <p className="text-sm text-muted-foreground">Por Kilometraje</p>
+                  <p className="text-lg font-semibold">
+                    {camion.proximo_servicio_km ? `${camion.proximo_servicio_km.toLocaleString('es-AR')} km` : 'No programado'}
                   </p>
-                )}
-              </div>
+                  {camion.km_para_proximo_servicio != null && (
+                    <p className={`text-xs ${camion.km_para_proximo_servicio <= 0 ? 'text-red-600 font-semibold' : camion.km_para_proximo_servicio <= 1000 ? 'text-orange-600 font-semibold' : 'text-muted-foreground'}`}>
+                      {camion.km_para_proximo_servicio <= 0
+                        ? `¡Pasado por ${Math.abs(camion.km_para_proximo_servicio).toLocaleString('es-AR')} km!`
+                        : `Faltan ${camion.km_para_proximo_servicio.toLocaleString('es-AR')} km`
+                      }
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-muted-foreground">Por Horas de Uso</p>
+                  <p className="text-lg font-semibold">
+                    {proximoServicioHorasValue > 0 ? `${proximoServicioHorasValue.toLocaleString('es-AR')} hs` : 'No programado'}
+                  </p>
+                  {proximoServicioHorasValue > 0 && (
+                    <p className={`text-xs ${horasRestantes <= 0 ? 'text-red-600 font-semibold' : horasRestantes <= 50 ? 'text-orange-600 font-semibold' : 'text-muted-foreground'}`}>
+                      {horasRestantes <= 0
+                        ? `¡Pasado por ${Math.abs(horasRestantes).toLocaleString('es-AR')} hs!`
+                        : `Faltan ${horasRestantes.toLocaleString('es-AR')} hs`
+                      }
+                    </p>
+                  )}
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">Intervalo de Servicio</p>
                 <p className="text-lg font-semibold">
-                  {camion.intervalo_servicio_km ? `Cada ${camion.intervalo_servicio_km.toLocaleString('es-AR')} km` : 'No definido'}
+                  {!esMaquina
+                    ? (camion.intervalo_servicio_km ? `Cada ${camion.intervalo_servicio_km.toLocaleString('es-AR')} km` : 'No definido')
+                    : (camion.intervalo_servicio_horas ? `Cada ${camion.intervalo_servicio_horas.toLocaleString('es-AR')} hs` : 'No definido')
+                  }
                 </p>
               </div>
             </div>
@@ -262,12 +330,16 @@ export default function CamionDetailPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
-                Historial de Servicios
+                Historial de {esMaquina ? 'Mantenimientos' : 'Servicios'}
               </CardTitle>
-              <CardDescription>Servicios realizados a este camión</CardDescription>
+              <CardDescription>
+                {esMaquina
+                  ? 'Trabajos y reparaciones realizados'
+                  : 'Servicios realizados a este camión'}
+              </CardDescription>
             </div>
             <Button onClick={() => navigate(`/servicios/nuevo?camion=${id}`)}>
-              Registrar Servicio
+              Registrar {esMaquina ? 'Mantenimiento' : 'Servicio'}
             </Button>
           </div>
         </CardHeader>
@@ -278,7 +350,7 @@ export default function CamionDetailPage() {
             </div>
           ) : servicios.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No hay servicios registrados para este camión
+              No hay {esMaquina ? 'mantenimientos' : 'servicios'} registrados para {esMaquina ? 'esta máquina' : 'este camión'}
             </div>
           ) : (
             <div className="space-y-4">
@@ -290,13 +362,22 @@ export default function CamionDetailPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="inline-flex px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${
+                          servicio.tipo === 'preventivo' ? 'bg-blue-100 text-blue-700' :
+                          servicio.tipo === 'correctivo' ? 'bg-orange-100 text-orange-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
                           {servicio.tipo}
                         </span>
                         <span className="text-sm text-muted-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {formatDate(servicio.fecha)}
                         </span>
+                        {servicio.mecanico && (
+                          <span className="text-sm text-muted-foreground">
+                            • Responsable: {servicio.mecanico}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm font-medium mb-1">{servicio.descripcion}</p>
                       {servicio.observaciones && (
@@ -322,9 +403,14 @@ export default function CamionDetailPage() {
                       <p className="text-lg font-bold text-gray-900">
                         {formatCurrency(servicio.costo_total || 0)}
                       </p>
-                      {servicio.kilometraje_servicio && (
+                      {!esMaquina && servicio.kilometraje_servicio && (
                         <p className="text-xs text-muted-foreground">
                           {servicio.kilometraje_servicio.toLocaleString('es-AR')} km
+                        </p>
+                      )}
+                      {esMaquina && servicio.horometro_servicio && (
+                        <p className="text-xs text-muted-foreground">
+                          {Number(servicio.horometro_servicio).toLocaleString('es-AR')} hs
                         </p>
                       )}
                       {isAdmin && (
