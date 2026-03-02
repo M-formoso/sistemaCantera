@@ -341,6 +341,8 @@ export default function CamionesPage() {
       sorting,
       columnFilters,
     },
+    // Reset sorting when tab changes to avoid column mismatch
+    autoResetAll: false,
   })
 
   // Contadores
@@ -387,8 +389,8 @@ export default function CamionesPage() {
         <button
           type="button"
           onClick={() => {
-            console.log('Cambiando a camion')
             setActiveTab('camion')
+            setSorting([])
             setColumnFilters([])
           }}
           className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer ${
@@ -408,8 +410,8 @@ export default function CamionesPage() {
         <button
           type="button"
           onClick={() => {
-            console.log('Cambiando a maquina')
             setActiveTab('maquina')
+            setSorting([])
             setColumnFilters([])
           }}
           className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer ${
