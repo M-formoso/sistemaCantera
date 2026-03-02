@@ -1,45 +1,21 @@
-import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
 
-class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware que intercepta redirects y fuerza HTTPS.
-    Esto evita el error de Mixed Content cuando FastAPI hace redirect de trailing slashes.
-    """
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
-        # Si es un redirect (307 o 308), forzar HTTPS en la URL de destino
-        if response.status_code in (307, 308):
-            location = response.headers.get("location", "")
-            if location.startswith("http://"):
-                # Cambiar http:// por https://
-                new_location = "https://" + location[7:]
-                return RedirectResponse(
-                    url=new_location,
-                    status_code=response.status_code
-                )
-
-        return response
-
-
 # Crear aplicación FastAPI
+# redirect_slashes=False evita redirects 307/308 que rompen CORS en navegadores
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
+    redirect_slashes=False,
 )
 
 # Configurar CORS - permitir todos los orígenes ya que usamos Bearer tokens
-# IMPORTANTE: CORS debe agregarse PRIMERO para que se ejecute ÚLTIMO (antes de procesar la request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Permitir todos los orígenes
@@ -49,9 +25,6 @@ app.add_middleware(
     expose_headers=["Content-Disposition", "Content-Type"],
     max_age=600,  # Cache preflight por 10 minutos
 )
-
-# Middleware para forzar HTTPS en redirects
-app.add_middleware(HTTPSRedirectMiddleware)
 
 # Incluir routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
