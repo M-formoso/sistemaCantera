@@ -253,9 +253,27 @@ export default function NuevoPesajePage() {
     }
   }
 
-  // Crear nueva empresa
+  // Crear nueva empresa y asociar patente
   const createEmpresaMutation = useMutation({
-    mutationFn: (data: EmpresaCreate) => empresasService.create(data),
+    mutationFn: async (data: EmpresaCreate) => {
+      // Crear la empresa
+      const empresa = await empresasService.create(data)
+
+      // Si hay patente externa, asociarla a este cliente
+      const patenteExterna = taraForm.getValues('patente_externa')
+      if (patenteExterna) {
+        try {
+          await empresasService.agregarCamion(empresa.id, {
+            patente: patenteExterna.toUpperCase(),
+            chofer_habitual: taraForm.getValues('chofer') || undefined,
+          })
+        } catch (e) {
+          console.log('Error agregando camión al cliente:', e)
+        }
+      }
+
+      return empresa
+    },
     onSuccess: (empresa) => {
       queryClient.invalidateQueries({ queryKey: ['empresas'] })
       seleccionarCliente(empresa)
