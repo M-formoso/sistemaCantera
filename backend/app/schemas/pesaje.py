@@ -248,8 +248,7 @@ class PesajeIniciarCreate(BaseModel):
         if self.tipo_entrega == "propio" and not self.camion_id:
             raise ValueError('Debe seleccionar un camión propio')
         if self.tipo_entrega == "transportista":
-            if not self.transportista_id and not self.transportista:
-                raise ValueError('Debe seleccionar o ingresar un transportista')
+            # Para transportista solo es obligatoria la patente
             if not self.patente_externa:
                 raise ValueError('Debe ingresar la patente del camión externo')
         return self
