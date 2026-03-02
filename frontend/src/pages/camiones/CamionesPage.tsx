@@ -385,11 +385,13 @@ export default function CamionesPage() {
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <button
+          type="button"
           onClick={() => {
+            console.log('Cambiando a camion')
             setActiveTab('camion')
             setColumnFilters([])
           }}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer ${
             activeTab === 'camion'
               ? 'border-brand-600 text-brand-600 font-medium'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -404,11 +406,13 @@ export default function CamionesPage() {
           </span>
         </button>
         <button
+          type="button"
           onClick={() => {
+            console.log('Cambiando a maquina')
             setActiveTab('maquina')
             setColumnFilters([])
           }}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors cursor-pointer ${
             activeTab === 'maquina'
               ? 'border-brand-600 text-brand-600 font-medium'
               : 'border-transparent text-gray-500 hover:text-gray-700'
