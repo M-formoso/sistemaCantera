@@ -1,21 +1,54 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
 
 
+class CORSRedirectMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware que intercepta redirects (307/308) y:
+    1. Fuerza HTTPS para evitar Mixed Content
+    2. Agrega headers CORS para que el navegador pueda seguir el redirect
+    """
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Si es un redirect (307 o 308), agregar headers CORS y forzar HTTPS
+        if response.status_code in (307, 308):
+            location = response.headers.get("location", "")
+
+            # Forzar HTTPS si es HTTP
+            if location.startswith("http://"):
+                location = "https://" + location[7:]
+
+            # Crear nuevo redirect con headers CORS
+            new_response = RedirectResponse(
+                url=location,
+                status_code=response.status_code
+            )
+            # Agregar headers CORS al redirect
+            new_response.headers["Access-Control-Allow-Origin"] = "*"
+            new_response.headers["Access-Control-Allow-Methods"] = "*"
+            new_response.headers["Access-Control-Allow-Headers"] = "*"
+            return new_response
+
+        return response
+
+
 # Crear aplicación FastAPI
-# redirect_slashes=False evita redirects 307/308 que rompen CORS en navegadores
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    redirect_slashes=False,
 )
 
 # Configurar CORS - permitir todos los orígenes ya que usamos Bearer tokens
+# IMPORTANTE: CORS debe agregarse PRIMERO para que se ejecute ÚLTIMO (antes de procesar la request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Permitir todos los orígenes
@@ -25,6 +58,9 @@ app.add_middleware(
     expose_headers=["Content-Disposition", "Content-Type"],
     max_age=600,  # Cache preflight por 10 minutos
 )
+
+# Middleware para manejar redirects con CORS
+app.add_middleware(CORSRedirectMiddleware)
 
 # Incluir routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
