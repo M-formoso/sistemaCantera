@@ -193,11 +193,20 @@ export default function NuevoPesajePage() {
         if (pesaje.material) {
           brutoForm.setValue('material', pesaje.material)
         }
+        // Pre-llenar chofer si existe
+        if (pesaje.chofer) {
+          brutoForm.setValue('chofer', pesaje.chofer)
+        }
       } else if (resultado.encontrado && resultado.tipo === 'propio') {
         // Camión propio de la cantera - modo nueva tara
         setModo('nueva_tara')
         taraForm.setValue('tipo_entrega', 'propio')
         taraForm.setValue('camion_id', resultado.camion_id!)
+
+        // Auto-completar chofer habitual del camión propio
+        if (resultado.chofer_habitual) {
+          taraForm.setValue('chofer', resultado.chofer_habitual)
+        }
 
         // Auto-completar cliente si existe
         if (resultado.cliente_id && resultado.cliente_nombre) {
@@ -221,6 +230,11 @@ export default function NuevoPesajePage() {
         // Auto-completar chofer si existe
         if (resultado.chofer_habitual) {
           taraForm.setValue('chofer', resultado.chofer_habitual)
+        }
+
+        // Auto-completar acoplado si existe
+        if (resultado.acoplado) {
+          taraForm.setValue('acoplado', resultado.acoplado)
         }
       } else {
         // Patente no encontrada - modo nueva tara como transportista

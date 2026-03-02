@@ -515,9 +515,12 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
         "camion_marca": None,
         "camion_modelo": None,
         "camion_descripcion": None,
+        "camion_tipo": None,
+        "camion_año": None,
         "cliente_id": None,
         "cliente_nombre": None,
         "chofer_habitual": None,
+        "acoplado": None,
         "pesaje_pendiente_id": None,
         "pesaje_pendiente_numero": None,
         "pesaje_pendiente_tara": None,
@@ -526,16 +529,20 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
 
     # 1. Buscar en camiones propios de la cantera
     camion_propio = db.query(Camion).filter(
-        func.upper(Camion.patente) == patente
+        func.upper(Camion.patente) == patente,
+        Camion.activo == True
     ).first()
 
     if camion_propio:
         result["encontrado"] = True
         result["tipo"] = "propio"
-        result["camion_id"] = camion_propio.id
+        result["camion_id"] = str(camion_propio.id)
         result["camion_patente"] = camion_propio.patente
         result["camion_marca"] = camion_propio.marca
         result["camion_modelo"] = camion_propio.modelo
+        result["camion_tipo"] = camion_propio.tipo.value if camion_propio.tipo else None
+        result["camion_año"] = camion_propio.año
+        result["chofer_habitual"] = camion_propio.chofer_habitual
 
         # Buscar pesaje pendiente para este camión propio
         pesaje_pendiente = db.query(Pesaje).filter(
@@ -544,15 +551,15 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
         ).first()
 
         if pesaje_pendiente:
-            result["pesaje_pendiente_id"] = pesaje_pendiente.id
+            result["pesaje_pendiente_id"] = str(pesaje_pendiente.id)
             result["pesaje_pendiente_numero"] = pesaje_pendiente.numero_pesaje
-            result["pesaje_pendiente_tara"] = pesaje_pendiente.peso_tara
-            result["pesaje_pendiente_fecha"] = pesaje_pendiente.fecha
+            result["pesaje_pendiente_tara"] = float(pesaje_pendiente.peso_tara) if pesaje_pendiente.peso_tara else None
+            result["pesaje_pendiente_fecha"] = pesaje_pendiente.fecha.isoformat() if pesaje_pendiente.fecha else None
 
             if pesaje_pendiente.cliente_id:
                 cliente = db.query(Empresa).filter(Empresa.id == pesaje_pendiente.cliente_id).first()
                 if cliente:
-                    result["cliente_id"] = cliente.id
+                    result["cliente_id"] = str(cliente.id)
                     result["cliente_nombre"] = cliente.nombre
 
         return result
@@ -568,13 +575,13 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
         cliente = db.query(Empresa).filter(Empresa.id == camion_cliente.cliente_id).first()
 
         result["encontrado"] = True
-        result["tipo"] = "cliente"  # Nuevo tipo: camión de cliente
+        result["tipo"] = "cliente"
         result["camion_patente"] = camion_cliente.patente
         result["camion_descripcion"] = camion_cliente.descripcion
         result["chofer_habitual"] = camion_cliente.chofer_habitual
 
         if cliente:
-            result["cliente_id"] = cliente.id
+            result["cliente_id"] = str(cliente.id)
             result["cliente_nombre"] = cliente.nombre
 
         # Buscar pesaje pendiente para esta patente externa
@@ -584,14 +591,15 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
         ).first()
 
         if pesaje_pendiente:
-            result["pesaje_pendiente_id"] = pesaje_pendiente.id
+            result["pesaje_pendiente_id"] = str(pesaje_pendiente.id)
             result["pesaje_pendiente_numero"] = pesaje_pendiente.numero_pesaje
-            result["pesaje_pendiente_tara"] = pesaje_pendiente.peso_tara
-            result["pesaje_pendiente_fecha"] = pesaje_pendiente.fecha
+            result["pesaje_pendiente_tara"] = float(pesaje_pendiente.peso_tara) if pesaje_pendiente.peso_tara else None
+            result["pesaje_pendiente_fecha"] = pesaje_pendiente.fecha.isoformat() if pesaje_pendiente.fecha else None
+            result["acoplado"] = pesaje_pendiente.acoplado
 
         return result
 
-    # 3. Buscar en pesajes pendientes con patente externa (transportista sin cliente)
+    # 3. Buscar en pesajes pendientes con patente externa (transportista sin cliente registrado)
     pesaje_externo = db.query(Pesaje).filter(
         func.upper(Pesaje.patente_externa) == patente,
         Pesaje.estado == "pendiente"
@@ -601,20 +609,22 @@ def buscar_por_patente(db: Session, patente: str) -> dict:
         result["encontrado"] = True
         result["tipo"] = "transportista"
         result["camion_patente"] = pesaje_externo.patente_externa
-        result["pesaje_pendiente_id"] = pesaje_externo.id
+        result["pesaje_pendiente_id"] = str(pesaje_externo.id)
         result["pesaje_pendiente_numero"] = pesaje_externo.numero_pesaje
-        result["pesaje_pendiente_tara"] = pesaje_externo.peso_tara
-        result["pesaje_pendiente_fecha"] = pesaje_externo.fecha
+        result["pesaje_pendiente_tara"] = float(pesaje_externo.peso_tara) if pesaje_externo.peso_tara else None
+        result["pesaje_pendiente_fecha"] = pesaje_externo.fecha.isoformat() if pesaje_externo.fecha else None
+        result["chofer_habitual"] = pesaje_externo.chofer
+        result["acoplado"] = pesaje_externo.acoplado
 
         if pesaje_externo.cliente_id:
             cliente = db.query(Empresa).filter(Empresa.id == pesaje_externo.cliente_id).first()
             if cliente:
-                result["cliente_id"] = cliente.id
+                result["cliente_id"] = str(cliente.id)
                 result["cliente_nombre"] = cliente.nombre
 
         return result
 
-    # No encontrado - puede ser patente nueva
+    # No encontrado - puede ser patente nueva (retorna encontrado=False)
     return result
 
 

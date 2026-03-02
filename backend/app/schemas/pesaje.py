@@ -312,21 +312,26 @@ class BusquedaPatenteResult(BaseModel):
     tipo: Optional[Literal["propio", "cliente", "transportista"]] = None
 
     # Datos del camión
-    camion_id: Optional[UUID] = None
+    camion_id: Optional[str] = None
     camion_patente: Optional[str] = None
     camion_marca: Optional[str] = None
     camion_modelo: Optional[str] = None
     camion_descripcion: Optional[str] = None  # Para camiones de clientes
+    camion_tipo: Optional[str] = None  # volcador, acoplado, etc.
+    camion_año: Optional[int] = None
 
     # Cliente asociado (si existe)
-    cliente_id: Optional[UUID] = None
+    cliente_id: Optional[str] = None
     cliente_nombre: Optional[str] = None
 
     # Chofer habitual (si está registrado)
     chofer_habitual: Optional[str] = None
 
+    # Acoplado (si tiene)
+    acoplado: Optional[str] = None
+
     # Pesaje pendiente (si existe)
-    pesaje_pendiente_id: Optional[UUID] = None
+    pesaje_pendiente_id: Optional[str] = None
     pesaje_pendiente_numero: Optional[int] = None
-    pesaje_pendiente_tara: Optional[Decimal] = None
-    pesaje_pendiente_fecha: Optional[datetime] = None
+    pesaje_pendiente_tara: Optional[float] = None
+    pesaje_pendiente_fecha: Optional[str] = None
