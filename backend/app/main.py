@@ -38,10 +38,8 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
 
-# Middleware para forzar HTTPS en redirects (debe ir ANTES de CORS)
-app.add_middleware(HTTPSRedirectMiddleware)
-
 # Configurar CORS - permitir todos los orígenes ya que usamos Bearer tokens
+# IMPORTANTE: CORS debe agregarse PRIMERO para que se ejecute ÚLTIMO (antes de procesar la request)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Permitir todos los orígenes
@@ -51,6 +49,9 @@ app.add_middleware(
     expose_headers=["Content-Disposition", "Content-Type"],
     max_age=600,  # Cache preflight por 10 minutos
 )
+
+# Middleware para forzar HTTPS en redirects
+app.add_middleware(HTTPSRedirectMiddleware)
 
 # Incluir routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
