@@ -54,6 +54,10 @@ export default function CamionDetailPage() {
     retry: false,
   })
 
+  // Separar repuestos asignados a este equipo de los generales
+  const repuestosAsignados = repuestosDisponibles.filter((r: Repuesto) => r.camion_id === id)
+  const repuestosGenerales = repuestosDisponibles.filter((r: Repuesto) => !r.camion_id)
+
   const deleteServicioMutation = useMutation({
     mutationFn: (servicioId: string) => serviciosService.delete(servicioId),
     onSuccess: () => {
@@ -100,6 +104,30 @@ export default function CamionDetailPage() {
       ...trabajoRepuestos,
       { repuesto_id: repuestoId, cantidad: 1, nombre: repuesto.nombre, precio: repuesto.precio_unitario }
     ])
+  }
+
+  // Agregar todos los repuestos asignados a este equipo
+  const agregarTodosRepuestosAsignados = () => {
+    if (repuestosAsignados.length === 0) {
+      alert('Este equipo no tiene repuestos asignados')
+      return
+    }
+    const nuevosRepuestos = repuestosAsignados
+      .filter((r: Repuesto) => !trabajoRepuestos.some(tr => tr.repuesto_id === r.id))
+      .filter((r: Repuesto) => Number(r.stock_actual) > 0) // Solo con stock disponible
+      .map((r: Repuesto) => ({
+        repuesto_id: r.id,
+        cantidad: 1,
+        nombre: r.nombre,
+        precio: r.precio_unitario || 0
+      }))
+
+    if (nuevosRepuestos.length === 0) {
+      alert('Todos los repuestos asignados ya fueron agregados o no tienen stock')
+      return
+    }
+
+    setTrabajoRepuestos([...trabajoRepuestos, ...nuevosRepuestos])
   }
 
   const handleCrearTrabajo = async () => {
@@ -592,6 +620,33 @@ export default function CamionDetailPage() {
                   <Package className="h-4 w-4" />
                   Repuestos utilizados
                 </label>
+
+                {/* Botón para agregar todos los repuestos asignados */}
+                {repuestosAsignados.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">
+                          Repuestos asignados a este equipo ({repuestosAsignados.length})
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          {repuestosAsignados.map((r: Repuesto) => r.nombre).join(', ')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                        onClick={agregarTodosRepuestosAsignados}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Agregar todos
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <select
                     className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -602,11 +657,26 @@ export default function CamionDetailPage() {
                     defaultValue=""
                   >
                     <option value="">Agregar repuesto...</option>
-                    {repuestosDisponibles.map((rep: Repuesto) => (
-                      <option key={rep.id} value={rep.id}>
-                        {rep.nombre} - Stock: {rep.stock_actual} - {formatCurrency(rep.precio_unitario)}
-                      </option>
-                    ))}
+                    {repuestosAsignados.length > 0 && (
+                      <optgroup label="🔧 Asignados a este equipo">
+                        {repuestosAsignados.map((rep: Repuesto) => (
+                          <option key={rep.id} value={rep.id} disabled={Number(rep.stock_actual) <= 0}>
+                            {rep.nombre} - Stock: {rep.stock_actual} - {formatCurrency(rep.precio_unitario)}
+                            {Number(rep.stock_actual) <= 0 ? ' (Sin stock)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {repuestosGenerales.length > 0 && (
+                      <optgroup label="📦 Repuestos generales">
+                        {repuestosGenerales.map((rep: Repuesto) => (
+                          <option key={rep.id} value={rep.id} disabled={Number(rep.stock_actual) <= 0}>
+                            {rep.nombre} - Stock: {rep.stock_actual} - {formatCurrency(rep.precio_unitario)}
+                            {Number(rep.stock_actual) <= 0 ? ' (Sin stock)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
                 {trabajoRepuestos.length > 0 && (
