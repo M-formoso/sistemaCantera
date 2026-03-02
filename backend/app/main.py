@@ -44,9 +44,16 @@ app.add_middleware(HTTPSRedirectMiddleware)
 # Configurar CORS - lista explícita de orígenes permitidos
 cors_origins = [
     "https://sistema.canteralarufina.com.ar",
+    "https://www.sistema.canteralarufina.com.ar",
     "https://canteralarufina.com.ar",
+    "https://www.canteralarufina.com.ar",
     "https://frontend-production-d4d3.up.railway.app",
+    # Agregar cualquier subdominio de Railway que pueda usarse
+    "https://sistemacantera-production.up.railway.app",
+    "https://frontend-production.up.railway.app",
+    # Desarrollo local
     "http://localhost:5173",
+    "http://localhost:5180",
     "http://localhost:3000",
 ]
 
