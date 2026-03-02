@@ -622,6 +622,9 @@ def iniciar_pesaje(db: Session, pesaje_data: PesajeIniciarCreate, usuario_id: UU
     """
     Inicia un nuevo pesaje registrando solo la tara (camión vacío).
     El pesaje queda en estado 'pendiente' hasta que se complete con el peso bruto.
+
+    Si es transportista con patente nueva y cliente seleccionado,
+    guarda automáticamente la patente asociada al cliente.
     """
     camion = None
     transportista_empresa = None
@@ -680,6 +683,31 @@ def iniciar_pesaje(db: Session, pesaje_data: PesajeIniciarCreate, usuario_id: UU
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cliente no encontrado"
             )
+
+    # Si es transportista con patente nueva y cliente seleccionado,
+    # guardar automáticamente la patente asociada al cliente
+    if (pesaje_data.tipo_entrega == "transportista"
+        and pesaje_data.patente_externa
+        and pesaje_data.cliente_id):
+
+        patente_upper = pesaje_data.patente_externa.upper().strip()
+
+        # Verificar si ya existe esta patente para este cliente
+        camion_existente = db.query(CamionCliente).filter(
+            CamionCliente.cliente_id == pesaje_data.cliente_id,
+            func.upper(CamionCliente.patente) == patente_upper
+        ).first()
+
+        if not camion_existente:
+            # Crear nuevo registro de camión de cliente
+            nuevo_camion = CamionCliente(
+                cliente_id=pesaje_data.cliente_id,
+                patente=patente_upper,
+                chofer_habitual=pesaje_data.chofer,
+                activo=True
+            )
+            db.add(nuevo_camion)
+            # No hacer commit aún, se hará con el pesaje
 
     # Obtener próximo número de pesaje
     numero_pesaje = _obtener_proximo_numero(db)
