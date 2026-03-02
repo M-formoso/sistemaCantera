@@ -58,9 +58,12 @@ export interface BusquedaPatenteResult {
   camion_marca?: string
   camion_modelo?: string
   camion_descripcion?: string
+  camion_tipo?: string
+  camion_año?: number
   cliente_id?: string
   cliente_nombre?: string
   chofer_habitual?: string
+  acoplado?: string
   pesaje_pendiente_id?: string
   pesaje_pendiente_numero?: number
   pesaje_pendiente_tara?: number
