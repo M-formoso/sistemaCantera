@@ -43,13 +43,15 @@ export default function CamionDetailPage() {
 
   const { data: trabajos = [], isLoading: isLoadingTrabajos } = useQuery({
     queryKey: ['camion-trabajos', id],
-    queryFn: () => trabajosService.getByEquipo(id!),
+    queryFn: () => trabajosService.getByEquipo(id!).catch(() => []),
+    retry: false,
   })
 
   const { data: repuestosDisponibles = [] } = useQuery({
     queryKey: ['repuestos-equipo', id],
-    queryFn: () => repuestosService.getByEquipo(id!, true),
+    queryFn: () => repuestosService.getByEquipo(id!, true).catch(() => []),
     enabled: showTrabajoForm,
+    retry: false,
   })
 
   const deleteServicioMutation = useMutation({
