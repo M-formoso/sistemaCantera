@@ -95,6 +95,50 @@ async def startup_event():
             inspector = inspect(engine)
             tablas_existentes = inspector.get_table_names()
 
+            # Verificar columnas para doble pesaje en tabla pesajes
+            if 'pesajes' in tablas_existentes:
+                columns = [col['name'] for col in inspector.get_columns('pesajes')]
+
+                # Agregar columna estado si no existe
+                if 'estado' not in columns:
+                    print("⚠️ Columna estado no existe en pesajes, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE pesajes ADD COLUMN estado VARCHAR(20) DEFAULT 'completado'
+                    """))
+                    conn.execute(text("UPDATE pesajes SET estado = 'completado' WHERE estado IS NULL"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pesajes_estado ON pesajes(estado)"))
+                    conn.commit()
+                    print("✅ Columna estado creada exitosamente")
+
+                # Agregar columna fecha_completado si no existe
+                if 'fecha_completado' not in columns:
+                    print("⚠️ Columna fecha_completado no existe en pesajes, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE pesajes ADD COLUMN fecha_completado TIMESTAMP
+                    """))
+                    conn.commit()
+                    print("✅ Columna fecha_completado creada exitosamente")
+
+            # Crear tabla camiones_clientes si no existe
+            if 'camiones_clientes' not in tablas_existentes:
+                print("⚠️ Tabla camiones_clientes no existe, creándola...")
+                conn.execute(text("""
+                    CREATE TABLE camiones_clientes (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        cliente_id UUID NOT NULL REFERENCES empresas(id),
+                        patente VARCHAR(20) NOT NULL,
+                        descripcion VARCHAR(100),
+                        chofer_habitual VARCHAR(100),
+                        activo BOOLEAN NOT NULL DEFAULT true,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                conn.execute(text("CREATE INDEX ix_camiones_clientes_cliente_id ON camiones_clientes(cliente_id)"))
+                conn.execute(text("CREATE INDEX ix_camiones_clientes_patente ON camiones_clientes(patente)"))
+                conn.commit()
+                print("✅ Tabla camiones_clientes creada exitosamente")
+
             # Verificar si existe la columna camion_id en repuestos
             if 'repuestos' in tablas_existentes:
                 columns = [col['name'] for col in inspector.get_columns('repuestos')]
