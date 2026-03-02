@@ -50,25 +50,18 @@ async function request<T>(method: string, endpoint: string, data?: any, config?:
       headers,
       body: data ? JSON.stringify(data) : undefined,
       signal: controller.signal,
-      mode: 'cors',
     })
   } catch (fetchError: any) {
     clearTimeout(timeoutId)
     console.error('[API] Fetch error:', fetchError.name, fetchError.message)
     console.error('[API] URL que falló:', url)
-    console.error('[API] Token presente:', !!token)
 
     if (fetchError.name === 'AbortError') {
       throw new Error('La solicitud tardó demasiado tiempo')
     }
 
-    // Error de red o CORS - dar más contexto
-    if (fetchError.message === 'Failed to fetch') {
-      console.error('[API] Posible error de CORS, red o SSL. Verificar en Network tab del navegador.')
-      throw new Error('Error de conexión. Verifique su conexión a internet.')
-    }
-
-    throw fetchError
+    // Error de red - puede ser CORS, SSL, o conexión
+    throw new Error('Error de conexión. Verifique su conexión a internet.')
   }
   clearTimeout(timeoutId)
 
