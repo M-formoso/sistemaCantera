@@ -140,6 +140,35 @@ async def startup_event():
                     conn.commit()
                     print("✅ Columna fecha_completado creada exitosamente")
 
+                # Hacer peso_bruto, peso_tara y peso_neto nullable para doble pesaje
+                print("⚠️ Verificando que peso_bruto, peso_tara y peso_neto sean nullable...")
+                try:
+                    conn.execute(text("ALTER TABLE pesajes ALTER COLUMN peso_bruto DROP NOT NULL"))
+                    conn.commit()
+                    print("✅ peso_bruto ahora es nullable")
+                except Exception as e:
+                    if "does not have a not-null constraint" not in str(e):
+                        print(f"   peso_bruto: {e}")
+                    conn.rollback()
+
+                try:
+                    conn.execute(text("ALTER TABLE pesajes ALTER COLUMN peso_tara DROP NOT NULL"))
+                    conn.commit()
+                    print("✅ peso_tara ahora es nullable")
+                except Exception as e:
+                    if "does not have a not-null constraint" not in str(e):
+                        print(f"   peso_tara: {e}")
+                    conn.rollback()
+
+                try:
+                    conn.execute(text("ALTER TABLE pesajes ALTER COLUMN peso_neto DROP NOT NULL"))
+                    conn.commit()
+                    print("✅ peso_neto ahora es nullable")
+                except Exception as e:
+                    if "does not have a not-null constraint" not in str(e):
+                        print(f"   peso_neto: {e}")
+                    conn.rollback()
+
             # Crear tabla camiones_clientes si no existe
             if 'camiones_clientes' not in tablas_existentes:
                 print("⚠️ Tabla camiones_clientes no existe, creándola...")
