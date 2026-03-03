@@ -169,6 +169,20 @@ async def startup_event():
                         print(f"   peso_neto: {e}")
                     conn.rollback()
 
+            # Verificar columna categoria en camiones
+            if 'camiones' in tablas_existentes:
+                columns = [col['name'] for col in inspector.get_columns('camiones')]
+                if 'categoria' not in columns:
+                    print("⚠️ Columna categoria no existe en camiones, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE camiones ADD COLUMN categoria VARCHAR(20) DEFAULT 'camion'
+                    """))
+                    conn.execute(text("UPDATE camiones SET categoria = 'camion' WHERE categoria IS NULL"))
+                    conn.commit()
+                    print("✅ Columna categoria creada exitosamente")
+                else:
+                    print("✅ Columna categoria ya existe en camiones")
+
             # Crear tabla camiones_clientes si no existe
             if 'camiones_clientes' not in tablas_existentes:
                 print("⚠️ Tabla camiones_clientes no existe, creándola...")

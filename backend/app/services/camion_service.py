@@ -90,10 +90,16 @@ def crear(db: Session, camion_data: CamionCreate) -> Camion:
             detail=f"Ya existe un camión con la patente {camion_data.patente}"
         )
 
-    db_camion = Camion(**camion_data.model_dump())
+    data_dict = camion_data.model_dump()
+    print(f"[crear_camion] Datos recibidos: {data_dict}")
+    print(f"[crear_camion] Categoría: {data_dict.get('categoria')}")
+
+    db_camion = Camion(**data_dict)
     db.add(db_camion)
     db.commit()
     db.refresh(db_camion)
+
+    print(f"[crear_camion] Categoría guardada: {db_camion.categoria}")
 
     return db_camion
 
