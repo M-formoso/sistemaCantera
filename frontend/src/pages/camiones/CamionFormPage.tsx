@@ -98,6 +98,13 @@ export default function CamionFormPage() {
 
   const categoria = watch('categoria')
 
+  // Establecer categoría desde URL al montar (para nuevo equipo)
+  useEffect(() => {
+    if (!isEditing && categoriaFromUrl) {
+      setValue('categoria', categoriaFromUrl)
+    }
+  }, [isEditing, categoriaFromUrl, setValue])
+
   useEffect(() => {
     if (camion) {
       reset({
