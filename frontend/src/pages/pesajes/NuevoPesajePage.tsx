@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -74,7 +74,11 @@ type ModoFormulario = 'busqueda' | 'nueva_tara' | 'completar_bruto' | 'exito'
 
 export default function NuevoPesajePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
+
+  // Obtener parámetro de URL para completar pesaje
+  const completarPesajeId = searchParams.get('completar')
 
   // Estado del flujo
   const [modo, setModo] = useState<ModoFormulario>('busqueda')
@@ -145,6 +149,27 @@ export default function NuevoPesajePage() {
       brutoForm.setValue('importe_total', Math.round(importeCalculado * 100) / 100)
     }
   }, [importeCalculado, brutoForm])
+
+  // Cargar pesaje pendiente desde URL (para completar desde tabla)
+  useEffect(() => {
+    if (completarPesajeId) {
+      pesajesService.getById(completarPesajeId).then((pesaje) => {
+        if (pesaje && pesaje.estado === 'pendiente') {
+          setPesajePendiente(pesaje)
+          setModo('completar_bruto')
+          // Pre-cargar datos en el form de bruto
+          if (pesaje.material) {
+            brutoForm.setValue('material', pesaje.material)
+          }
+          if (pesaje.chofer) {
+            brutoForm.setValue('chofer', pesaje.chofer)
+          }
+        }
+      }).catch(() => {
+        // Si falla, quedarse en modo búsqueda
+      })
+    }
+  }, [completarPesajeId, brutoForm])
 
   // Buscar clientes
   const buscarClientes = useCallback(async (nombre: string) => {

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, DollarSign } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -59,6 +59,24 @@ export default function PesajesTab() {
       ),
     },
     {
+      accessorKey: 'estado',
+      header: 'Estado',
+      cell: ({ row }) => {
+        const estado = row.original.estado
+        const esPendiente = estado === 'pendiente'
+        return (
+          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded ${
+            esPendiente
+              ? 'bg-yellow-100 text-yellow-700'
+              : 'bg-green-100 text-green-700'
+          }`}>
+            {esPendiente ? <Clock className="h-3 w-3" /> : null}
+            {esPendiente ? 'Pendiente' : 'Completado'}
+          </span>
+        )
+      },
+    },
+    {
       accessorKey: 'fecha',
       header: 'Fecha',
       cell: ({ row }) => {
@@ -67,11 +85,13 @@ export default function PesajesTab() {
       },
     },
     {
-      accessorKey: 'camion_patente',
-      header: 'Camión',
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('camion_patente')}</div>
-      ),
+      id: 'patente',
+      header: 'Patente',
+      cell: ({ row }) => {
+        const pesaje = row.original
+        const patente = pesaje.camion_patente || pesaje.patente_externa || '-'
+        return <div className="font-medium">{patente}</div>
+      },
     },
     {
       accessorKey: 'material',
@@ -86,35 +106,37 @@ export default function PesajesTab() {
       },
     },
     {
-      accessorKey: 'cliente_destino',
-      header: 'Cliente/Destino',
-      cell: ({ row }) => (
-        <div className="text-sm">{row.getValue('cliente_destino') || '-'}</div>
-      ),
+      id: 'cliente',
+      header: 'Cliente',
+      cell: ({ row }) => {
+        const pesaje = row.original
+        const cliente = pesaje.cliente_nombre || '-'
+        return <div className="text-sm">{cliente}</div>
+      },
     },
     {
-      accessorKey: 'peso_neto',
-      header: 'Peso Neto',
+      accessorKey: 'peso_tara',
+      header: 'Tara',
       cell: ({ row }) => {
-        const pesoNeto = row.getValue('peso_neto') as number
+        const pesoTara = row.original.peso_tara as number
         return (
-          <div className="text-sm font-semibold text-right text-green-700">
-            {formatNumber(pesoNeto / 1000, 2)} t
+          <div className="text-sm text-right">
+            {pesoTara ? `${formatNumber(pesoTara)} kg` : '-'}
           </div>
         )
       },
     },
     {
-      accessorKey: 'importe_total',
-      header: 'Importe',
+      accessorKey: 'peso_neto',
+      header: 'Neto',
       cell: ({ row }) => {
-        const importe = row.original.importe_total
-        if (!importe || importe <= 0) {
+        const pesoNeto = row.getValue('peso_neto') as number
+        if (!pesoNeto) {
           return <div className="text-sm text-gray-400 text-right">-</div>
         }
         return (
-          <div className="text-sm font-semibold text-right text-blue-700">
-            ${formatNumber(importe, 2)}
+          <div className="text-sm font-semibold text-right text-green-700">
+            {formatNumber(pesoNeto / 1000, 2)} t
           </div>
         )
       },
@@ -124,16 +146,35 @@ export default function PesajesTab() {
       header: 'Acciones',
       cell: ({ row }) => {
         const pesaje = row.original
+        const esPendiente = pesaje.estado === 'pendiente'
+
         return (
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownloadPDF(pesaje.id, pesaje.numero_pesaje)}
-              title="Descargar Comprobante"
-            >
-              <Download className="h-4 w-4 text-green-600" />
-            </Button>
+            {/* Botón para completar pesaje pendiente */}
+            {esPendiente && (
+              <Button
+                size="sm"
+                className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                onClick={() => navigate(`/pesajes-remitos/nuevo?completar=${pesaje.id}`)}
+                title="Registrar peso bruto"
+              >
+                <Scale className="h-4 w-4 mr-1" />
+                Completar
+              </Button>
+            )}
+
+            {/* Botón descargar PDF solo para completados */}
+            {!esPendiente && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadPDF(pesaje.id, pesaje.numero_pesaje)}
+                title="Descargar Comprobante"
+              >
+                <Download className="h-4 w-4 text-green-600" />
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -142,6 +183,7 @@ export default function PesajesTab() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
+
             {isAdmin && (
               <Button
                 variant="outline"

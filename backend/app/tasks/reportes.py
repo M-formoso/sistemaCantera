@@ -66,7 +66,7 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     """
     Dibuja un ticket compacto en la posición especificada.
     """
-    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
 
     # Parsear fecha
     fecha = pesaje_data.get('fecha', datetime.now())
@@ -93,7 +93,19 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     font_small = 6
     line_height = 10
 
-    y = y_top - 12  # Empezar un poco abajo del tope
+    y = y_top - 5  # Empezar un poco abajo del tope
+
+    # --- LOGO (centrado arriba) ---
+    logo_height = 18 * mm
+    logo_width = 50 * mm
+    if os.path.exists(LOGO_PATH):
+        try:
+            c.drawImage(LOGO_PATH, x + (width - logo_width) / 2, y - logo_height,
+                       width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
+            y -= logo_height + 2
+        except Exception as e:
+            print(f"Error al cargar logo: {e}")
+            y -= 5
 
     # --- TIPO DE COPIA (esquina superior derecha) ---
     c.setFont("Helvetica-Bold", font_normal)
