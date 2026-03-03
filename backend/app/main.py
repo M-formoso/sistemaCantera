@@ -7,35 +7,56 @@ from app.core.config import settings
 from app.api.v1.api import api_router
 
 
-class CORSRedirectMiddleware(BaseHTTPMiddleware):
+class CORSErrorMiddleware(BaseHTTPMiddleware):
     """
-    Middleware que intercepta redirects (307/308) y:
-    1. Fuerza HTTPS para evitar Mixed Content
-    2. Agrega headers CORS para que el navegador pueda seguir el redirect
+    Middleware que:
+    1. Intercepta redirects (307/308) y agrega CORS + HTTPS
+    2. Captura errores 500 y agrega headers CORS para que el navegador pueda ver el error
     """
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
 
-        # Si es un redirect (307 o 308), agregar headers CORS y forzar HTTPS
-        if response.status_code in (307, 308):
-            location = response.headers.get("location", "")
+            # Si es un redirect (307 o 308), agregar headers CORS y forzar HTTPS
+            if response.status_code in (307, 308):
+                location = response.headers.get("location", "")
 
-            # Forzar HTTPS si es HTTP
-            if location.startswith("http://"):
-                location = "https://" + location[7:]
+                # Forzar HTTPS si es HTTP
+                if location.startswith("http://"):
+                    location = "https://" + location[7:]
 
-            # Crear nuevo redirect con headers CORS
-            new_response = RedirectResponse(
-                url=location,
-                status_code=response.status_code
+                # Crear nuevo redirect con headers CORS
+                new_response = RedirectResponse(
+                    url=location,
+                    status_code=response.status_code
+                )
+                new_response.headers["Access-Control-Allow-Origin"] = "*"
+                new_response.headers["Access-Control-Allow-Methods"] = "*"
+                new_response.headers["Access-Control-Allow-Headers"] = "*"
+                return new_response
+
+            # Agregar CORS a respuestas de error (4xx, 5xx)
+            if response.status_code >= 400:
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                response.headers["Access-Control-Allow-Methods"] = "*"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+
+            return response
+        except Exception as e:
+            # Si hay una excepción no manejada, devolver 500 con CORS
+            from fastapi.responses import JSONResponse
+            import traceback
+            print(f"[MIDDLEWARE ERROR] {type(e).__name__}: {str(e)}")
+            print(traceback.format_exc())
+            return JSONResponse(
+                status_code=500,
+                content={"detail": str(e)},
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*"
+                }
             )
-            # Agregar headers CORS al redirect
-            new_response.headers["Access-Control-Allow-Origin"] = "*"
-            new_response.headers["Access-Control-Allow-Methods"] = "*"
-            new_response.headers["Access-Control-Allow-Headers"] = "*"
-            return new_response
-
-        return response
 
 
 # Crear aplicación FastAPI
@@ -59,8 +80,8 @@ app.add_middleware(
     max_age=600,  # Cache preflight por 10 minutos
 )
 
-# Middleware para manejar redirects con CORS
-app.add_middleware(CORSRedirectMiddleware)
+# Middleware para manejar errores y redirects con CORS
+app.add_middleware(CORSErrorMiddleware)
 
 # Incluir routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
