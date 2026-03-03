@@ -150,6 +150,9 @@ export default function CamionFormPage() {
           delete cleanData[key]
         }
       })
+      // Debug: ver qué se envía
+      console.log('Enviando datos:', cleanData)
+      console.log('Categoría:', cleanData.categoria)
       return camionesService.create(cleanData)
     },
     onSuccess: () => {
