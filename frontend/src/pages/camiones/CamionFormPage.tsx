@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -62,9 +62,13 @@ const TIPOS_MAQUINA = [
 export default function CamionFormPage() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const isEditing = !!id
   const [activeTab, setActiveTab] = useState<'general' | 'servicio' | 'documentos'>('general')
+
+  // Leer categoría desde URL (para nuevo equipo desde pestaña de máquinas)
+  const categoriaFromUrl = searchParams.get('categoria') as 'camion' | 'maquina' | null
 
   const { data: camion } = useQuery({
     queryKey: ['camion', id],
@@ -82,7 +86,7 @@ export default function CamionFormPage() {
   } = useForm<CamionFormData>({
     resolver: zodResolver(camionSchema),
     defaultValues: {
-      categoria: 'camion',
+      categoria: categoriaFromUrl || 'camion',
       estado: 'operativo',
       kilometraje_actual: 0,
       horometro_actual: 0,
