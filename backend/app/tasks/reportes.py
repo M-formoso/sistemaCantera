@@ -16,6 +16,179 @@ from datetime import datetime
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'logo_la_rufina.png')
 
 
+def generar_ticket_pesaje_pdf_multiple(pesaje_data: dict, num_copias: int = 1) -> BytesIO:
+    """
+    Genera un PDF con múltiples copias del ticket en una sola hoja A4.
+
+    Args:
+        pesaje_data: Diccionario con los datos del pesaje
+        num_copias: 1 = original, 2 = original + duplicado, 3 = original + duplicado + triplicado
+
+    Returns:
+        BytesIO con el PDF generado
+    """
+    buffer = BytesIO()
+
+    # Definir tipos de copia
+    tipos_copia = ["ORIGINAL", "DUPLICADO", "TRIPLICADO"][:num_copias]
+
+    # Calcular altura disponible por copia
+    page_height = A4[1]  # ~842 puntos
+    page_width = A4[0]   # ~595 puntos
+    margin = 8 * mm
+    usable_height = page_height - (2 * margin)
+    copy_height = usable_height / num_copias - (5 * mm)  # Espacio entre copias
+
+    # Crear documento PDF
+    from reportlab.pdfgen import canvas
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    for i, tipo_copia in enumerate(tipos_copia):
+        # Calcular posición Y de inicio para esta copia (de arriba hacia abajo)
+        y_start = page_height - margin - (i * (copy_height + 5 * mm))
+
+        _dibujar_ticket_compacto(c, pesaje_data, tipo_copia, margin, y_start, copy_height, page_width - 2 * margin)
+
+        # Línea separadora entre copias (excepto la última)
+        if i < num_copias - 1:
+            y_line = y_start - copy_height - 2.5 * mm
+            c.setStrokeColor(colors.gray)
+            c.setDash(3, 3)
+            c.line(margin, y_line, page_width - margin, y_line)
+            c.setDash()
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_top: float, height: float, width: float):
+    """
+    Dibuja un ticket compacto en la posición especificada.
+    """
+    from reportlab.pdfgen import canvas
+
+    # Parsear fecha
+    fecha = pesaje_data.get('fecha', datetime.now())
+    if isinstance(fecha, str):
+        try:
+            fecha = datetime.fromisoformat(fecha.replace('Z', '+00:00'))
+        except:
+            fecha = datetime.now()
+
+    # Formatear pesos
+    def format_peso(peso):
+        try:
+            return f"{int(float(peso)):,}".replace(',', '.') + " kg"
+        except:
+            return "- kg"
+
+    peso_bruto = pesaje_data.get('peso_bruto', 0)
+    peso_tara = pesaje_data.get('peso_tara', 0)
+    peso_neto = pesaje_data.get('peso_neto', 0)
+
+    # Tamaños de fuente según número de copias (más pequeño = más copias)
+    font_title = 10
+    font_normal = 7
+    font_small = 6
+    line_height = 10
+
+    y = y_top - 12  # Empezar un poco abajo del tope
+
+    # --- TIPO DE COPIA (esquina superior derecha) ---
+    c.setFont("Helvetica-Bold", font_normal)
+    c.setFillColor(colors.gray)
+    c.drawRightString(x + width, y, tipo_copia)
+    c.setFillColor(colors.black)
+
+    # --- ENCABEZADO ---
+    c.setFont("Helvetica-Bold", font_title)
+    c.drawCentredString(x + width / 2, y, "Canteras La Rufina - TBF SRL")
+    y -= line_height
+
+    c.setFont("Helvetica", font_small)
+    c.drawCentredString(x + width / 2, y, "Ruta C45 - Km 11 - Falda del Carmen | Tel: 351 537-2741")
+    y -= line_height + 2
+
+    # --- CONTROL DE PESADA ---
+    c.setFont("Helvetica-Bold", font_title)
+    c.drawCentredString(x + width / 2, y, "CONTROL DE PESADA")
+    y -= line_height + 4
+
+    # --- DATOS EN DOS COLUMNAS ---
+    col1_x = x
+    col2_x = x + width / 2
+
+    def draw_field(label, value, col_x, y_pos):
+        c.setFont("Helvetica-Bold", font_normal)
+        c.drawString(col_x, y_pos, f"{label}:")
+        c.setFont("Helvetica", font_normal)
+        c.drawString(col_x + 45, y_pos, str(value or "-"))
+
+    # Fila 1
+    draw_field("Ticket", pesaje_data.get('numero_pesaje', '-'), col1_x, y)
+    draw_field("Fecha", fecha.strftime('%d/%m/%Y %H:%M'), col2_x, y)
+    y -= line_height
+
+    # Fila 2
+    draw_field("Patente", pesaje_data.get('camion_patente', '-'), col1_x, y)
+    draw_field("Chofer", pesaje_data.get('chofer', '-'), col2_x, y)
+    y -= line_height
+
+    # Fila 3
+    draw_field("Acoplado", pesaje_data.get('acoplado', '-'), col1_x, y)
+    draw_field("Transportista", pesaje_data.get('transportista', '-'), col2_x, y)
+    y -= line_height
+
+    # Fila 4
+    draw_field("Cliente", pesaje_data.get('cliente_destino', '-'), col1_x, y)
+    draw_field("Material", pesaje_data.get('material', '-'), col2_x, y)
+    y -= line_height + 4
+
+    # --- PESOS (destacados) ---
+    c.setStrokeColor(colors.HexColor('#cccccc'))
+    c.setFillColor(colors.HexColor('#f5f5f5'))
+    peso_box_height = line_height + 6
+    c.rect(x, y - peso_box_height + 4, width, peso_box_height, fill=1, stroke=1)
+    c.setFillColor(colors.black)
+
+    c.setFont("Helvetica-Bold", font_normal)
+    peso_y = y - 2
+
+    # Bruto
+    c.drawString(x + 5, peso_y, "Bruto:")
+    c.setFont("Helvetica", font_normal)
+    c.drawString(x + 35, peso_y, format_peso(peso_bruto))
+
+    # Tara
+    c.setFont("Helvetica-Bold", font_normal)
+    c.drawString(x + width / 3, peso_y, "Tara:")
+    c.setFont("Helvetica", font_normal)
+    c.drawString(x + width / 3 + 25, peso_y, format_peso(peso_tara))
+
+    # Neto (destacado)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(x + 2 * width / 3, peso_y, "Neto:")
+    c.setFillColor(colors.HexColor('#006600'))
+    c.drawString(x + 2 * width / 3 + 28, peso_y, format_peso(peso_neto))
+    c.setFillColor(colors.black)
+
+    y -= peso_box_height + 4
+
+    # --- OPERARIO ---
+    draw_field("Operario", pesaje_data.get('operario', '-'), col1_x, y)
+    y -= line_height + 4
+
+    # --- FIRMAS ---
+    c.setFont("Helvetica", font_small)
+    firma_width = width / 2 - 20
+    c.line(x + 10, y, x + 10 + firma_width, y)
+    c.line(x + width / 2 + 10, y, x + width / 2 + 10 + firma_width, y)
+    y -= 8
+    c.drawCentredString(x + 10 + firma_width / 2, y, "Firma Chofer")
+    c.drawCentredString(x + width / 2 + 10 + firma_width / 2, y, "Firma Operario")
+
+
 def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -> BytesIO:
     """
     Genera un PDF con el ticket de pesaje/control de pesada

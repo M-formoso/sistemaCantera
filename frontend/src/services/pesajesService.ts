@@ -147,9 +147,13 @@ export const pesajesService = {
 
   /**
    * Descarga el ticket PDF de un pesaje
+   * @param id - ID del pesaje
+   * @param numeroPesaje - Número de pesaje para el nombre del archivo
+   * @param copias - Número de copias: 1=original, 2=duplicado, 3=triplicado
    */
-  async downloadTicketPDF(id: string, numeroPesaje: number): Promise<void> {
+  async downloadTicketPDF(id: string, numeroPesaje: number, copias: 1 | 2 | 3 = 1): Promise<void> {
     const response = await api.get<Blob>(`/pesajes/${id}/ticket-pdf`, {
+      params: { copias },
       responseType: 'blob',
     })
 

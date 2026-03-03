@@ -96,6 +96,9 @@ export default function NuevoPesajePage() {
   const [leyendoBalanza, setLeyendoBalanza] = useState<'bruto' | 'tara' | null>(null)
   const [balanzaError, setBalanzaError] = useState<string | null>(null)
 
+  // Estado para copias del ticket PDF
+  const [copiasTicket, setCopiasTicket] = useState<1 | 2 | 3>(1)
+
   // Queries
   const { data: camiones = [] } = useQuery({
     queryKey: ['camiones'],
@@ -386,7 +389,7 @@ export default function NuevoPesajePage() {
   const handleDownloadPDF = async () => {
     if (!createdPesaje) return
     try {
-      await pesajesService.downloadTicketPDF(createdPesaje.id, createdPesaje.numero_pesaje)
+      await pesajesService.downloadTicketPDF(createdPesaje.id, createdPesaje.numero_pesaje, copiasTicket)
     } catch {
       alert('Error al descargar el ticket PDF')
     }
@@ -491,10 +494,31 @@ export default function NuevoPesajePage() {
 
             <div className="flex flex-col gap-3">
               {esCompletado && (
-                <Button onClick={handleDownloadPDF} className="w-full bg-green-600 hover:bg-green-700">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir Ticket PDF
-                </Button>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-sm text-gray-600">Copias:</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setCopiasTicket(n as 1 | 2 | 3)}
+                          className={`px-3 py-1 text-sm rounded-md border transition-colors ${
+                            copiasTicket === n
+                              ? 'bg-green-600 text-white border-green-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {n === 1 ? 'Simple' : n === 2 ? 'Duplicado' : 'Triplicado'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Button onClick={handleDownloadPDF} className="w-full bg-green-600 hover:bg-green-700">
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir Ticket PDF
+                  </Button>
+                </div>
               )}
               <Button
                 variant="outline"

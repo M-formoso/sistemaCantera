@@ -227,6 +227,7 @@ async def obtener_estadisticas_periodo(
 @router.get("/{pesaje_id}/ticket-pdf")
 async def descargar_ticket_pdf(
     pesaje_id: UUID,
+    copias: int = Query(1, ge=1, le=3, description="Número de copias: 1=original, 2=duplicado, 3=triplicado"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
@@ -238,6 +239,9 @@ async def descargar_ticket_pdf(
     - Pesos (bruto, tara, neto)
     - Datos del producto y destino
     - Fecha, hora y operario
+
+    Parámetros:
+    - copias: 1 = solo original, 2 = original + duplicado, 3 = original + duplicado + triplicado
     """
     pesaje = pesaje_service.obtener_por_id(db, pesaje_id)
 
@@ -247,29 +251,43 @@ async def descargar_ticket_pdf(
             detail="Pesaje no encontrado"
         )
 
+    # Obtener patente (propia o externa)
+    patente = None
+    if pesaje.camion:
+        patente = pesaje.camion.patente
+    elif pesaje.patente_externa:
+        patente = pesaje.patente_externa
+
+    # Obtener nombre del cliente
+    cliente_nombre = pesaje.cliente_nombre
+    if pesaje.cliente:
+        cliente_nombre = pesaje.cliente.nombre
+
+    # Obtener nombre del transportista
+    transportista_nombre = pesaje.transportista
+    if pesaje.transportista_empresa:
+        transportista_nombre = pesaje.transportista_empresa.nombre
+
     # Preparar datos para el PDF
     pesaje_data = {
         "numero_pesaje": pesaje.numero_pesaje,
         "fecha": pesaje.fecha,
-        "camion_patente": pesaje.camion.patente if pesaje.camion else None,
+        "camion_patente": patente,
         "acoplado": pesaje.acoplado,
-        "transportista": pesaje.transportista,
-        "remitente": pesaje.remitente,
-        "cliente_destino": pesaje.cliente_destino,
-        "producto": pesaje.producto,
+        "transportista": transportista_nombre,
+        "cliente_destino": cliente_nombre,
         "material": pesaje.material,
-        "numero_guia": pesaje.numero_guia,
         "chofer": pesaje.chofer,
-        "peso_bruto": float(pesaje.peso_bruto),
-        "peso_tara": float(pesaje.peso_tara),
-        "peso_neto": float(pesaje.peso_neto),
+        "peso_bruto": float(pesaje.peso_bruto) if pesaje.peso_bruto else 0,
+        "peso_tara": float(pesaje.peso_tara) if pesaje.peso_tara else 0,
+        "peso_neto": float(pesaje.peso_neto) if pesaje.peso_neto else 0,
         "operario": pesaje.operario,
         "observaciones": pesaje.observaciones,
     }
 
-    # Generar PDF
-    from app.tasks.reportes import generar_ticket_pesaje_pdf
-    pdf_buffer = generar_ticket_pesaje_pdf(pesaje_data)
+    # Generar PDF con las copias solicitadas
+    from app.tasks.reportes import generar_ticket_pesaje_pdf_multiple
+    pdf_buffer = generar_ticket_pesaje_pdf_multiple(pesaje_data, copias)
 
     # Nombre del archivo
     filename = f"ticket_pesaje_{pesaje.numero_pesaje}.pdf"
