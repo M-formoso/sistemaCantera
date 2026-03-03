@@ -83,8 +83,8 @@ def crear(db: Session, camion_data: CamionCreate) -> Camion:
     Raises:
         HTTPException: Si la patente ya existe
     """
-    # Verificar que la patente no exista
-    if obtener_por_patente(db, camion_data.patente):
+    # Verificar que la patente no exista (solo si tiene patente)
+    if camion_data.patente and obtener_por_patente(db, camion_data.patente):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ya existe un camión con la patente {camion_data.patente}"
