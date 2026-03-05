@@ -185,9 +185,11 @@ async def actualizar_pesaje(
 
     **Requiere rol:** Administrador u Operador
 
-    NOTA: No se puede editar si ya tiene remito generado
+    NOTA: Si ya tiene remito generado:
+    - Administradores pueden editar todo
+    - Otros usuarios solo pueden editar precio, importe y observaciones
     """
-    return pesaje_service.actualizar(db, pesaje_id, pesaje_data)
+    return pesaje_service.actualizar(db, pesaje_id, pesaje_data, current_user)
 
 
 @router.delete("/{pesaje_id}")

@@ -336,15 +336,19 @@ def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) ->
     return db_remito
 
 
-def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaje:
+def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario = None) -> Pesaje:
     """
     Actualiza un pesaje existente
 
     Recalcula peso neto si se actualizan tara o bruto
     Recalcula importe_total si se actualiza precio_unitario
 
-    Nota: Si ya tiene remito generado, solo permite modificar precio_unitario e importe_total
+    Nota: Si ya tiene remito generado:
+    - Administradores pueden editar todo
+    - Otros usuarios solo pueden modificar precio_unitario, importe_total y observaciones
     """
+    from app.models.usuario import RolEnum
+
     db_pesaje = obtener_por_id(db, pesaje_id)
 
     if not db_pesaje:
@@ -355,8 +359,11 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaj
 
     update_data = pesaje_data.model_dump(exclude_unset=True)
 
-    # Si ya tiene remito generado, solo permitir edición de precio e importe
-    if db_pesaje.remito_generado:
+    # Verificar si el usuario es administrador
+    es_admin = usuario and usuario.rol == RolEnum.ADMINISTRADOR
+
+    # Si ya tiene remito generado y NO es admin, restringir campos
+    if db_pesaje.remito_generado and not es_admin:
         campos_permitidos = {'precio_unitario', 'importe_total', 'observaciones'}
         campos_no_permitidos = set(update_data.keys()) - campos_permitidos
 
