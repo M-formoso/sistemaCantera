@@ -395,6 +395,30 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         peso_toneladas = db_pesaje.peso_neto / Decimal("1000")
         db_pesaje.importe_total = peso_toneladas * db_pesaje.precio_unitario
 
+    # Si tiene remito asociado, actualizarlo con los nuevos datos del pesaje
+    if db_pesaje.remito:
+        remito = db_pesaje.remito
+
+        # Actualizar datos del remito que vienen del pesaje
+        remito.peso_neto = db_pesaje.peso_neto
+        remito.producto = db_pesaje.material or remito.producto
+        remito.observaciones = db_pesaje.observaciones
+
+        # Actualizar cliente
+        if db_pesaje.cliente:
+            remito.cliente = db_pesaje.cliente.nombre
+        elif db_pesaje.cliente_nombre:
+            remito.cliente = db_pesaje.cliente_nombre
+
+        # Actualizar patente del camión
+        if db_pesaje.camion:
+            remito.camion_patente = db_pesaje.camion.patente
+        elif db_pesaje.patente_externa:
+            remito.camion_patente = db_pesaje.patente_externa
+
+        # Actualizar chofer
+        remito.chofer = db_pesaje.chofer
+
     db.commit()
     db.refresh(db_pesaje)
 
