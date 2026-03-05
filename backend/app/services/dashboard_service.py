@@ -37,7 +37,7 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
     ).all()
 
     total_pesajes = len(pesajes_hoy)
-    total_kg = sum(p.peso_neto for p in pesajes_hoy)
+    total_kg = sum((p.peso_neto or Decimal("0")) for p in pesajes_hoy)
     total_toneladas = total_kg / Decimal("1000")
 
     # ===== NIVEL DE COMBUSTIBLE =====
@@ -189,7 +189,7 @@ def obtener_estadisticas_mes(db: Session) -> Dict[str, Any]:
     ).all()
 
     total_pesajes_mes = len(pesajes_mes)
-    total_kg_mes = sum(p.peso_neto for p in pesajes_mes)
+    total_kg_mes = sum((p.peso_neto or Decimal("0")) for p in pesajes_mes)
     total_toneladas_mes = total_kg_mes / Decimal("1000")
 
     # Combustible del mes
@@ -198,7 +198,7 @@ def obtener_estadisticas_mes(db: Session) -> Dict[str, Any]:
         func.date(SuministroCombustible.fecha) >= primer_dia_mes
     ).all()
 
-    total_combustible_mes = sum(s.litros for s in suministros_mes)
+    total_combustible_mes = sum((s.litros or Decimal("0")) for s in suministros_mes)
 
     # Servicios del mes
     servicios_mes = db.query(Servicio).filter(
@@ -206,7 +206,7 @@ def obtener_estadisticas_mes(db: Session) -> Dict[str, Any]:
     ).all()
 
     total_servicios_mes = len(servicios_mes)
-    costo_total_servicios = sum(s.costo_total for s in servicios_mes)
+    costo_total_servicios = sum((s.costo_total or Decimal("0")) for s in servicios_mes)
 
     return {
         "total_pesajes_mes": total_pesajes_mes,
