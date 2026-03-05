@@ -341,6 +341,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaj
     Actualiza un pesaje existente
 
     Recalcula peso neto si se actualizan tara o bruto
+    Recalcula importe_total si se actualiza precio_unitario
+
+    Nota: Si ya tiene remito generado, solo permite modificar precio_unitario e importe_total
     """
     db_pesaje = obtener_por_id(db, pesaje_id)
 
@@ -350,29 +353,40 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate) -> Pesaj
             detail="Pesaje no encontrado"
         )
 
-    # Si ya tiene remito generado, no permitir edición
-    if db_pesaje.remito_generado:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se puede editar un pesaje que ya tiene remito generado"
-        )
-
     update_data = pesaje_data.model_dump(exclude_unset=True)
+
+    # Si ya tiene remito generado, solo permitir edición de precio e importe
+    if db_pesaje.remito_generado:
+        campos_permitidos = {'precio_unitario', 'importe_total', 'observaciones'}
+        campos_no_permitidos = set(update_data.keys()) - campos_permitidos
+
+        if campos_no_permitidos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Solo se puede modificar precio, importe y observaciones en pesajes con remito. Campos no permitidos: {', '.join(campos_no_permitidos)}"
+            )
 
     # Aplicar actualizaciones
     for field, value in update_data.items():
         setattr(db_pesaje, field, value)
 
-    # Recalcular peso neto
-    db_pesaje.peso_neto = db_pesaje.peso_bruto - db_pesaje.peso_tara
+    # Recalcular peso neto si se modificaron los pesos
+    if db_pesaje.peso_bruto and db_pesaje.peso_tara:
+        db_pesaje.peso_neto = db_pesaje.peso_bruto - db_pesaje.peso_tara
 
-    # Validar pesos
-    if db_pesaje.peso_bruto <= db_pesaje.peso_tara:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El peso bruto debe ser mayor que el peso tara"
-        )
+        # Validar pesos
+        if db_pesaje.peso_bruto <= db_pesaje.peso_tara:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El peso bruto debe ser mayor que el peso tara"
+            )
+
+    # Recalcular importe_total si se actualizó precio_unitario
+    if 'precio_unitario' in update_data and db_pesaje.precio_unitario and db_pesaje.peso_neto:
+        # Convertir peso neto a toneladas y calcular importe
+        peso_toneladas = db_pesaje.peso_neto / Decimal("1000")
+        db_pesaje.importe_total = peso_toneladas * db_pesaje.precio_unitario
 
     db.commit()
     db.refresh(db_pesaje)
