@@ -214,83 +214,105 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
     """
     buffer = BytesIO()
 
-    # Crear documento PDF
+    # Crear documento PDF con márgenes más amplios
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=15*mm,
-        leftMargin=15*mm,
-        topMargin=10*mm,
-        bottomMargin=10*mm
+        rightMargin=20*mm,
+        leftMargin=20*mm,
+        topMargin=15*mm,
+        bottomMargin=15*mm
     )
 
-    # Estilos
+    # Estilos con tipografía más grande
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
         'TitleStyle',
         parent=styles['Heading1'],
-        fontSize=14,
-        alignment=TA_CENTER,
+        fontSize=18,
+        fontName='Helvetica-Bold',
+        alignment=TA_LEFT,
         spaceAfter=2*mm
     )
 
     subtitle_style = ParagraphStyle(
         'SubtitleStyle',
         parent=styles['Normal'],
-        fontSize=9,
-        alignment=TA_CENTER,
-        spaceAfter=2*mm
+        fontSize=11,
+        alignment=TA_LEFT,
+        spaceAfter=1*mm,
+        textColor=colors.HexColor('#444444')
     )
 
     header_style = ParagraphStyle(
         'HeaderStyle',
         parent=styles['Heading2'],
-        fontSize=14,
+        fontSize=16,
+        fontName='Helvetica-Bold',
         alignment=TA_CENTER,
-        spaceBefore=3*mm,
-        spaceAfter=4*mm,
+        spaceBefore=8*mm,
+        spaceAfter=8*mm,
         textColor=colors.HexColor('#1a1a1a')
     )
 
     normal_style = ParagraphStyle(
         'NormalStyle',
         parent=styles['Normal'],
-        fontSize=9,
-        leading=12
+        fontSize=11,
+        leading=14
     )
 
     # Estilo para tipo de copia (Original/Duplicado/Triplicado)
     tipo_copia_style = ParagraphStyle(
         'TipoCopiaStyle',
         parent=styles['Normal'],
-        fontSize=11,
+        fontSize=12,
         fontName='Helvetica-Bold',
         alignment=TA_RIGHT,
         textColor=colors.HexColor('#666666'),
-        spaceAfter=3*mm
     )
 
     elements = []
 
-    # Tipo de copia en la esquina superior derecha
-    tipo_label = tipo_copia.upper()
-    elements.append(Paragraph(tipo_label, tipo_copia_style))
+    # ===== ENCABEZADO CON LOGO A LA IZQUIERDA =====
+    # Crear tabla para logo + info empresa + tipo copia
+    header_data = []
 
-    # Logo más ancho
+    logo_cell = ""
     if os.path.exists(LOGO_PATH):
         try:
-            logo = Image(LOGO_PATH, width=120*mm, height=40*mm, kind='proportional')
-            logo.hAlign = 'CENTER'
-            elements.append(logo)
-            elements.append(Spacer(1, 2*mm))
+            logo = Image(LOGO_PATH, width=45*mm, height=35*mm, kind='proportional')
+            logo_cell = logo
         except Exception as e:
             print(f"Error al cargar logo: {e}")
 
-    # Encabezado
-    elements.append(Paragraph("Canteras La Rufina – TBF SRL", title_style))
-    elements.append(Paragraph("Ruta C45 – Km 11 – Falda del Carmen", subtitle_style))
-    elements.append(Paragraph("Tel: 351 537-2741", subtitle_style))
+    # Info de empresa
+    empresa_info = Paragraph(
+        "<b>Canteras La Rufina – TBF SRL</b><br/>"
+        "<font size='10'>Ruta C45 – Km 11 – Falda del Carmen</font><br/>"
+        "<font size='10'>Tel: 351 537-2741</font>",
+        ParagraphStyle('EmpresaInfo', parent=styles['Normal'], fontSize=14, leading=18)
+    )
+
+    # Tipo de copia
+    tipo_label = tipo_copia.upper()
+    tipo_cell = Paragraph(f"<b>{tipo_label}</b>", tipo_copia_style)
+
+    header_table = Table(
+        [[logo_cell, empresa_info, tipo_cell]],
+        colWidths=[50*mm, 85*mm, 35*mm]
+    )
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 5*mm))
 
     # Título principal
     elements.append(Paragraph("CONTROL DE PESADA", header_style))
@@ -315,64 +337,64 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
     peso_neto = pesaje_data.get('peso_neto', 0)
 
     # ===== TABLA PRINCIPAL CON DOS COLUMNAS =====
-    # Ancho total disponible: 180mm (A4 - márgenes)
-    col_width = 90*mm
+    # Ancho total disponible: 170mm (A4 - márgenes de 20mm cada lado)
+    col_width = 85*mm
 
-    # Datos organizados en dos columnas
+    # Datos organizados en dos columnas con fuente más grande
     main_data = [
         # Fila 1: Ticket y Fecha
         [
             Table([['Ticket:', str(pesaje_data.get('numero_pesaje', '-'))]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Fecha:', fecha.strftime('%d/%m/%Y')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
         # Fila 2: Camión y Hora
         [
             Table([['Camión:', str(pesaje_data.get('camion_patente', '-'))]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Hora:', fecha.strftime('%H:%M:%S')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
         # Fila 3: Acoplado y Chofer
         [
             Table([['Acoplado:', str(pesaje_data.get('acoplado', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Chofer:', str(pesaje_data.get('chofer', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
         # Fila 4: Transportista y Remitente
         [
             Table([['Transportista:', str(pesaje_data.get('transportista', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Remitente:', str(pesaje_data.get('remitente', 'LA RUFINA') or 'LA RUFINA')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
         # Fila 5: Destinatario y Producto
         [
             Table([['Destinatario:', str(pesaje_data.get('cliente_destino', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Producto:', str(pesaje_data.get('producto', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
         # Fila 6: Material y Nro. Guía
         [
             Table([['Material:', str(pesaje_data.get('material', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             Table([['Nro. Guía:', str(pesaje_data.get('numero_guia', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
         ],
     ]
 
-    # Aplicar estilos a las sub-tablas
+    # Aplicar estilos a las sub-tablas con fuente más grande
     cell_style = TableStyle([
         ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, 0), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
         ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
         ('ALIGN', (1, 0), (1, 0), 'LEFT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-        ('TOPPADDING', (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
     ])
 
     for row in main_data:
@@ -381,32 +403,34 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
 
     main_table = Table(main_data, colWidths=[col_width, col_width])
     main_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(main_table)
-    elements.append(Spacer(1, 5*mm))
+    elements.append(Spacer(1, 8*mm))
 
     # ===== SECCIÓN DE PESOS (centrada, destacada) =====
     pesos_header = ParagraphStyle(
         'PesosHeader',
         parent=styles['Heading3'],
-        fontSize=11,
+        fontSize=14,
+        fontName='Helvetica-Bold',
         alignment=TA_CENTER,
-        spaceBefore=2*mm,
-        spaceAfter=3*mm,
+        spaceBefore=4*mm,
+        spaceAfter=5*mm,
         textColor=colors.HexColor('#333333')
     )
     elements.append(Paragraph("PESOS", pesos_header))
 
-    # Pesos en una fila horizontal
+    # Pesos en una fila horizontal con fuente más grande
     pesos_data = [
         ['Bruto:', format_peso(peso_bruto), 'Tara:', format_peso(peso_tara), 'Neto:', format_peso(peso_neto)],
     ]
 
-    pesos_table = Table(pesos_data, colWidths=[20*mm, 40*mm, 20*mm, 40*mm, 20*mm, 40*mm])
+    pesos_table = Table(pesos_data, colWidths=[22*mm, 38*mm, 22*mm, 38*mm, 22*mm, 38*mm])
     pesos_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
         ('FONTNAME', (1, 0), (1, 0), 'Helvetica'),
@@ -414,8 +438,8 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
         ('FONTNAME', (3, 0), (3, 0), 'Helvetica'),
         ('FONTNAME', (4, 0), (4, 0), 'Helvetica-Bold'),
         ('FONTNAME', (5, 0), (5, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 11),
-        ('FONTSIZE', (4, 0), (5, 0), 13),
+        ('FONTSIZE', (0, 0), (-1, -1), 13),
+        ('FONTSIZE', (4, 0), (5, 0), 16),
         ('TEXTCOLOR', (5, 0), (5, 0), colors.HexColor('#006600')),
         ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
         ('ALIGN', (1, 0), (1, 0), 'LEFT'),
@@ -423,23 +447,33 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
         ('ALIGN', (3, 0), (3, 0), 'LEFT'),
         ('ALIGN', (4, 0), (4, 0), 'RIGHT'),
         ('ALIGN', (5, 0), (5, 0), 'LEFT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cccccc')),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f9f9f9')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOX', (0, 0), (-1, -1), 1.5, colors.HexColor('#aaaaaa')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f5f5f5')),
     ]))
     elements.append(pesos_table)
-    elements.append(Spacer(1, 4*mm))
+    elements.append(Spacer(1, 8*mm))
 
     # ===== OPERARIO =====
+    operario_style = TableStyle([
+        ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, 0), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('ALIGN', (0, 0), (0, 0), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ])
+
     operario_data = [
         [
             Table([['Operario:', str(pesaje_data.get('operario', '-') or '-')]],
-                  colWidths=[25*mm, 60*mm]),
+                  colWidths=[32*mm, 50*mm]),
             '',
         ],
     ]
-    operario_data[0][0].setStyle(cell_style)
+    operario_data[0][0].setStyle(operario_style)
 
     operario_table = Table(operario_data, colWidths=[col_width, col_width])
     operario_table.setStyle(TableStyle([
@@ -448,7 +482,7 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
     ]))
     elements.append(operario_table)
-    elements.append(Spacer(1, 3*mm))
+    elements.append(Spacer(1, 5*mm))
 
     # Observaciones
     observaciones = pesaje_data.get('observaciones', '')
@@ -456,36 +490,36 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
         obs_style = ParagraphStyle(
             'ObsTitle',
             parent=styles['Normal'],
-            fontSize=9,
+            fontSize=11,
             fontName='Helvetica-Bold',
-            spaceAfter=2*mm,
+            spaceAfter=3*mm,
         )
         elements.append(Paragraph("Observaciones:", obs_style))
         elements.append(Paragraph(str(observaciones), normal_style))
-        elements.append(Spacer(1, 5*mm))
+        elements.append(Spacer(1, 8*mm))
 
     # ===== LÍNEAS PARA FIRMA =====
-    elements.append(Spacer(1, 10*mm))
+    elements.append(Spacer(1, 15*mm))
     firma_data = [
-        ['_' * 35, '_' * 35],
+        ['_' * 40, '_' * 40],
         ['Firma Chofer', 'Firma Operario'],
     ]
 
     firma_table = Table(firma_data, colWidths=[85*mm, 85*mm])
     firma_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, 1), 8),
-        ('TOPPADDING', (0, 1), (-1, 1), 2),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, 1), 10),
+        ('TOPPADDING', (0, 1), (-1, 1), 5),
     ]))
     elements.append(firma_table)
 
     # Pie de página
-    elements.append(Spacer(1, 8*mm))
+    elements.append(Spacer(1, 15*mm))
     footer_style = ParagraphStyle(
         'FooterStyle',
         parent=styles['Normal'],
-        fontSize=7,
+        fontSize=9,
         alignment=TA_CENTER,
         textColor=colors.gray
     )
