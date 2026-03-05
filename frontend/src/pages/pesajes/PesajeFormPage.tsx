@@ -15,6 +15,7 @@ import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { balanzaService } from '@/services/balanzaService'
 import { formatNumber } from '@/lib/utils'
 import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 // Lista de materiales disponibles
 const MATERIALES_DISPONIBLES = [
@@ -83,6 +84,7 @@ export default function PesajeFormPage() {
   const { id } = useParams()
   const queryClient = useQueryClient()
   const isEditing = !!id
+  const isAdmin = useIsAdmin()
 
   const [pesoNeto, setPesoNeto] = useState(0)
   const [importeCalculado, setImporteCalculado] = useState(0)
@@ -456,7 +458,8 @@ export default function PesajeFormPage() {
                   {formatNumber(createdPesaje.peso_neto || 0)} kg ({formatNumber((createdPesaje.peso_neto || 0) / 1000, 2)} t)
                 </span>
               </div>
-              {createdPesaje.importe_total && createdPesaje.importe_total > 0 && (
+              {/* Solo mostrar importe a administradores */}
+              {isAdmin && createdPesaje.importe_total && createdPesaje.importe_total > 0 && (
                 <>
                   <div className="border-t pt-2 mt-2">
                     <div className="flex justify-between text-sm">
@@ -934,51 +937,53 @@ export default function PesajeFormPage() {
                   </div>
                 </div>
 
-                {/* Sección: Importe */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Importe (Opcional)
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-3">
-                    Si completa el precio por tonelada, se generará automáticamente un ingreso en Finanzas.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Precio por tonelada */}
-                    <div className="space-y-2">
-                      <label htmlFor="precio_unitario" className="text-sm font-medium">
-                        Precio por Tonelada ($)
-                      </label>
-                      <Input
-                        id="precio_unitario"
-                        type="number"
-                        step="0.01"
-                        {...register('precio_unitario', { valueAsNumber: true })}
-                        placeholder="5000"
-                      />
-                    </div>
+                {/* Sección: Importe - Solo visible para administradores */}
+                {isAdmin && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Importe (Opcional)
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Si completa el precio por tonelada, se generará automáticamente un ingreso en Finanzas.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Precio por tonelada */}
+                      <div className="space-y-2">
+                        <label htmlFor="precio_unitario" className="text-sm font-medium">
+                          Precio por Tonelada ($)
+                        </label>
+                        <Input
+                          id="precio_unitario"
+                          type="number"
+                          step="0.01"
+                          {...register('precio_unitario', { valueAsNumber: true })}
+                          placeholder="5000"
+                        />
+                      </div>
 
-                    {/* Importe total */}
-                    <div className="space-y-2">
-                      <label htmlFor="importe_total" className="text-sm font-medium">
-                        Importe Total ($)
-                      </label>
-                      <Input
-                        id="importe_total"
-                        type="number"
-                        step="0.01"
-                        {...register('importe_total', { valueAsNumber: true })}
-                        placeholder="Calculado automáticamente"
-                        className="bg-gray-50"
-                      />
-                      {importeCalculado > 0 && (
-                        <p className="text-xs text-green-600">
-                          Calculado: ${formatNumber(importeCalculado, 2)}
-                        </p>
-                      )}
+                      {/* Importe total */}
+                      <div className="space-y-2">
+                        <label htmlFor="importe_total" className="text-sm font-medium">
+                          Importe Total ($)
+                        </label>
+                        <Input
+                          id="importe_total"
+                          type="number"
+                          step="0.01"
+                          {...register('importe_total', { valueAsNumber: true })}
+                          placeholder="Calculado automáticamente"
+                          className="bg-gray-50"
+                        />
+                        {importeCalculado > 0 && (
+                          <p className="text-xs text-green-600">
+                            Calculado: ${formatNumber(importeCalculado, 2)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Observaciones */}
                 <div className="space-y-2">
@@ -1060,8 +1065,8 @@ export default function PesajeFormPage() {
                 </div>
               )}
 
-              {/* Sección de importe calculado */}
-              {importeCalculado > 0 && (
+              {/* Sección de importe calculado - Solo visible para administradores */}
+              {isAdmin && importeCalculado > 0 && (
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-center gap-2 mb-3">
                     <DollarSign className="h-4 w-4 text-green-600" />

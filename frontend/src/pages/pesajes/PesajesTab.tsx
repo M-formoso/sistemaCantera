@@ -224,7 +224,7 @@ export default function PesajesTab() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${isAdmin ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Pesajes</div>
@@ -247,17 +247,20 @@ export default function PesajesTab() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <DollarSign className="h-3 w-3" />
-              Ingresos por Pesajes
-            </div>
-            <div className="text-2xl font-bold text-blue-600">
-              ${formatNumber(totalIngresos, 2)}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Solo visible para administradores */}
+        {isAdmin && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                <DollarSign className="h-3 w-3" />
+                Ingresos por Pesajes
+              </div>
+              <div className="text-2xl font-bold text-blue-600">
+                ${formatNumber(totalIngresos, 2)}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tabla */}
