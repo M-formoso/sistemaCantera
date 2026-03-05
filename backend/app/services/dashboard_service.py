@@ -11,6 +11,7 @@ from app.models.pesaje import Pesaje
 from app.models.camion import Camion
 from app.models.repuesto import Repuesto
 from app.models.servicio import Servicio, EstadoServicioEnum
+from app.models.orden_entrega import OrdenEntrega, EstadoOrdenEntrega
 from app.services import combustible_service
 
 
@@ -74,24 +75,38 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         Repuesto.activo == True
     ).count()
 
-    # Servicios próximos (próximos 7 días)
+    # Servicios próximos (próximos 7 días) - incluir programados y en proceso
     proximos_7_dias = hoy + timedelta(days=7)
     servicios_proximos_count = db.query(Servicio).filter(
-        Servicio.estado == EstadoServicioEnum.PROGRAMADO,
+        Servicio.estado.in_([EstadoServicioEnum.PROGRAMADO, EstadoServicioEnum.EN_PROCESO]),
         Servicio.fecha >= hoy,
         Servicio.fecha <= proximos_7_dias
+    ).count()
+
+    # Órdenes de entrega pendientes (hoy y próximos días)
+    ordenes_pendientes_count = db.query(OrdenEntrega).filter(
+        OrdenEntrega.estado.in_([EstadoOrdenEntrega.pendiente.value, EstadoOrdenEntrega.en_proceso.value]),
+        OrdenEntrega.fecha_entrega >= hoy,
+        OrdenEntrega.fecha_entrega <= proximos_7_dias
     ).count()
 
     # Camiones que requieren servicio por kilometraje
     from app.services import camion_service
     camiones_requieren_servicio = camion_service.obtener_camiones_requieren_servicio(db)
 
-    # ===== SERVICIOS PRÓXIMOS (lista detallada) =====
+    # ===== SERVICIOS PRÓXIMOS (lista detallada) - incluir programados y en proceso =====
     servicios_proximos = db.query(Servicio).filter(
-        Servicio.estado == EstadoServicioEnum.PROGRAMADO,
+        Servicio.estado.in_([EstadoServicioEnum.PROGRAMADO, EstadoServicioEnum.EN_PROCESO]),
         Servicio.fecha >= hoy,
         Servicio.fecha <= proximos_7_dias
     ).order_by(Servicio.fecha).limit(5).all()
+
+    # ===== ÓRDENES DE ENTREGA PENDIENTES =====
+    ordenes_pendientes = db.query(OrdenEntrega).filter(
+        OrdenEntrega.estado.in_([EstadoOrdenEntrega.pendiente.value, EstadoOrdenEntrega.en_proceso.value]),
+        OrdenEntrega.fecha_entrega >= hoy,
+        OrdenEntrega.fecha_entrega <= proximos_7_dias
+    ).order_by(OrdenEntrega.fecha_entrega).limit(10).all()
 
     def get_equipo_identificador(equipo):
         """Obtiene identificador del equipo (patente o nombre)"""
@@ -109,9 +124,27 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
             "camion_patente": get_equipo_identificador(s.camion) if s.camion else "Sin equipo",
             "fecha": s.fecha.isoformat(),
             "tipo": get_tipo_value(s.tipo),
+            "estado": get_estado_value(s.estado),
             "descripcion": s.descripcion[:100] if s.descripcion else ""  # Truncar descripción
         }
         for s in servicios_proximos
+    ]
+
+    # Lista de órdenes de entrega pendientes
+    ordenes_pendientes_lista = [
+        {
+            "id": str(o.id),
+            "numero_orden": o.numero_orden,
+            "fecha_entrega": o.fecha_entrega.isoformat(),
+            "cliente": o.cliente.nombre if o.cliente else (o.cliente_nombre or "Sin cliente"),
+            "material": o.material,
+            "cantidad_cargas": o.cantidad_cargas,
+            "cargas_entregadas": o.cargas_entregadas,
+            "cargas_pendientes": o.cantidad_cargas - o.cargas_entregadas,
+            "estado": o.estado,
+            "solicitante": o.solicitante or "-"
+        }
+        for o in ordenes_pendientes
     ]
 
     # ===== ÚLTIMOS PESAJES =====
@@ -151,10 +184,12 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
         "alertas": {
             "repuestos_bajo_stock": repuestos_bajos,
             "servicios_proximos": servicios_proximos_count,
+            "ordenes_pendientes": ordenes_pendientes_count,
             "nivel_combustible_bajo": esta_bajo,
             "camiones_requieren_servicio": len(camiones_requieren_servicio)
         },
         "servicios_proximos": servicios_proximos_lista,
+        "ordenes_entrega_pendientes": ordenes_pendientes_lista,
         "ultimos_pesajes": ultimos_pesajes_lista,
         "camiones_requieren_servicio": [
             {
