@@ -89,13 +89,13 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     peso_neto = pesaje_data.get('peso_neto', 0)
 
     # Tamaños de fuente más grandes y legibles
-    font_title = 12
-    font_subtitle = 10
-    font_normal = 9
-    font_label = 8
-    font_small = 7
-    line_height = 14
-    section_spacing = 8
+    font_title = 14
+    font_subtitle = 12
+    font_normal = 11
+    font_label = 10
+    font_small = 9
+    line_height = 16
+    section_spacing = 10
 
     y = y_top - 8  # Empezar con más margen
 
@@ -112,23 +112,23 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
             print(f"Error al cargar logo: {e}")
 
     # Info empresa (al lado del logo)
-    c.setFont("Helvetica-Bold", font_title)
-    c.drawString(x + logo_width + 8, y - 6, "Canteras La Rufina")
-    c.setFont("Helvetica", font_small)
-    c.drawString(x + logo_width + 8, y - 16, "TBF SRL")
-    c.drawString(x + logo_width + 8, y - 25, "Ruta C45 - Km 11 - Falda del Carmen")
-    c.drawString(x + logo_width + 8, y - 34, "Tel: 351 537-2741")
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(x + logo_width + 10, y - 8, "Canteras La Rufina")
+    c.setFont("Helvetica", font_label)
+    c.drawString(x + logo_width + 10, y - 20, "TBF SRL")
+    c.drawString(x + logo_width + 10, y - 32, "Ruta C45 - Km 11 - Falda del Carmen")
+    c.drawString(x + logo_width + 10, y - 44, "Tel: 351 537-2741")
 
     # Tipo de copia (esquina derecha)
-    c.setFont("Helvetica-Bold", font_normal)
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.HexColor('#666666'))
-    c.drawRightString(x + width, y - 6, tipo_copia)
+    c.drawRightString(x + width, y - 8, tipo_copia)
     c.setFillColor(colors.black)
 
     y -= logo_height + section_spacing
 
     # ==================== TÍTULO ====================
-    c.setFont("Helvetica-Bold", font_title)
+    c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(x + width / 2, y, "CONTROL DE PESADA")
     y -= line_height + section_spacing
 
@@ -170,13 +170,13 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
 
     # ==================== SECCIÓN DE PESOS ====================
     # Recuadro destacado para pesos
-    peso_box_height = 28
+    peso_box_height = 34
     c.setStrokeColor(colors.HexColor('#999999'))
     c.setFillColor(colors.HexColor('#f0f0f0'))
     c.roundRect(x, y - peso_box_height, width, peso_box_height, 3, fill=1, stroke=1)
     c.setFillColor(colors.black)
 
-    peso_y = y - 10
+    peso_y = y - 12
     peso_section_width = width / 3
 
     # Bruto
@@ -185,7 +185,7 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     c.drawCentredString(x + peso_section_width / 2, peso_y, "BRUTO")
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", font_subtitle)
-    c.drawCentredString(x + peso_section_width / 2, peso_y - 12, format_peso(peso_bruto))
+    c.drawCentredString(x + peso_section_width / 2, peso_y - 14, format_peso(peso_bruto))
 
     # Tara
     c.setFont("Helvetica", font_label)
@@ -193,14 +193,14 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     c.drawCentredString(x + peso_section_width + peso_section_width / 2, peso_y, "TARA")
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", font_subtitle)
-    c.drawCentredString(x + peso_section_width + peso_section_width / 2, peso_y - 12, format_peso(peso_tara))
+    c.drawCentredString(x + peso_section_width + peso_section_width / 2, peso_y - 14, format_peso(peso_tara))
 
     # Neto (destacado en verde)
     c.setFont("Helvetica", font_label)
     c.setFillColor(colors.HexColor('#006600'))
     c.drawCentredString(x + 2 * peso_section_width + peso_section_width / 2, peso_y, "NETO")
-    c.setFont("Helvetica-Bold", 12)
-    c.drawCentredString(x + 2 * peso_section_width + peso_section_width / 2, peso_y - 12, format_peso(peso_neto))
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(x + 2 * peso_section_width + peso_section_width / 2, peso_y - 14, format_peso(peso_neto))
     c.setFillColor(colors.black)
 
     y -= peso_box_height + section_spacing

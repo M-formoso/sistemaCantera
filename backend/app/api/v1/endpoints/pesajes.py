@@ -270,10 +270,13 @@ async def descargar_ticket_pdf(
     if pesaje.transportista_empresa:
         transportista_nombre = pesaje.transportista_empresa.nombre
 
+    # Usar fecha_completado si existe (tiene la hora real), sino usar fecha
+    fecha_pesaje = pesaje.fecha_completado or pesaje.fecha
+
     # Preparar datos para el PDF
     pesaje_data = {
         "numero_pesaje": pesaje.numero_pesaje,
-        "fecha": pesaje.fecha,
+        "fecha": fecha_pesaje,
         "camion_patente": patente,
         "acoplado": pesaje.acoplado,
         "transportista": transportista_nombre,
