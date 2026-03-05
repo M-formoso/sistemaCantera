@@ -8,7 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
-from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin_or_operador, require_admin
 from app.models.usuario import Usuario
 from app.schemas.pesaje import (
     PesajeSchema, PesajeCreate, PesajeUpdate,
@@ -142,7 +142,7 @@ async def completar_pesaje(
 async def cancelar_pesaje_pendiente(
     pesaje_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Cancela un pesaje pendiente (elimina sin generar remito)
@@ -178,7 +178,7 @@ async def actualizar_pesaje(
     pesaje_id: UUID,
     pesaje_data: PesajeUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Actualiza un pesaje existente
@@ -196,7 +196,7 @@ async def actualizar_pesaje(
 async def eliminar_pesaje(
     pesaje_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Elimina un pesaje

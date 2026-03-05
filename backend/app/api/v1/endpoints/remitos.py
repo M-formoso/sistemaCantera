@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Literal
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin_or_operador, require_admin
 from app.models.usuario import Usuario
 from app.schemas.remito import RemitoSchema, RemitoCreate, RemitoFromPesaje
 from app.services import remito_service
@@ -86,7 +86,7 @@ async def obtener_remito(
 async def eliminar_remito(
     remito_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Elimina un remito

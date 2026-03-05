@@ -168,7 +168,7 @@ async def actualizar_camion_cliente(
     camion_id: UUID,
     camion_data: CamionClienteUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Actualiza un camión de cliente
@@ -182,7 +182,7 @@ async def actualizar_camion_cliente(
 async def eliminar_camion_cliente(
     camion_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Elimina (desactiva) un camión de cliente

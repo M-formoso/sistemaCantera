@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
-from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin_or_operador, require_admin
 from app.models.usuario import Usuario
 from app.schemas.orden_entrega import (
     OrdenEntregaSchema,
@@ -171,7 +171,7 @@ async def actualizar_orden(
     orden_id: UUID,
     orden: OrdenEntregaUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """Actualiza una orden de entrega"""
     orden_actualizada = orden_entrega_service.actualizar(db, orden_id, orden)
@@ -205,7 +205,7 @@ async def desasociar_pesaje(
     orden_id: UUID,
     pesaje_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """Desasocia un pesaje de la orden"""
     orden = orden_entrega_service.desasociar_pesaje(db, orden_id, pesaje_id)
@@ -253,7 +253,7 @@ async def completar_orden(
 async def eliminar_orden(
     orden_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """Elimina una orden de entrega"""
     return orden_entrega_service.eliminar(db, orden_id)

@@ -121,7 +121,7 @@ async def actualizar_movimiento(
     movimiento_id: UUID,
     movimiento_data: MovimientoFinancieroUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_active_user)
+    current_user: Usuario = Depends(require_admin)
 ):
     """Actualiza un movimiento"""
     actualizado = finanzas_service.actualizar_movimiento(db, movimiento_id, movimiento_data)

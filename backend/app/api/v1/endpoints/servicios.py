@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin_or_operador, require_admin
 from app.models.usuario import Usuario
 from app.models.servicio import EstadoServicioEnum
 from app.schemas.servicio import ServicioSchema, ServicioCreate, ServicioUpdate
@@ -99,7 +99,7 @@ async def actualizar_servicio(
     servicio_id: UUID,
     servicio_data: ServicioUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Actualiza un servicio existente
@@ -115,7 +115,7 @@ async def actualizar_servicio(
 async def eliminar_servicio(
     servicio_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_admin)
 ):
     """
     Elimina un servicio
