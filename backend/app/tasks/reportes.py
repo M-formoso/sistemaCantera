@@ -65,6 +65,7 @@ def generar_ticket_pesaje_pdf_multiple(pesaje_data: dict, num_copias: int = 1) -
 def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_top: float, height: float, width: float):
     """
     Dibuja un ticket compacto en la posición especificada.
+    Diseño mejorado con mejor espaciado y tipografía más legible.
     """
     from reportlab.lib.utils import ImageReader
 
@@ -87,118 +88,140 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     peso_tara = pesaje_data.get('peso_tara', 0)
     peso_neto = pesaje_data.get('peso_neto', 0)
 
-    # Tamaños de fuente según número de copias (más pequeño = más copias)
-    font_title = 10
-    font_normal = 7
-    font_small = 6
-    line_height = 10
+    # Tamaños de fuente más grandes y legibles
+    font_title = 12
+    font_subtitle = 10
+    font_normal = 9
+    font_label = 8
+    font_small = 7
+    line_height = 14
+    section_spacing = 8
 
-    y = y_top - 5  # Empezar un poco abajo del tope
+    y = y_top - 8  # Empezar con más margen
 
-    # --- LOGO (centrado arriba) ---
-    logo_height = 18 * mm
-    logo_width = 50 * mm
+    # ==================== ENCABEZADO ====================
+    # Logo a la izquierda, info empresa al centro, tipo copia a la derecha
+    logo_height = 20 * mm
+    logo_width = 35 * mm
+
     if os.path.exists(LOGO_PATH):
         try:
-            c.drawImage(LOGO_PATH, x + (width - logo_width) / 2, y - logo_height,
+            c.drawImage(LOGO_PATH, x, y - logo_height,
                        width=logo_width, height=logo_height, preserveAspectRatio=True, mask='auto')
-            y -= logo_height + 2
         except Exception as e:
             print(f"Error al cargar logo: {e}")
-            y -= 5
 
-    # --- TIPO DE COPIA (esquina superior derecha) ---
+    # Info empresa (al lado del logo)
+    c.setFont("Helvetica-Bold", font_title)
+    c.drawString(x + logo_width + 8, y - 6, "Canteras La Rufina")
+    c.setFont("Helvetica", font_small)
+    c.drawString(x + logo_width + 8, y - 16, "TBF SRL")
+    c.drawString(x + logo_width + 8, y - 25, "Ruta C45 - Km 11 - Falda del Carmen")
+    c.drawString(x + logo_width + 8, y - 34, "Tel: 351 537-2741")
+
+    # Tipo de copia (esquina derecha)
     c.setFont("Helvetica-Bold", font_normal)
-    c.setFillColor(colors.gray)
-    c.drawRightString(x + width, y, tipo_copia)
+    c.setFillColor(colors.HexColor('#666666'))
+    c.drawRightString(x + width, y - 6, tipo_copia)
     c.setFillColor(colors.black)
 
-    # --- ENCABEZADO ---
-    c.setFont("Helvetica-Bold", font_title)
-    c.drawCentredString(x + width / 2, y, "Canteras La Rufina - TBF SRL")
-    y -= line_height
+    y -= logo_height + section_spacing
 
-    c.setFont("Helvetica", font_small)
-    c.drawCentredString(x + width / 2, y, "Ruta C45 - Km 11 - Falda del Carmen | Tel: 351 537-2741")
-    y -= line_height + 2
-
-    # --- CONTROL DE PESADA ---
+    # ==================== TÍTULO ====================
     c.setFont("Helvetica-Bold", font_title)
     c.drawCentredString(x + width / 2, y, "CONTROL DE PESADA")
-    y -= line_height + 4
+    y -= line_height + section_spacing
 
-    # --- DATOS EN DOS COLUMNAS ---
-    col1_x = x
-    col2_x = x + width / 2
+    # ==================== DATOS PRINCIPALES ====================
+    col1_x = x + 5
+    col2_x = x + width / 2 + 5
+    label_width = 55
 
-    def draw_field(label, value, col_x, y_pos):
-        c.setFont("Helvetica-Bold", font_normal)
+    def draw_field(label, value, col_x, y_pos, bold_value=False):
+        c.setFont("Helvetica-Bold", font_label)
+        c.setFillColor(colors.HexColor('#555555'))
         c.drawString(col_x, y_pos, f"{label}:")
-        c.setFont("Helvetica", font_normal)
-        c.drawString(col_x + 45, y_pos, str(value or "-"))
+        c.setFillColor(colors.black)
+        if bold_value:
+            c.setFont("Helvetica-Bold", font_normal)
+        else:
+            c.setFont("Helvetica", font_normal)
+        c.drawString(col_x + label_width, y_pos, str(value or "-"))
 
-    # Fila 1
-    draw_field("Ticket", pesaje_data.get('numero_pesaje', '-'), col1_x, y)
-    draw_field("Fecha", fecha.strftime('%d/%m/%Y %H:%M'), col2_x, y)
+    # Fila 1: Ticket y Fecha/Hora
+    draw_field("Ticket", f"#{pesaje_data.get('numero_pesaje', '-')}", col1_x, y, bold_value=True)
+    draw_field("Fecha", fecha.strftime('%d/%m/%Y  %H:%M'), col2_x, y)
     y -= line_height
 
-    # Fila 2
-    draw_field("Patente", pesaje_data.get('camion_patente', '-'), col1_x, y)
+    # Fila 2: Patente y Chofer
+    draw_field("Patente", pesaje_data.get('camion_patente', '-'), col1_x, y, bold_value=True)
     draw_field("Chofer", pesaje_data.get('chofer', '-'), col2_x, y)
     y -= line_height
 
-    # Fila 3
+    # Fila 3: Acoplado y Transportista
     draw_field("Acoplado", pesaje_data.get('acoplado', '-'), col1_x, y)
     draw_field("Transportista", pesaje_data.get('transportista', '-'), col2_x, y)
     y -= line_height
 
-    # Fila 4
+    # Fila 4: Cliente y Material
     draw_field("Cliente", pesaje_data.get('cliente_destino', '-'), col1_x, y)
-    draw_field("Material", pesaje_data.get('material', '-'), col2_x, y)
-    y -= line_height + 4
+    draw_field("Material", pesaje_data.get('material', '-'), col2_x, y, bold_value=True)
+    y -= line_height + section_spacing
 
-    # --- PESOS (destacados) ---
-    c.setStrokeColor(colors.HexColor('#cccccc'))
-    c.setFillColor(colors.HexColor('#f5f5f5'))
-    peso_box_height = line_height + 6
-    c.rect(x, y - peso_box_height + 4, width, peso_box_height, fill=1, stroke=1)
+    # ==================== SECCIÓN DE PESOS ====================
+    # Recuadro destacado para pesos
+    peso_box_height = 28
+    c.setStrokeColor(colors.HexColor('#999999'))
+    c.setFillColor(colors.HexColor('#f0f0f0'))
+    c.roundRect(x, y - peso_box_height, width, peso_box_height, 3, fill=1, stroke=1)
     c.setFillColor(colors.black)
 
-    c.setFont("Helvetica-Bold", font_normal)
-    peso_y = y - 2
+    peso_y = y - 10
+    peso_section_width = width / 3
 
     # Bruto
-    c.drawString(x + 5, peso_y, "Bruto:")
-    c.setFont("Helvetica", font_normal)
-    c.drawString(x + 35, peso_y, format_peso(peso_bruto))
+    c.setFont("Helvetica", font_label)
+    c.setFillColor(colors.HexColor('#555555'))
+    c.drawCentredString(x + peso_section_width / 2, peso_y, "BRUTO")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", font_subtitle)
+    c.drawCentredString(x + peso_section_width / 2, peso_y - 12, format_peso(peso_bruto))
 
     # Tara
-    c.setFont("Helvetica-Bold", font_normal)
-    c.drawString(x + width / 3, peso_y, "Tara:")
-    c.setFont("Helvetica", font_normal)
-    c.drawString(x + width / 3 + 25, peso_y, format_peso(peso_tara))
+    c.setFont("Helvetica", font_label)
+    c.setFillColor(colors.HexColor('#555555'))
+    c.drawCentredString(x + peso_section_width + peso_section_width / 2, peso_y, "TARA")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", font_subtitle)
+    c.drawCentredString(x + peso_section_width + peso_section_width / 2, peso_y - 12, format_peso(peso_tara))
 
-    # Neto (destacado)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(x + 2 * width / 3, peso_y, "Neto:")
+    # Neto (destacado en verde)
+    c.setFont("Helvetica", font_label)
     c.setFillColor(colors.HexColor('#006600'))
-    c.drawString(x + 2 * width / 3 + 28, peso_y, format_peso(peso_neto))
+    c.drawCentredString(x + 2 * peso_section_width + peso_section_width / 2, peso_y, "NETO")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(x + 2 * peso_section_width + peso_section_width / 2, peso_y - 12, format_peso(peso_neto))
     c.setFillColor(colors.black)
 
-    y -= peso_box_height + 4
+    y -= peso_box_height + section_spacing
 
-    # --- OPERARIO ---
+    # ==================== OPERARIO ====================
     draw_field("Operario", pesaje_data.get('operario', '-'), col1_x, y)
-    y -= line_height + 4
+    y -= line_height + section_spacing + 4
 
-    # --- FIRMAS ---
+    # ==================== FIRMAS ====================
+    c.setStrokeColor(colors.black)
+    firma_width = width / 2 - 30
+
+    # Línea firma chofer
+    c.line(x + 15, y, x + 15 + firma_width, y)
+    # Línea firma operario
+    c.line(x + width / 2 + 15, y, x + width / 2 + 15 + firma_width, y)
+
+    y -= 10
     c.setFont("Helvetica", font_small)
-    firma_width = width / 2 - 20
-    c.line(x + 10, y, x + 10 + firma_width, y)
-    c.line(x + width / 2 + 10, y, x + width / 2 + 10 + firma_width, y)
-    y -= 8
-    c.drawCentredString(x + 10 + firma_width / 2, y, "Firma Chofer")
-    c.drawCentredString(x + width / 2 + 10 + firma_width / 2, y, "Firma Operario")
+    c.drawCentredString(x + 15 + firma_width / 2, y, "Firma Chofer")
+    c.drawCentredString(x + width / 2 + 15 + firma_width / 2, y, "Firma Operario")
 
 
 def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -> BytesIO:
