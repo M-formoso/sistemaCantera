@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown,
-  X, ChevronDown, ChevronUp, Search
+  X, Search
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Pagination } from '@/components/ui/pagination'
 import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
 import { facturacionService } from '@/services/facturacionService'
@@ -19,7 +20,14 @@ export default function CuentaCorrienteTab() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [showAjusteModal, setShowAjusteModal] = useState(false)
   const [busqueda, setBusqueda] = useState('')
-  const [mostrarTodos, setMostrarTodos] = useState(false)
+
+  // Paginación de clientes
+  const [clientesPage, setClientesPage] = useState(1)
+  const [clientesPageSize, setClientesPageSize] = useState(10)
+
+  // Paginación de movimientos
+  const [movimientosPage, setMovimientosPage] = useState(1)
+  const [movimientosPageSize, setMovimientosPageSize] = useState(10)
 
   // Queries
   const { data: clientesConDeuda = [] } = useQuery({
@@ -48,10 +56,38 @@ export default function CuentaCorrienteTab() {
   const totalDeuda = clientesConDeuda.reduce((sum, c) => sum + c.saldo, 0)
 
   // Filtrar clientes
-  const clientesFiltrados = todosClientes.filter(c =>
-    c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (c.cuit && c.cuit.includes(busqueda))
-  )
+  const clientesFiltrados = useMemo(() => {
+    return todosClientes.filter(c =>
+      c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.cuit && c.cuit.includes(busqueda))
+    )
+  }, [todosClientes, busqueda])
+
+  // Paginar clientes
+  const clientesTotalPages = Math.ceil(clientesFiltrados.length / clientesPageSize)
+  const clientesPaginados = useMemo(() => {
+    const start = (clientesPage - 1) * clientesPageSize
+    return clientesFiltrados.slice(start, start + clientesPageSize)
+  }, [clientesFiltrados, clientesPage, clientesPageSize])
+
+  // Paginar movimientos
+  const movimientosTotalPages = Math.ceil(movimientos.length / movimientosPageSize)
+  const movimientosPaginados = useMemo(() => {
+    const start = (movimientosPage - 1) * movimientosPageSize
+    return movimientos.slice(start, start + movimientosPageSize)
+  }, [movimientos, movimientosPage, movimientosPageSize])
+
+  // Reset página cuando cambia búsqueda
+  const handleBusquedaChange = (value: string) => {
+    setBusqueda(value)
+    setClientesPage(1)
+  }
+
+  // Reset página movimientos cuando cambia cliente
+  const handleSelectCliente = (id: string) => {
+    setSelectedCliente(id)
+    setMovimientosPage(1)
+  }
 
   // Descargar PDF estado de cuenta
   const handleDescargarPDF = async () => {
@@ -106,7 +142,7 @@ export default function CuentaCorrienteTab() {
               <Input
                 placeholder="Buscar por nombre o CUIT..."
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={(e) => handleBusquedaChange(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -114,12 +150,12 @@ export default function CuentaCorrienteTab() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {clientesFiltrados.slice(0, mostrarTodos ? undefined : 10).map((cliente) => {
+            {clientesPaginados.map((cliente) => {
               const deuda = clientesConDeuda.find(c => c.id === cliente.id)
               return (
                 <button
                   key={cliente.id}
-                  onClick={() => setSelectedCliente(cliente.id)}
+                  onClick={() => handleSelectCliente(cliente.id)}
                   className={`p-3 rounded-lg text-left transition-all ${
                     selectedCliente === cliente.id
                       ? 'bg-blue-100 border-2 border-blue-500 shadow-md'
@@ -138,25 +174,18 @@ export default function CuentaCorrienteTab() {
               )
             })}
           </div>
-          {clientesFiltrados.length > 10 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMostrarTodos(!mostrarTodos)}
-              className="w-full mt-4"
-            >
-              {mostrarTodos ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-2" />
-                  Mostrar menos
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Ver todos ({clientesFiltrados.length})
-                </>
-              )}
-            </Button>
+          {clientesFiltrados.length > 0 && (
+            <Pagination
+              currentPage={clientesPage}
+              totalPages={clientesTotalPages}
+              totalItems={clientesFiltrados.length}
+              pageSize={clientesPageSize}
+              onPageChange={setClientesPage}
+              onPageSizeChange={(size) => {
+                setClientesPageSize(size)
+                setClientesPage(1)
+              }}
+            />
           )}
         </CardContent>
       </Card>
@@ -244,7 +273,7 @@ export default function CuentaCorrienteTab() {
                           </td>
                         </tr>
                       ) : (
-                        movimientos.map((mov) => (
+                        movimientosPaginados.map((mov) => (
                           <tr key={mov.id} className={mov.anulado ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}>
                             <td className="px-4 py-3 text-sm">{formatDate(mov.fecha)}</td>
                             <td className="px-4 py-3">
@@ -276,6 +305,19 @@ export default function CuentaCorrienteTab() {
                     </tbody>
                   </table>
                 </div>
+                {movimientos.length > 0 && (
+                  <Pagination
+                    currentPage={movimientosPage}
+                    totalPages={movimientosTotalPages}
+                    totalItems={movimientos.length}
+                    pageSize={movimientosPageSize}
+                    onPageChange={setMovimientosPage}
+                    onPageSizeChange={(size) => {
+                      setMovimientosPageSize(size)
+                      setMovimientosPage(1)
+                    }}
+                  />
+                )}
               </div>
             </div>
           </CardContent>

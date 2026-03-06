@@ -8,9 +8,10 @@ import {
   getSortedRowModel,
   SortingState,
   getFilteredRowModel,
+  getPaginationRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Building2, Plus, Pencil, Trash2, Truck, UserCheck, Car, X } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Truck, UserCheck, Car, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -377,13 +378,24 @@ export default function EmpresasPage() {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     state: {
       sorting,
       columnFilters,
     },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
   })
+
+  const currentPage = table.getState().pagination.pageIndex + 1
+  const totalPages = table.getPageCount()
+  const pageSize = table.getState().pagination.pageSize
+  const totalRows = table.getFilteredRowModel().rows.length
 
   if (isLoading) {
     return (
@@ -505,6 +517,73 @@ export default function EmpresasPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Paginación */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t">
+            <div className="flex items-center gap-4 text-sm text-gray-600">
+              <span>
+                Mostrando {table.getRowModel().rows.length} de {totalRows}
+              </span>
+              <div className="flex items-center gap-2">
+                <span>Por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => table.setPageSize(Number(e.target.value))}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {[10, 25, 50, 100].map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <span className="px-2 text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

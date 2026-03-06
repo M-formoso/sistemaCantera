@@ -7,10 +7,10 @@ export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex overflow-hidden">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto">

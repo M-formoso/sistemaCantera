@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   FileText, Plus, X, Check,
@@ -7,6 +7,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Pagination } from '@/components/ui/pagination'
 import { facturacionService, TIPOS_COMPROBANTE, FORMAS_PAGO, Factura } from '@/services/facturacionService'
 import { empresasService } from '@/services/empresasService'
 import { formatDate, formatNumber } from '@/lib/utils'
@@ -18,6 +19,10 @@ export default function FacturacionTab() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [facturaSeleccionada, setFacturaSeleccionada] = useState<Factura | null>(null)
   const [expandedFactura, setExpandedFactura] = useState<string | null>(null)
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   // Queries
   const { data: clientes = [] } = useQuery({
@@ -41,6 +46,19 @@ export default function FacturacionTab() {
   // Estadísticas
   const totalPendiente = facturasPendientes.reduce((sum, f) => sum + f.saldo_pendiente, 0)
   const cantidadPendientes = facturasPendientes.length
+
+  // Paginación de facturas
+  const totalPages = Math.ceil(facturas.length / pageSize)
+  const facturasPaginadas = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return facturas.slice(start, start + pageSize)
+  }, [facturas, currentPage, pageSize])
+
+  // Reset página cuando cambia cliente
+  const handleClienteChange = (clienteId: string) => {
+    setSelectedCliente(clienteId)
+    setCurrentPage(1)
+  }
 
   const handleVerDetalle = (factura: Factura) => {
     setExpandedFactura(expandedFactura === factura.id ? null : factura.id)
@@ -82,7 +100,7 @@ export default function FacturacionTab() {
         <div className="flex gap-2 items-center flex-1">
           <select
             value={selectedCliente}
-            onChange={(e) => setSelectedCliente(e.target.value)}
+            onChange={(e) => handleClienteChange(e.target.value)}
             className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[200px]"
           >
             <option value="">Todos los clientes</option>
@@ -112,7 +130,7 @@ export default function FacturacionTab() {
             </div>
           ) : (
             <div className="space-y-3">
-              {facturas.map((factura) => (
+              {facturasPaginadas.map((factura) => (
                 <div key={factura.id} className="border rounded-lg">
                   {/* Header de factura */}
                   <div
@@ -252,6 +270,19 @@ export default function FacturacionTab() {
                 </div>
               ))}
             </div>
+          )}
+          {facturas.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={facturas.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setCurrentPage(1)
+              }}
+            />
           )}
         </CardContent>
       </Card>
