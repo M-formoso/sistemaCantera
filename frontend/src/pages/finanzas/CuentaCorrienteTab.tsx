@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
+  TrendingUp, TrendingDown,
   X, ChevronDown, ChevronUp, Search
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

@@ -186,29 +186,29 @@ export const facturacionService = {
     skip?: number
     limit?: number
   }): Promise<Factura[]> => {
-    const { data } = await api.get('/facturacion/facturas', { params })
+    const { data } = await api.get<Factura[]>('/facturacion/facturas', { params })
     return data
   },
 
   getFacturasPendientes: async (empresa_id?: string): Promise<Factura[]> => {
-    const { data } = await api.get('/facturacion/facturas/pendientes', {
+    const { data } = await api.get<Factura[]>('/facturacion/facturas/pendientes', {
       params: { empresa_id }
     })
     return data
   },
 
   getFactura: async (id: string): Promise<Factura> => {
-    const { data } = await api.get(`/facturacion/facturas/${id}`)
+    const { data } = await api.get<Factura>(`/facturacion/facturas/${id}`)
     return data
   },
 
   crearFactura: async (factura: FacturaCreate): Promise<Factura> => {
-    const { data } = await api.post('/facturacion/facturas', factura)
+    const { data } = await api.post<Factura>('/facturacion/facturas', factura)
     return data
   },
 
   actualizarFactura: async (id: string, factura: Partial<FacturaCreate>): Promise<Factura> => {
-    const { data } = await api.put(`/facturacion/facturas/${id}`, factura)
+    const { data } = await api.put<Factura>(`/facturacion/facturas/${id}`, factura)
     return data
   },
 
@@ -218,7 +218,7 @@ export const facturacionService = {
 
   // Pagos de Factura
   getPagosFactura: async (facturaId: string): Promise<PagoFactura[]> => {
-    const { data } = await api.get(`/facturacion/facturas/${facturaId}/pagos`)
+    const { data } = await api.get<PagoFactura[]>(`/facturacion/facturas/${facturaId}/pagos`)
     return data
   },
 
@@ -227,7 +227,7 @@ export const facturacionService = {
     pago: Omit<PagoFacturaCreate, 'factura_id'>,
     registrarEnCC: boolean = true
   ): Promise<PagoFactura> => {
-    const { data } = await api.post(
+    const { data } = await api.post<PagoFactura>(
       `/facturacion/facturas/${facturaId}/pagos`,
       { ...pago, factura_id: facturaId },
       { params: { registrar_en_cc: registrarEnCC } }
@@ -244,7 +244,7 @@ export const facturacionService = {
     remitoId: string,
     pago: Omit<PagoRemitoCreate, 'remito_id'>,
     registrarEnCC: boolean = true
-  ): Promise<any> => {
+  ): Promise<unknown> => {
     const { data } = await api.post(
       `/facturacion/remitos/${remitoId}/pagos`,
       { ...pago, remito_id: remitoId },
@@ -259,7 +259,7 @@ export const facturacionService = {
     soloSinFacturar: boolean = true,
     soloConSaldo: boolean = true
   ): Promise<RemitoParaFactura[]> => {
-    const { data } = await api.get(`/facturacion/clientes/${empresaId}/remitos-pendientes`, {
+    const { data } = await api.get<RemitoParaFactura[]>(`/facturacion/clientes/${empresaId}/remitos-pendientes`, {
       params: {
         solo_sin_facturar: soloSinFacturar,
         solo_con_saldo: soloConSaldo
@@ -274,7 +274,7 @@ export const facturacionService = {
     fechaDesde?: string,
     fechaHasta?: string
   ): Promise<EstadoCuenta> => {
-    const { data } = await api.get(`/facturacion/clientes/${empresaId}/estado-cuenta`, {
+    const { data } = await api.get<EstadoCuenta>(`/facturacion/clientes/${empresaId}/estado-cuenta`, {
       params: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta }
     })
     return data
@@ -285,7 +285,7 @@ export const facturacionService = {
     fechaDesde?: string,
     fechaHasta?: string
   ): Promise<Blob> => {
-    const { data } = await api.get(`/facturacion/clientes/${empresaId}/estado-cuenta/pdf`, {
+    const { data } = await api.get<Blob>(`/facturacion/clientes/${empresaId}/estado-cuenta/pdf`, {
       params: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta },
       responseType: 'blob'
     })

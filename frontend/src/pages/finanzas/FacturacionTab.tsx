@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  FileText, Plus, Search, Download, Eye, X, Check,
+  FileText, Plus, X, Check,
   CreditCard, AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { facturacionService, TIPOS_COMPROBANTE, FORMAS_PAGO, Factura, RemitoParaFactura } from '@/services/facturacionService'
+import { facturacionService, TIPOS_COMPROBANTE, FORMAS_PAGO, Factura } from '@/services/facturacionService'
 import { empresasService } from '@/services/empresasService'
 import { formatDate, formatNumber } from '@/lib/utils'
 
@@ -331,7 +331,7 @@ function CrearFacturaModal({
   })
 
   // Calcular totales cuando cambian los remitos seleccionados
-  const handleToggleRemito = (remitoId: string, importe: number) => {
+  const handleToggleRemito = (remitoId: string, _importe: number) => {
     let nuevosSeleccionados: string[]
     if (remitosSeleccionados.includes(remitoId)) {
       nuevosSeleccionados = remitosSeleccionados.filter(id => id !== remitoId)
@@ -527,7 +527,7 @@ function PagoFacturaModal({
   const [numeroCheque, setNumeroCheque] = useState('')
   const [fechaCheque, setFechaCheque] = useState('')
   const [esRetencion, setEsRetencion] = useState(false)
-  const [tipoRetencion, setTipoRetencion] = useState('')
+  const [tipoRetencion] = useState('')
   const [numeroCertificado, setNumeroCertificado] = useState('')
   const [referencia, setReferencia] = useState('')
   const [registrarEnCC, setRegistrarEnCC] = useState(true)
