@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { DollarSign, CreditCard } from 'lucide-react'
+import { DollarSign, CreditCard, FileText } from 'lucide-react'
 import MovimientosTab from './MovimientosTab'
 import CuentaCorrienteTab from './CuentaCorrienteTab'
+import FacturacionTab from './FacturacionTab'
 
-type TabType = 'movimientos' | 'cuenta-corriente'
+type TabType = 'movimientos' | 'cuenta-corriente' | 'facturacion'
 
 export default function FinanzasPage() {
   const [activeTab, setActiveTab] = useState<TabType>('movimientos')
 
   const tabs = [
     { id: 'movimientos' as TabType, label: 'Ingresos y Egresos', icon: DollarSign },
+    { id: 'facturacion' as TabType, label: 'Facturación', icon: FileText },
     { id: 'cuenta-corriente' as TabType, label: 'Cuenta Corriente', icon: CreditCard },
   ]
 
@@ -50,6 +52,7 @@ export default function FinanzasPage() {
       {/* Tab Content */}
       <div>
         {activeTab === 'movimientos' && <MovimientosTab />}
+        {activeTab === 'facturacion' && <FacturacionTab />}
         {activeTab === 'cuenta-corriente' && <CuentaCorrienteTab />}
       </div>
     </div>

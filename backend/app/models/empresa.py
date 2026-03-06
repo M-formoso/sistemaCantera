@@ -29,6 +29,7 @@ class Empresa(BaseModel):
 
     # Relaciones
     movimientos_cuenta_corriente = relationship("MovimientoCuentaCorriente", back_populates="empresa")
+    facturas = relationship("Factura", back_populates="empresa")
 
     def __repr__(self):
         return f"<Empresa {self.nombre} ({self.tipo})>"

@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Users, Plus, CreditCard, FileText,
+  Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  X
+  X, ChevronDown, ChevronUp, Search
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
+import { facturacionService } from '@/services/facturacionService'
 import { formatDate, formatNumber } from '@/lib/utils'
 
 export default function CuentaCorrienteTab() {
@@ -17,6 +18,8 @@ export default function CuentaCorrienteTab() {
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null)
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [showAjusteModal, setShowAjusteModal] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [mostrarTodos, setMostrarTodos] = useState(false)
 
   // Queries
   const { data: clientesConDeuda = [] } = useQuery({
@@ -44,6 +47,29 @@ export default function CuentaCorrienteTab() {
   // Calcular totales
   const totalDeuda = clientesConDeuda.reduce((sum, c) => sum + c.saldo, 0)
 
+  // Filtrar clientes
+  const clientesFiltrados = todosClientes.filter(c =>
+    c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (c.cuit && c.cuit.includes(busqueda))
+  )
+
+  // Descargar PDF estado de cuenta
+  const handleDescargarPDF = async () => {
+    if (!selectedCliente) return
+    try {
+      const blob = await facturacionService.descargarEstadoCuentaPDF(selectedCliente)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `estado_cuenta_${resumen?.empresa_nombre || 'cliente'}.pdf`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error al descargar PDF:', error)
+      alert('Error al descargar el PDF')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Estadísticas */}
@@ -70,166 +96,203 @@ export default function CuentaCorrienteTab() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de clientes */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg">Clientes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
-            {todosClientes.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No hay clientes</p>
-            ) : (
-              todosClientes.map((cliente) => {
-                const deuda = clientesConDeuda.find(c => c.id === cliente.id)
-                return (
-                  <button
-                    key={cliente.id}
-                    onClick={() => setSelectedCliente(cliente.id)}
-                    className={`w-full p-3 rounded-lg text-left transition-colors ${
-                      selectedCliente === cliente.id
-                        ? 'bg-blue-50 border-2 border-blue-500'
-                        : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-sm">{cliente.nombre}</p>
-                        {cliente.cuit && (
-                          <p className="text-xs text-gray-500">CUIT: {cliente.cuit}</p>
-                        )}
-                      </div>
-                      {deuda && deuda.saldo > 0 && (
-                        <span className="text-sm font-bold text-red-600">
-                          ${formatNumber(deuda.saldo, 2)}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Detalle del cliente */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                {resumen ? resumen.empresa_nombre : 'Seleccione un cliente'}
-              </CardTitle>
-              {selectedCliente && (
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => setShowPagoModal(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Registrar Pago
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowAjusteModal(true)}>
-                    <FileText className="h-4 w-4 mr-1" />
-                    Ajuste
-                  </Button>
-                </div>
+      {/* Selector de cliente con búsqueda */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <CardTitle className="text-lg">Seleccionar Cliente</CardTitle>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar por nombre o CUIT..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            {clientesFiltrados.slice(0, mostrarTodos ? undefined : 10).map((cliente) => {
+              const deuda = clientesConDeuda.find(c => c.id === cliente.id)
+              return (
+                <button
+                  key={cliente.id}
+                  onClick={() => setSelectedCliente(cliente.id)}
+                  className={`p-3 rounded-lg text-left transition-all ${
+                    selectedCliente === cliente.id
+                      ? 'bg-blue-100 border-2 border-blue-500 shadow-md'
+                      : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300'
+                  }`}
+                >
+                  <p className="font-medium text-sm truncate">{cliente.nombre}</p>
+                  {deuda && deuda.saldo > 0 ? (
+                    <p className="text-xs font-bold text-red-600 mt-1">
+                      ${formatNumber(deuda.saldo, 2)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-green-600 mt-1">Sin deuda</p>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {clientesFiltrados.length > 10 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMostrarTodos(!mostrarTodos)}
+              className="w-full mt-4"
+            >
+              {mostrarTodos ? (
+                <>
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  Mostrar menos
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Ver todos ({clientesFiltrados.length})
+                </>
               )}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detalle del cliente - Ancho completo */}
+      {selectedCliente && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl">
+                  {resumen ? resumen.empresa_nombre : 'Cargando...'}
+                </CardTitle>
+                {resumen && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    CUIT: {todosClientes.find(c => c.id === selectedCliente)?.cuit || '-'}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => setShowPagoModal(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Registrar Pago
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowAjusteModal(true)}>
+                  <FileText className="h-4 w-4 mr-1" />
+                  Ajuste
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleDescargarPDF}>
+                  <Download className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {!selectedCliente ? (
-              <div className="text-center py-12 text-gray-500">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Seleccione un cliente para ver su cuenta corriente</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Resumen */}
-                {resumen && (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-red-50 p-4 rounded-lg">
-                      <p className="text-xs text-red-600 font-medium">Total Cargos</p>
-                      <p className="text-xl font-bold text-red-700">
-                        ${formatNumber(resumen.total_cargos, 2)}
-                      </p>
-                    </div>
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <p className="text-xs text-green-600 font-medium">Total Pagos</p>
-                      <p className="text-xl font-bold text-green-700">
-                        ${formatNumber(resumen.total_pagos, 2)}
-                      </p>
-                    </div>
-                    <div className={`p-4 rounded-lg ${resumen.saldo_actual > 0 ? 'bg-orange-50' : 'bg-blue-50'}`}>
-                      <p className={`text-xs font-medium ${resumen.saldo_actual > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
-                        Saldo Actual
-                      </p>
-                      <p className={`text-xl font-bold ${resumen.saldo_actual > 0 ? 'text-orange-700' : 'text-blue-700'}`}>
-                        ${formatNumber(resumen.saldo_actual, 2)}
-                      </p>
-                    </div>
+            <div className="space-y-6">
+              {/* Resumen */}
+              {resumen && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <p className="text-xs text-red-600 font-medium">Total Cargos</p>
+                    <p className="text-2xl font-bold text-red-700">
+                      ${formatNumber(resumen.total_cargos, 2)}
+                    </p>
                   </div>
-                )}
-
-                {/* Movimientos */}
-                <div>
-                  <h4 className="font-medium mb-3">Movimientos</h4>
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                    {movimientos.length === 0 ? (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        No hay movimientos
-                      </p>
-                    ) : (
-                      movimientos.map((mov) => (
-                        <div
-                          key={mov.id}
-                          className={`p-3 rounded-lg border ${
-                            mov.anulado ? 'bg-gray-100 opacity-60' : 'bg-white'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-full ${
-                                mov.tipo === 'cargo' ? 'bg-red-100' :
-                                mov.tipo === 'pago' ? 'bg-green-100' : 'bg-blue-100'
-                              }`}>
-                                {mov.tipo === 'cargo' ? (
-                                  <ArrowUpRight className="h-4 w-4 text-red-600" />
-                                ) : mov.tipo === 'pago' ? (
-                                  <ArrowDownRight className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <FileText className="h-4 w-4 text-blue-600" />
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm">{mov.descripcion}</p>
-                                <p className="text-xs text-gray-500">
-                                  {formatDate(mov.fecha)}
-                                  {mov.metodo_pago && ` - ${mov.metodo_pago}`}
-                                </p>
-                                {mov.anulado && (
-                                  <span className="text-xs text-red-500 font-medium">ANULADO</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className={`font-bold ${
-                                mov.tipo === 'cargo' ? 'text-red-600' :
-                                mov.tipo === 'pago' ? 'text-green-600' : 'text-blue-600'
-                              }`}>
-                                {mov.tipo === 'cargo' ? '+' : '-'}${formatNumber(Math.abs(mov.monto), 2)}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Saldo: ${formatNumber(mov.saldo_posterior, 2)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <p className="text-xs text-green-600 font-medium">Total Pagos</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      ${formatNumber(resumen.total_pagos, 2)}
+                    </p>
+                  </div>
+                  <div className={`p-4 rounded-lg ${resumen.saldo_actual > 0 ? 'bg-orange-50' : 'bg-blue-50'}`}>
+                    <p className={`text-xs font-medium ${resumen.saldo_actual > 0 ? 'text-orange-600' : 'text-blue-600'}`}>
+                      Saldo Actual
+                    </p>
+                    <p className={`text-2xl font-bold ${resumen.saldo_actual > 0 ? 'text-orange-700' : 'text-blue-700'}`}>
+                      ${formatNumber(resumen.saldo_actual, 2)}
+                    </p>
                   </div>
                 </div>
+              )}
+
+              {/* Tabla de Movimientos - Ancho completo */}
+              <div>
+                <h4 className="font-medium mb-3">Movimientos</h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debe</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Haber</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {movimientos.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                            No hay movimientos
+                          </td>
+                        </tr>
+                      ) : (
+                        movimientos.map((mov) => (
+                          <tr key={mov.id} className={mov.anulado ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}>
+                            <td className="px-4 py-3 text-sm">{formatDate(mov.fecha)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                mov.tipo === 'cargo' ? 'bg-red-100 text-red-700' :
+                                mov.tipo === 'pago' ? 'bg-green-100 text-green-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                                {mov.tipo.toUpperCase()}
+                              </span>
+                              {mov.anulado && (
+                                <span className="ml-2 text-xs text-red-500">(ANULADO)</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">{mov.descripcion}</td>
+                            <td className="px-4 py-3 text-sm text-gray-500">{mov.metodo_pago || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                              {mov.tipo === 'cargo' ? `$${formatNumber(mov.monto, 2)}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
+                              {mov.tipo === 'pago' ? `$${formatNumber(mov.monto, 2)}` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-bold">
+                              ${formatNumber(mov.saldo_posterior, 2)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
-      </div>
+      )}
+
+      {/* Mensaje cuando no hay cliente seleccionado */}
+      {!selectedCliente && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-gray-500">
+              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Seleccione un cliente para ver su cuenta corriente</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal Pago */}
       {showPagoModal && selectedCliente && (

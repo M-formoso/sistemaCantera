@@ -15,6 +15,7 @@ from app.models.orden_entrega import OrdenEntrega
 from app.models.camion_cliente import CamionCliente
 from app.models.cuenta_corriente import MovimientoCuentaCorriente
 from app.models.trabajo import Trabajo, TrabajoRepuesto
+from app.models.factura import Factura, PagoFactura, PagoRemito, factura_remito
 
 __all__ = [
     "BaseModel",
@@ -40,4 +41,8 @@ __all__ = [
     "MovimientoCuentaCorriente",
     "Trabajo",
     "TrabajoRepuesto",
+    "Factura",
+    "PagoFactura",
+    "PagoRemito",
+    "factura_remito",
 ]

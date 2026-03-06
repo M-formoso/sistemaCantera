@@ -23,9 +23,16 @@ class Remito(BaseModel):
     enviado_email = Column(Boolean, default=False, nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
 
+    # Importe y saldo (para control de cobranza)
+    importe = Column(Numeric(12, 2), default=0)  # Importe total del remito
+    saldo_pendiente = Column(Numeric(12, 2), default=0)  # Saldo sin cobrar
+    facturado = Column(Boolean, default=False)  # Si ya fue incluido en una factura
+
     # Relaciones
     pesaje = relationship("Pesaje", back_populates="remito")
     creador = relationship("Usuario", back_populates="remitos_creados", foreign_keys=[created_by])
+    facturas = relationship("Factura", secondary="factura_remito", back_populates="remitos")
+    pagos = relationship("PagoRemito", back_populates="remito")
 
     def __repr__(self):
         return f"<Remito #{self.numero_remito} - {self.cliente}>"
