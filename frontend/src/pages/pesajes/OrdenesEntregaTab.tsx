@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { ordenEntregaService, OrdenEntregaCreate } from '@/services/ordenEntregaService'
 import { empresasService } from '@/services/empresasService'
 import { usuariosService } from '@/services/usuariosService'
-import { formatDate, formatNumber } from '@/lib/utils'
+import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
 
 const MATERIALES = ['10.30', '6.19', '0.20', '6.12', 'relleno', 'binder', '0.6']
 
@@ -84,7 +84,7 @@ export default function OrdenesEntregaTab() {
   const ordenesActivas = ordenesPendientes.length
   const cargasPendientes = ordenesPendientes.reduce((sum, o) => sum + (o.cargas_pendientes || 0), 0)
   const ordenesCompletadasHoy = todasOrdenes.filter(
-    o => o.estado === 'completada' && o.fecha_entrega === new Date().toISOString().split('T')[0]
+    o => o.estado === 'completada' && o.fecha_entrega === getTodayLocalDate()
   ).length
 
   const ordenesMostrar = filtroEstado === 'pendientes' ? ordenesPendientes : todasOrdenes
@@ -418,7 +418,7 @@ function NuevaOrdenModal({
   isLoading: boolean
 }) {
   const [formData, setFormData] = useState<OrdenEntregaCreate>({
-    fecha_entrega: new Date().toISOString().split('T')[0],
+    fecha_entrega: getTodayLocalDate(),
     material: '',
     cantidad_cargas: 1,
   })

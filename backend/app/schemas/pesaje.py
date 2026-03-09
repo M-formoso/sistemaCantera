@@ -5,6 +5,7 @@ from decimal import Decimal
 from datetime import datetime, date
 
 from app.schemas.common import ResponseBase
+from app.models.base import get_argentina_now
 
 
 # Materiales disponibles
@@ -87,7 +88,7 @@ class PesajeBase(BaseModel):
 class PesajeCreate(PesajeBase):
     """Schema para crear Pesaje"""
 
-    fecha: Union[datetime, date, str] = Field(default_factory=datetime.utcnow)
+    fecha: Union[datetime, date, str] = Field(default_factory=get_argentina_now)
 
     @field_validator('fecha', mode='before')
     @classmethod
@@ -228,7 +229,7 @@ class PesajeIniciarCreate(BaseModel):
     # Orden de entrega
     orden_entrega_id: Optional[UUID] = None
 
-    fecha: Union[datetime, date, str] = Field(default_factory=datetime.utcnow)
+    fecha: Union[datetime, date, str] = Field(default_factory=get_argentina_now)
 
     @field_validator('fecha', mode='before')
     @classmethod

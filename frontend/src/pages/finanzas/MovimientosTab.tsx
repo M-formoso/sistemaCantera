@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { finanzasService } from '@/services/finanzasService'
 import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
-import { formatNumber, formatDate } from '@/lib/utils'
+import { formatNumber, formatDate, getTodayLocalDate } from '@/lib/utils'
 import { MovimientoFinancieroCreate, TipoMovimiento } from '@/types'
 
 export default function MovimientosTab() {
@@ -30,7 +30,7 @@ export default function MovimientosTab() {
   // Form state
   const [formData, setFormData] = useState<MovimientoFinancieroCreate>({
     tipo: 'ingreso',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: getTodayLocalDate(),
     monto: 0,
     descripcion: '',
     estado: 'completado'
@@ -80,7 +80,7 @@ export default function MovimientosTab() {
   const resetForm = () => {
     setFormData({
       tipo: 'ingreso',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       monto: 0,
       descripcion: '',
       estado: 'completado'

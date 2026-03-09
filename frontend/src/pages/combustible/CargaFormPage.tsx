@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { combustibleService } from '@/services/combustibleService'
-import { formatNumber, formatCurrency } from '@/lib/utils'
+import { formatNumber, formatCurrency, getTodayLocalDate } from '@/lib/utils'
 
 const cargaSchema = z.object({
   cisterna_id: z.string().min(1, 'Debe seleccionar una cisterna'),
@@ -42,7 +42,7 @@ export default function CargaFormPage() {
   } = useForm<CargaFormData>({
     resolver: zodResolver(cargaSchema),
     defaultValues: {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       litros: 0,
       precio_por_litro: 0,
     },

@@ -13,6 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.schemas.factura import EstadoCuentaCliente
+from app.models.base import get_argentina_now
 
 # Ruta al logo
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'logo_la_rufina.png')
@@ -90,7 +91,7 @@ def generar_estado_cuenta_pdf(estado_cuenta: EstadoCuentaCliente) -> BytesIO:
     )
 
     fecha_emision = Paragraph(
-        f"<b>Fecha emisión:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        f"<b>Fecha emisión:</b> {get_argentina_now().strftime('%d/%m/%Y %H:%M')}",
         info_style
     )
 
@@ -221,7 +222,7 @@ def generar_estado_cuenta_pdf(estado_cuenta: EstadoCuentaCliente) -> BytesIO:
         textColor=colors.gray
     )
     elements.append(Paragraph("Sistema de Gestión - Canteras La Rufina", footer_style))
-    elements.append(Paragraph(f"Documento generado el {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
+    elements.append(Paragraph(f"Documento generado el {get_argentina_now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
 
     # Construir PDF
     doc.build(elements)

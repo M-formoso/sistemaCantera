@@ -17,7 +17,7 @@ import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
 import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { balanzaService } from '@/services/balanzaService'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, getTodayLocalDate } from '@/lib/utils'
 import { Pesaje, Empresa, EmpresaCreate } from '@/types'
 
 // Lista de materiales disponibles
@@ -124,7 +124,7 @@ export default function NuevoPesajePage() {
     resolver: zodResolver(pesajeTaraSchema),
     defaultValues: {
       tipo_entrega: 'propio',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       peso_tara: 0,
     },
   })
@@ -430,7 +430,7 @@ export default function NuevoPesajePage() {
     busquedaForm.reset()
     taraForm.reset({
       tipo_entrega: 'propio',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       peso_tara: 0,
     })
     brutoForm.reset({ peso_bruto: 0 })

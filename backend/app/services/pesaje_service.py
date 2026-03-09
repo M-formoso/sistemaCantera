@@ -9,6 +9,8 @@ from decimal import Decimal
 from datetime import datetime, date
 from fastapi import HTTPException, status
 
+from app.models.base import get_argentina_now
+
 from app.models.pesaje import Pesaje
 from app.models.remito import Remito
 from app.models.empresa import Empresa
@@ -538,7 +540,7 @@ def obtener_pendientes(db: Session) -> List[Pesaje]:
 
         # Calcular minutos esperando
         if p.fecha:
-            delta = datetime.utcnow() - p.fecha
+            delta = get_argentina_now() - p.fecha
             p.minutos_esperando = int(delta.total_seconds() / 60)
 
     return pesajes
@@ -828,7 +830,7 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     db_pesaje.peso_bruto = pesaje_data.peso_bruto
     db_pesaje.peso_neto = peso_neto
     db_pesaje.estado = "completado"
-    db_pesaje.fecha_completado = datetime.utcnow()
+    db_pesaje.fecha_completado = get_argentina_now()
 
     # Actualizar campos opcionales
     if pesaje_data.material:

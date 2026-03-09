@@ -9,7 +9,7 @@ import { camionesService } from '@/services/camionesService'
 import { serviciosService } from '@/services/serviciosService'
 import { trabajosService } from '@/services/trabajosService'
 import { repuestosService } from '@/services/repuestosService'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, getTodayLocalDate } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 import { Trabajo, Repuesto } from '@/types'
 
@@ -138,7 +138,7 @@ export default function CamionDetailPage() {
     try {
       await createTrabajoMutation.mutateAsync({
         camion_id: id,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: getTodayLocalDate(),
         descripcion: trabajoDescripcion,
         responsable: trabajoResponsable || undefined,
         costo_mano_obra: parseFloat(trabajoCosto) || 0,

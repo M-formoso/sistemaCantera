@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { serviciosService } from '@/services/serviciosService'
 import { camionesService } from '@/services/camionesService'
 import { repuestosService } from '@/services/repuestosService'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getTodayLocalDate } from '@/lib/utils'
 
 const servicioSchema = z.object({
   camion_id: z.string().min(1, 'Debe seleccionar un camión'),
@@ -64,7 +64,7 @@ export default function ServicioFormPage() {
   } = useForm<ServicioFormData>({
     resolver: zodResolver(servicioSchema),
     defaultValues: {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       tipo: 'preventivo',
       costo_mano_obra: 0,
     },

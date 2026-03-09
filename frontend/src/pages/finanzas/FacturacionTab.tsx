@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
 import { facturacionService, TIPOS_COMPROBANTE, FORMAS_PAGO, Factura } from '@/services/facturacionService'
 import { empresasService } from '@/services/empresasService'
-import { formatDate, formatNumber } from '@/lib/utils'
+import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
 
 export default function FacturacionTab() {
   const queryClient = useQueryClient()
@@ -332,7 +332,7 @@ function CrearFacturaModal({
 }) {
   const [empresaId, setEmpresaId] = useState('')
   const [tipoComprobante, setTipoComprobante] = useState('factura_b')
-  const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().split('T')[0])
+  const [fechaEmision, setFechaEmision] = useState(getTodayLocalDate())
   const [remitosSeleccionados, setRemitosSeleccionados] = useState<string[]>([])
   const [subtotal, setSubtotal] = useState(0)
   const [iva21, setIva21] = useState(0)
@@ -552,7 +552,7 @@ function PagoFacturaModal({
   onSuccess: () => void
 }) {
   const [monto, setMonto] = useState(factura.saldo_pendiente.toString())
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(getTodayLocalDate())
   const [formaPago, setFormaPago] = useState('transferencia')
   const [banco, setBanco] = useState('')
   const [numeroCheque, setNumeroCheque] = useState('')

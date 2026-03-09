@@ -70,3 +70,15 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .substring(0, 2)
 }
+
+/**
+ * Obtiene la fecha actual en formato YYYY-MM-DD usando la hora local
+ * (evita problemas con toISOString() que convierte a UTC)
+ */
+export function getTodayLocalDate(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}

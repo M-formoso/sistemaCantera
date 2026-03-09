@@ -5,6 +5,7 @@ from datetime import datetime
 from app.core.deps import get_db, get_current_active_user
 from app.core.security import verify_password, create_access_token, create_refresh_token, decode_token
 from app.models.usuario import Usuario
+from app.models.base import get_argentina_now
 from app.schemas.auth import LoginRequest, TokenResponse, RefreshTokenRequest, AccessTokenResponse
 from app.schemas.usuario import UsuarioSchema, UsuarioChangePassword
 from app.core.security import get_password_hash
@@ -38,7 +39,7 @@ async def login(
         )
 
     # Actualizar último acceso
-    usuario.ultimo_acceso = datetime.utcnow()
+    usuario.ultimo_acceso = get_argentina_now()
     db.commit()
 
     # Crear tokens

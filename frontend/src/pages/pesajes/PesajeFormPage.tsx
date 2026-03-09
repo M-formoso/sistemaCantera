@@ -13,7 +13,7 @@ import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
 import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { balanzaService } from '@/services/balanzaService'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, getTodayLocalDate } from '@/lib/utils'
 import { Pesaje, Empresa, TipoEntrega, EmpresaCreate } from '@/types'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 
@@ -135,7 +135,7 @@ export default function PesajeFormPage() {
     resolver: zodResolver(pesajeSchema),
     defaultValues: {
       tipo_entrega: 'propio',
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       peso_bruto: 0,
       peso_tara: 0,
     },
@@ -496,7 +496,7 @@ export default function PesajeFormPage() {
                   setClienteBusqueda('')
                   reset({
                     tipo_entrega: 'propio',
-                    fecha: new Date().toISOString().split('T')[0],
+                    fecha: getTodayLocalDate(),
                     peso_bruto: 0,
                     peso_tara: 0,
                     camion_id: '',

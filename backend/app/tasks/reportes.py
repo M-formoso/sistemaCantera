@@ -12,6 +12,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from datetime import datetime
 
+from app.models.base import get_argentina_now
+
 # Ruta al logo
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'logo_la_rufina.png')
 
@@ -70,12 +72,12 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     from reportlab.lib.utils import ImageReader
 
     # Parsear fecha
-    fecha = pesaje_data.get('fecha', datetime.now())
+    fecha = pesaje_data.get('fecha', get_argentina_now())
     if isinstance(fecha, str):
         try:
             fecha = datetime.fromisoformat(fecha.replace('Z', '+00:00'))
         except:
-            fecha = datetime.now()
+            fecha = get_argentina_now()
 
     # Formatear pesos
     def format_peso(peso):
@@ -341,12 +343,12 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
     elements.append(Paragraph("CONTROL DE PESADA", header_style))
 
     # Parsear fecha
-    fecha = pesaje_data.get('fecha', datetime.now())
+    fecha = pesaje_data.get('fecha', get_argentina_now())
     if isinstance(fecha, str):
         try:
             fecha = datetime.fromisoformat(fecha.replace('Z', '+00:00'))
         except:
-            fecha = datetime.now()
+            fecha = get_argentina_now()
 
     # Formatear números
     def format_peso(peso):
@@ -547,7 +549,7 @@ def generar_ticket_pesaje_pdf(pesaje_data: dict, tipo_copia: str = "original") -
         textColor=colors.gray
     )
     elements.append(Paragraph("Sistema de Control de Pesada - Canteras La Rufina", footer_style))
-    elements.append(Paragraph(f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
+    elements.append(Paragraph(f"Generado: {get_argentina_now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
 
     # Construir PDF
     doc.build(elements)

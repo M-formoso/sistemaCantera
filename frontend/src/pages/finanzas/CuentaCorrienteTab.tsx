@@ -12,7 +12,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
 import { facturacionService } from '@/services/facturacionService'
-import { formatDate, formatNumber } from '@/lib/utils'
+import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
 
 export default function CuentaCorrienteTab() {
   const queryClient = useQueryClient()
@@ -382,7 +382,7 @@ function PagoModal({
   onSuccess: () => void
 }) {
   const [monto, setMonto] = useState('')
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(getTodayLocalDate())
   const [descripcion, setDescripcion] = useState('Pago recibido')
   const [metodoPago, setMetodoPago] = useState('efectivo')
   const [registrarIngreso, setRegistrarIngreso] = useState(true)
@@ -510,7 +510,7 @@ function AjusteModal({
 }) {
   const [monto, setMonto] = useState('')
   const [esCredito, setEsCredito] = useState(true)
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(getTodayLocalDate())
   const [descripcion, setDescripcion] = useState('')
 
   const mutation = useMutation({

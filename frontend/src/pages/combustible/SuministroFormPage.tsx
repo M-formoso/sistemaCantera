@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { combustibleService } from '@/services/combustibleService'
 import { camionesService } from '@/services/camionesService'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, getTodayLocalDate } from '@/lib/utils'
 
 const suministroSchema = z.object({
   cisterna_id: z.string().min(1, 'Debe seleccionar una cisterna'),
@@ -47,7 +47,7 @@ export default function SuministroFormPage() {
   } = useForm<SuministroFormData>({
     resolver: zodResolver(suministroSchema),
     defaultValues: {
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: getTodayLocalDate(),
       litros: 0,
     },
   })
