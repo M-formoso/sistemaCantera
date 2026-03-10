@@ -95,3 +95,9 @@ class ClienteConDeuda(BaseModel):
 class AnularMovimientoRequest(BaseModel):
     """Request para anular un movimiento"""
     motivo: str = Field(..., min_length=5, max_length=500)
+
+
+class ActualizarMontoRequest(BaseModel):
+    """Request para actualizar el monto de un cargo"""
+    monto: Decimal = Field(..., ge=0)
+    precio_unitario: Optional[Decimal] = Field(None, ge=0)  # Precio por tonelada

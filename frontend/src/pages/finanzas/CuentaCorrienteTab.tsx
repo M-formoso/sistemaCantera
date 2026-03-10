@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown,
-  X, Search
+  X, Search, Pencil
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,8 @@ export default function CuentaCorrienteTab() {
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null)
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [showAjusteModal, setShowAjusteModal] = useState(false)
+  const [showEditarMontoModal, setShowEditarMontoModal] = useState(false)
+  const [movimientoAEditar, setMovimientoAEditar] = useState<any>(null)
   const [busqueda, setBusqueda] = useState('')
 
   // Paginación de clientes
@@ -263,12 +265,13 @@ export default function CuentaCorrienteTab() {
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debe</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Haber</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {movimientos.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                             No hay movimientos
                           </td>
                         </tr>
@@ -287,6 +290,9 @@ export default function CuentaCorrienteTab() {
                               {mov.anulado && (
                                 <span className="ml-2 text-xs text-red-500">(ANULADO)</span>
                               )}
+                              {mov.tipo === 'cargo' && mov.monto === 0 && !mov.anulado && (
+                                <span className="ml-2 text-xs text-orange-500">(Sin precio)</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-sm">{mov.descripcion}</td>
                             <td className="px-4 py-3 text-sm text-gray-500">{mov.metodo_pago || '-'}</td>
@@ -298,6 +304,21 @@ export default function CuentaCorrienteTab() {
                             </td>
                             <td className="px-4 py-3 text-sm text-right font-bold">
                               ${formatNumber(mov.saldo_posterior, 2)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {mov.tipo === 'cargo' && !mov.anulado && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setMovimientoAEditar(mov)
+                                    setShowEditarMontoModal(true)
+                                  }}
+                                  title="Editar monto"
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -359,6 +380,24 @@ export default function CuentaCorrienteTab() {
           onClose={() => setShowAjusteModal(false)}
           onSuccess={() => {
             setShowAjusteModal(false)
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+            queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+          }}
+        />
+      )}
+
+      {/* Modal Editar Monto */}
+      {showEditarMontoModal && movimientoAEditar && (
+        <EditarMontoModal
+          movimiento={movimientoAEditar}
+          onClose={() => {
+            setShowEditarMontoModal(false)
+            setMovimientoAEditar(null)
+          }}
+          onSuccess={() => {
+            setShowEditarMontoModal(false)
+            setMovimientoAEditar(null)
             queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
             queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
             queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
@@ -613,6 +652,131 @@ function AjusteModal({
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={mutation.isPending} className="flex-1">
                 {mutation.isPending ? 'Guardando...' : 'Registrar Ajuste'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// Modal para editar monto de cargo
+function EditarMontoModal({
+  movimiento,
+  onClose,
+  onSuccess
+}: {
+  movimiento: any
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  // Extraer peso en toneladas del descripción si es un pesaje
+  const extractPesoTn = (descripcion: string): number | null => {
+    const match = descripcion.match(/\((\d+(?:[.,]\d+)?)\s*tn\)/)
+    if (match) {
+      return parseFloat(match[1].replace(',', '.'))
+    }
+    return null
+  }
+
+  const pesoTn = extractPesoTn(movimiento.descripcion)
+  const [precioUnitario, setPrecioUnitario] = useState('')
+  const [montoTotal, setMontoTotal] = useState(movimiento.monto.toString())
+
+  // Calcular monto automáticamente cuando cambia precio unitario
+  const handlePrecioChange = (value: string) => {
+    setPrecioUnitario(value)
+    if (pesoTn && value) {
+      const precio = parseFloat(value)
+      if (!isNaN(precio)) {
+        const total = pesoTn * precio
+        setMontoTotal(total.toFixed(2))
+      }
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => cuentaCorrienteService.actualizarMontoCargo(
+      movimiento.id,
+      parseFloat(montoTotal),
+      precioUnitario ? parseFloat(precioUnitario) : undefined
+    ),
+    onSuccess,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!montoTotal || parseFloat(montoTotal) < 0) {
+      alert('Ingrese un monto válido')
+      return
+    }
+    mutation.mutate()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-blue-600" />
+              Editar Monto
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500">{movimiento.descripcion}</p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {pesoTn && (
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Peso:</strong> {pesoTn.toFixed(2)} toneladas
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Ingrese el precio por tonelada para calcular el monto automáticamente
+                </p>
+              </div>
+            )}
+
+            {pesoTn && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Precio por Tonelada</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={precioUnitario}
+                  onChange={(e) => handlePrecioChange(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Monto Total *</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={montoTotal}
+                onChange={(e) => setMontoTotal(e.target.value)}
+                placeholder="0.00"
+              />
+              {movimiento.monto > 0 && (
+                <p className="text-xs text-gray-500">
+                  Monto anterior: ${formatNumber(movimiento.monto, 2)}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button type="submit" disabled={mutation.isPending} className="flex-1">
+                {mutation.isPending ? 'Guardando...' : 'Guardar Monto'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar

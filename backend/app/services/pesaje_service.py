@@ -201,8 +201,8 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     # Generar remito automáticamente
     _generar_remito_automatico(db, db_pesaje, usuario_id)
 
-    # Si hay importe y cliente, registrar en cuenta corriente
-    if db_pesaje.importe_total and db_pesaje.importe_total > 0 and db_pesaje.cliente_id:
+    # Si tiene cliente, registrar en cuenta corriente (aunque no tenga importe)
+    if db_pesaje.cliente_id:
         _registrar_en_cuenta_corriente(db, db_pesaje, usuario_id)
 
     # Si está asociado a una orden de entrega, actualizar la orden
@@ -254,15 +254,19 @@ def _actualizar_orden_entrega(db: Session, orden_id: UUID, peso_neto: Decimal) -
 
 def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID) -> MovimientoCuentaCorriente:
     """
-    Registra un cargo en la cuenta corriente del cliente al crear un pesaje con importe
+    Registra un cargo en la cuenta corriente del cliente al crear un pesaje.
+    Si no tiene importe, registra con $0 (pendiente de precio).
     """
     # Obtener empresa y saldo actual
     empresa = db.query(Empresa).filter(Empresa.id == pesaje.cliente_id).first()
     if not empresa:
         return None
 
+    # Usar importe_total o 0 si no tiene
+    importe = pesaje.importe_total or Decimal("0")
+
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
-    saldo_posterior = saldo_anterior + pesaje.importe_total
+    saldo_posterior = saldo_anterior + importe
 
     # Crear descripción
     peso_tn = pesaje.peso_neto / Decimal("1000")
@@ -271,16 +275,24 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
         descripcion += f" - {pesaje.material}"
     descripcion += f" ({peso_tn:.2f} tn)"
 
+    # Detalle con info de precio
+    if pesaje.precio_unitario:
+        detalle = f"Precio/tn: ${pesaje.precio_unitario:,.2f}"
+    elif importe == 0:
+        detalle = "Pendiente de precio"
+    else:
+        detalle = None
+
     # Crear movimiento de cuenta corriente
     movimiento = MovimientoCuentaCorriente(
         empresa_id=pesaje.cliente_id,
         tipo="cargo",
-        monto=pesaje.importe_total,
+        monto=importe,
         saldo_anterior=saldo_anterior,
         saldo_posterior=saldo_posterior,
         fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
         descripcion=descripcion,
-        detalle=f"Precio/tn: ${pesaje.precio_unitario:,.2f}" if pesaje.precio_unitario else None,
+        detalle=detalle,
         pesaje_id=pesaje.id,
         created_by=usuario_id
     )
@@ -852,8 +864,8 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     # Generar remito automáticamente
     _generar_remito_automatico(db, db_pesaje, usuario_id)
 
-    # Si hay importe y cliente, registrar en cuenta corriente
-    if db_pesaje.importe_total and db_pesaje.importe_total > 0 and db_pesaje.cliente_id:
+    # Si tiene cliente, registrar en cuenta corriente (aunque no tenga importe)
+    if db_pesaje.cliente_id:
         _registrar_en_cuenta_corriente(db, db_pesaje, usuario_id)
 
     # Si está asociado a una orden de entrega, actualizar la orden

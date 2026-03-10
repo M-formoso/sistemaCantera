@@ -111,6 +111,19 @@ export const anularMovimiento = async (movimientoId: string, motivo: string): Pr
   return data
 }
 
+// Actualizar monto de un cargo
+export const actualizarMontoCargo = async (
+  movimientoId: string,
+  monto: number,
+  precioUnitario?: number
+): Promise<MovimientoCC> => {
+  const { data } = await api.put<MovimientoCC>(`/cuenta-corriente/${movimientoId}/monto`, {
+    monto,
+    precio_unitario: precioUnitario
+  })
+  return data
+}
+
 export const cuentaCorrienteService = {
   getClientesConDeuda,
   getResumenCliente,
@@ -119,6 +132,7 @@ export const cuentaCorrienteService = {
   registrarPago,
   registrarAjuste,
   anularMovimiento,
+  actualizarMontoCargo,
 }
 
 export default cuentaCorrienteService

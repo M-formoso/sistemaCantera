@@ -15,7 +15,8 @@ from app.schemas.cuenta_corriente import (
     AjusteCreate,
     ResumenCuentaCorriente,
     ClienteConDeuda,
-    AnularMovimientoRequest
+    AnularMovimientoRequest,
+    ActualizarMontoRequest
 )
 from app.services import cuenta_corriente_service
 
@@ -159,3 +160,30 @@ async def obtener_saldo_cliente(
     """Obtiene el saldo actual de un cliente"""
     saldo = cuenta_corriente_service.obtener_saldo_cliente(db, empresa_id)
     return {"saldo": float(saldo)}
+
+
+@router.put("/{movimiento_id}/monto", response_model=MovimientoCCSchema)
+async def actualizar_monto_cargo(
+    movimiento_id: UUID,
+    request: ActualizarMontoRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Actualiza el monto de un cargo en cuenta corriente.
+
+    Útil para agregar precio a pesajes que se registraron sin importe.
+    También actualiza el pesaje asociado si existe.
+    """
+    movimiento = cuenta_corriente_service.actualizar_monto_cargo(
+        db=db,
+        movimiento_id=movimiento_id,
+        nuevo_monto=request.monto,
+        precio_unitario=request.precio_unitario,
+        usuario_id=current_user.id
+    )
+
+    result = MovimientoCCSchema.model_validate(movimiento)
+    if movimiento.empresa:
+        result.empresa_nombre = movimiento.empresa.nombre
+    return result

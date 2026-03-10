@@ -299,6 +299,78 @@ def registrar_ajuste(
     return movimiento
 
 
+def actualizar_monto_cargo(
+    db: Session,
+    movimiento_id: UUID,
+    nuevo_monto: Decimal,
+    precio_unitario: Optional[Decimal] = None,
+    usuario_id: UUID = None
+) -> MovimientoCuentaCorriente:
+    """
+    Actualiza el monto de un cargo en cuenta corriente.
+    Útil para agregar precio a pesajes que se registraron sin importe.
+
+    También actualiza el pesaje asociado si existe.
+    """
+    movimiento = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.id == movimiento_id
+    ).first()
+
+    if not movimiento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movimiento no encontrado"
+        )
+
+    if movimiento.anulado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede editar un movimiento anulado"
+        )
+
+    if movimiento.tipo != "cargo":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se pueden editar montos de cargos"
+        )
+
+    # Obtener empresa
+    empresa = db.query(Empresa).filter(Empresa.id == movimiento.empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado"
+        )
+
+    # Calcular diferencia y actualizar saldo
+    diferencia = nuevo_monto - movimiento.monto
+    empresa.saldo_cuenta_corriente = (empresa.saldo_cuenta_corriente or Decimal("0")) + diferencia
+
+    # Actualizar monto del movimiento
+    monto_anterior = movimiento.monto
+    movimiento.monto = nuevo_monto
+    movimiento.saldo_posterior = movimiento.saldo_anterior + nuevo_monto
+
+    # Actualizar detalle
+    if precio_unitario:
+        movimiento.detalle = f"Precio/tn: ${precio_unitario:,.2f}"
+    elif nuevo_monto > 0:
+        movimiento.detalle = f"Monto actualizado (anterior: ${monto_anterior:,.2f})"
+
+    # Si tiene pesaje asociado, actualizarlo también
+    if movimiento.pesaje_id:
+        pesaje = db.query(Pesaje).filter(Pesaje.id == movimiento.pesaje_id).first()
+        if pesaje:
+            pesaje.importe_total = nuevo_monto
+            if precio_unitario:
+                pesaje.precio_unitario = precio_unitario
+
+    db.commit()
+    db.refresh(movimiento)
+
+    return movimiento
+
+
 def anular_movimiento(
     db: Session,
     movimiento_id: UUID,
