@@ -105,14 +105,19 @@ export default function CombustiblePage() {
       cell: ({ row }) => <div className="text-sm">{formatDate(row.getValue('fecha'))}</div>,
     },
     {
-      accessorKey: 'camion_patente',
-      header: 'Camión',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Truck className="h-4 w-4 text-blue-600" />
-          <span className="font-medium">{row.getValue('camion_patente')}</span>
-        </div>
-      ),
+      id: 'camion',
+      header: 'Camión/Máquina',
+      cell: ({ row }) => {
+        const suministro = row.original
+        // Mostrar patente, o nombre, o código interno (lo que esté disponible)
+        const identificador = suministro.camion_patente || suministro.camion_nombre || suministro.camion_codigo_interno || '-'
+        return (
+          <div className="flex items-center gap-2">
+            <Truck className="h-4 w-4 text-blue-600" />
+            <span className="font-medium">{identificador}</span>
+          </div>
+        )
+      },
     },
     {
       accessorKey: 'usuario_nombre',

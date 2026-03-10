@@ -132,6 +132,8 @@ class SuministroCombustibleSchema(ResponseBase):
     created_by: UUID
     # Información del camión (opcional)
     camion_patente: Optional[str] = None
+    camion_nombre: Optional[str] = None  # Para máquinas sin patente
+    camion_codigo_interno: Optional[str] = None  # Código interno
     # Información del usuario que creó el suministro
     usuario_nombre: Optional[str] = None
 

@@ -430,10 +430,14 @@ export interface SuministroCombustible {
   cisterna_id: string
   cisterna_nombre?: string
   camion_id: string
-  camion_patente: string
+  camion_patente?: string
+  camion_nombre?: string
+  camion_codigo_interno?: string
   fecha: string
   litros: number
   kilometraje_actual?: number
+  horometro?: number
+  chofer?: string
   observaciones?: string
   created_by: string
   usuario_nombre?: string

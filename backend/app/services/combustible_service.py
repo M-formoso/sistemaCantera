@@ -372,6 +372,8 @@ def obtener_todos_suministros(
         camion = db.query(Camion).filter(Camion.id == s.camion_id).first()
         if camion:
             s.camion_patente = camion.patente
+            s.camion_nombre = camion.nombre
+            s.camion_codigo_interno = camion.codigo_interno
 
         # Obtener cisterna
         cisterna = db.query(CisternaCombustible).filter(CisternaCombustible.id == s.cisterna_id).first()
@@ -469,6 +471,8 @@ def crear_suministro(
     # Agregar info para respuesta
     db_suministro.cisterna_nombre = cisterna.nombre
     db_suministro.camion_patente = camion.patente
+    db_suministro.camion_nombre = camion.nombre
+    db_suministro.camion_codigo_interno = camion.codigo_interno
 
     return db_suministro
 
