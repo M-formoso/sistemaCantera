@@ -9,10 +9,11 @@ from decimal import Decimal
 from datetime import date, datetime
 from fastapi import HTTPException, status
 
-from app.models.combustible import CisternaCombustible, CargaCisterna, SuministroCombustible
+from app.models.combustible import CisternaCombustible, CargaCisterna, SuministroCombustible, TransferenciaCisterna
 from app.schemas.combustible import (
     CisternaConfig, CisternaUpdate, CisternaCreate,
-    CargaCisternaCreate, SuministroCombustibleCreate
+    CargaCisternaCreate, CargaCisternaUpdate, SuministroCombustibleCreate,
+    TransferenciaCisternaCreate
 )
 from app.services import camion_service
 
@@ -23,6 +24,9 @@ def obtener_todas_cisternas(db: Session) -> List[CisternaCombustible]:
     """Obtiene todas las cisternas"""
     cisternas = db.query(CisternaCombustible).all()
 
+    # Crear un mapa de IDs a nombres para eficiencia
+    cisternas_map = {c.id: c.nombre for c in cisternas}
+
     # Agregar campos calculados
     for cisterna in cisternas:
         if cisterna.capacidad_total > 0:
@@ -30,6 +34,10 @@ def obtener_todas_cisternas(db: Session) -> List[CisternaCombustible]:
         else:
             cisterna.porcentaje_actual = Decimal("0")
         cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
+
+        # Agregar nombre de cisterna origen si existe
+        if cisterna.cisterna_origen_id and cisterna.cisterna_origen_id in cisternas_map:
+            cisterna.cisterna_origen_nombre = cisternas_map[cisterna.cisterna_origen_id]
 
     return cisternas
 
@@ -47,16 +55,34 @@ def obtener_cisterna_por_id(db: Session, cisterna_id: UUID) -> Optional[Cisterna
             cisterna.porcentaje_actual = Decimal("0")
         cisterna.esta_bajo = cisterna.nivel_actual <= cisterna.nivel_minimo
 
+        # Agregar nombre de cisterna origen si existe
+        if cisterna.cisterna_origen_id:
+            cisterna_origen = db.query(CisternaCombustible).filter(
+                CisternaCombustible.id == cisterna.cisterna_origen_id
+            ).first()
+            if cisterna_origen:
+                cisterna.cisterna_origen_nombre = cisterna_origen.nombre
+
     return cisterna
 
 
 def crear_cisterna(db: Session, cisterna_data: CisternaCreate) -> CisternaCombustible:
     """Crea una nueva cisterna"""
+    # Verificar que la cisterna origen exista si se especifica
+    if cisterna_data.cisterna_origen_id:
+        cisterna_origen = obtener_cisterna_por_id(db, cisterna_data.cisterna_origen_id)
+        if not cisterna_origen:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cisterna de origen no encontrada"
+            )
+
     cisterna = CisternaCombustible(
         nombre=cisterna_data.nombre,
         capacidad_total=cisterna_data.capacidad_total,
         nivel_actual=Decimal("0"),
-        nivel_minimo=cisterna_data.nivel_minimo
+        nivel_minimo=cisterna_data.nivel_minimo,
+        cisterna_origen_id=cisterna_data.cisterna_origen_id
     )
 
     db.add(cisterna)
@@ -66,6 +92,10 @@ def crear_cisterna(db: Session, cisterna_data: CisternaCreate) -> CisternaCombus
     # Agregar campos calculados
     cisterna.porcentaje_actual = Decimal("0")
     cisterna.esta_bajo = True
+
+    # Agregar nombre de cisterna origen si existe
+    if cisterna_data.cisterna_origen_id and cisterna_origen:
+        cisterna.cisterna_origen_nombre = cisterna_origen.nombre
 
     return cisterna
 
@@ -220,6 +250,69 @@ def crear_carga_cisterna(
 
     # Agregar nombre de cisterna para respuesta
     db_carga.cisterna_nombre = cisterna.nombre
+
+    return db_carga
+
+
+def actualizar_carga(db: Session, carga_id: UUID, update_data: CargaCisternaUpdate) -> CargaCisterna:
+    """
+    Actualiza una carga de cisterna
+
+    Si se modifican los litros, ajusta el nivel de la cisterna
+    """
+    db_carga = obtener_carga_por_id(db, carga_id)
+
+    if not db_carga:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Carga no encontrada"
+        )
+
+    # Obtener la cisterna asociada
+    if db_carga.cisterna_id:
+        cisterna = obtener_cisterna_por_id(db, db_carga.cisterna_id)
+    else:
+        cisterna = obtener_cisterna(db)
+
+    # Si se modifican los litros, ajustar el nivel de la cisterna
+    update_dict = update_data.model_dump(exclude_unset=True)
+    if 'litros' in update_dict and cisterna:
+        diferencia = update_dict['litros'] - db_carga.litros
+        nuevo_nivel = cisterna.nivel_actual + diferencia
+
+        # Verificar que no exceda la capacidad
+        if nuevo_nivel > cisterna.capacidad_total:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La carga excede la capacidad de la cisterna. Capacidad: {cisterna.capacidad_total}L, nivel actual: {cisterna.nivel_actual}L"
+            )
+
+        # No permitir nivel negativo
+        if nuevo_nivel < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El ajuste resultaría en un nivel negativo de cisterna"
+            )
+
+        cisterna.nivel_actual = nuevo_nivel
+
+    # Recalcular costo por litro si se modificó costo_total o litros
+    if 'costo_total' in update_dict or 'litros' in update_dict:
+        costo_total = update_dict.get('costo_total', db_carga.costo_total)
+        litros = update_dict.get('litros', db_carga.litros)
+        if costo_total and litros:
+            db_carga.costo_por_litro = costo_total / litros
+
+    # Actualizar campos
+    for field, value in update_dict.items():
+        setattr(db_carga, field, value)
+
+    db.commit()
+    db.refresh(db_carga)
+
+    # Agregar nombre de cisterna para respuesta
+    if cisterna:
+        db_carga.cisterna_nombre = cisterna.nombre
 
     return db_carga
 
@@ -412,6 +505,164 @@ def eliminar_suministro(db: Session, suministro_id: UUID) -> dict:
     db.commit()
 
     return {"message": "Suministro eliminado correctamente"}
+
+
+# ==================== TRANSFERENCIAS ENTRE CISTERNAS ====================
+
+def obtener_todas_transferencias(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100
+) -> List[TransferenciaCisterna]:
+    """Obtiene todas las transferencias entre cisternas"""
+    from app.models.usuario import Usuario
+
+    transferencias = db.query(TransferenciaCisterna).order_by(
+        desc(TransferenciaCisterna.fecha)
+    ).offset(skip).limit(limit).all()
+
+    # Enriquecer con datos de cisternas y usuario
+    for t in transferencias:
+        cisterna_origen = db.query(CisternaCombustible).filter(
+            CisternaCombustible.id == t.cisterna_origen_id
+        ).first()
+        if cisterna_origen:
+            t.cisterna_origen_nombre = cisterna_origen.nombre
+
+        cisterna_destino = db.query(CisternaCombustible).filter(
+            CisternaCombustible.id == t.cisterna_destino_id
+        ).first()
+        if cisterna_destino:
+            t.cisterna_destino_nombre = cisterna_destino.nombre
+
+        usuario = db.query(Usuario).filter(Usuario.id == t.created_by).first()
+        if usuario:
+            t.usuario_nombre = usuario.nombre
+
+    return transferencias
+
+
+def crear_transferencia(
+    db: Session,
+    transferencia_data: TransferenciaCisternaCreate,
+    usuario_id: UUID
+) -> TransferenciaCisterna:
+    """
+    Crea una transferencia de combustible entre cisternas
+
+    - Descuenta litros de la cisterna origen
+    - Suma litros a la cisterna destino
+    """
+    # Verificar que las cisternas sean diferentes
+    if transferencia_data.cisterna_origen_id == transferencia_data.cisterna_destino_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cisterna origen y destino deben ser diferentes"
+        )
+
+    # Obtener cisterna origen
+    cisterna_origen = obtener_cisterna_por_id(db, transferencia_data.cisterna_origen_id)
+    if not cisterna_origen:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cisterna de origen no encontrada"
+        )
+
+    # Obtener cisterna destino
+    cisterna_destino = obtener_cisterna_por_id(db, transferencia_data.cisterna_destino_id)
+    if not cisterna_destino:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cisterna de destino no encontrada"
+        )
+
+    # Verificar que haya combustible suficiente en origen
+    if cisterna_origen.nivel_actual < transferencia_data.litros:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No hay combustible suficiente en la cisterna origen. Nivel actual: {cisterna_origen.nivel_actual}L, requerido: {transferencia_data.litros}L"
+        )
+
+    # Verificar que no exceda la capacidad del destino
+    nuevo_nivel_destino = cisterna_destino.nivel_actual + transferencia_data.litros
+    if nuevo_nivel_destino > cisterna_destino.capacidad_total:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La transferencia excede la capacidad de la cisterna destino. Capacidad: {cisterna_destino.capacidad_total}L, nivel actual: {cisterna_destino.nivel_actual}L, transferencia: {transferencia_data.litros}L"
+        )
+
+    # Convertir fecha string a datetime
+    fecha = transferencia_data.fecha
+    if isinstance(fecha, str):
+        from datetime import datetime as dt
+        try:
+            fecha = dt.fromisoformat(fecha)
+        except ValueError:
+            fecha = dt.strptime(fecha, '%Y-%m-%d')
+
+    # Crear transferencia
+    db_transferencia = TransferenciaCisterna(
+        cisterna_origen_id=transferencia_data.cisterna_origen_id,
+        cisterna_destino_id=transferencia_data.cisterna_destino_id,
+        litros=transferencia_data.litros,
+        fecha=fecha,
+        observaciones=transferencia_data.observaciones,
+        created_by=usuario_id
+    )
+
+    db.add(db_transferencia)
+
+    # Actualizar niveles de cisternas
+    cisterna_origen.nivel_actual -= transferencia_data.litros
+    cisterna_destino.nivel_actual += transferencia_data.litros
+
+    db.commit()
+    db.refresh(db_transferencia)
+
+    # Agregar info para respuesta
+    db_transferencia.cisterna_origen_nombre = cisterna_origen.nombre
+    db_transferencia.cisterna_destino_nombre = cisterna_destino.nombre
+
+    return db_transferencia
+
+
+def eliminar_transferencia(db: Session, transferencia_id: UUID) -> dict:
+    """
+    Elimina una transferencia
+
+    IMPORTANTE: Revierte los litros (devuelve a origen, quita de destino)
+    """
+    db_transferencia = db.query(TransferenciaCisterna).filter(
+        TransferenciaCisterna.id == transferencia_id
+    ).first()
+
+    if not db_transferencia:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transferencia no encontrada"
+        )
+
+    # Obtener cisternas
+    cisterna_origen = obtener_cisterna_por_id(db, db_transferencia.cisterna_origen_id)
+    cisterna_destino = obtener_cisterna_por_id(db, db_transferencia.cisterna_destino_id)
+
+    # Revertir la transferencia
+    if cisterna_origen:
+        cisterna_origen.nivel_actual += db_transferencia.litros
+        # No exceder capacidad
+        if cisterna_origen.nivel_actual > cisterna_origen.capacidad_total:
+            cisterna_origen.nivel_actual = cisterna_origen.capacidad_total
+
+    if cisterna_destino:
+        cisterna_destino.nivel_actual -= db_transferencia.litros
+        # No permitir negativo
+        if cisterna_destino.nivel_actual < 0:
+            cisterna_destino.nivel_actual = Decimal("0")
+
+    db.delete(db_transferencia)
+    db.commit()
+
+    return {"message": "Transferencia eliminada correctamente"}
 
 
 def obtener_consumo_por_camion(

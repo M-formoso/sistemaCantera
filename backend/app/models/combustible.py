@@ -15,9 +15,15 @@ class CisternaCombustible(BaseModel):
     nivel_actual = Column(Numeric(10, 2), nullable=False, default=0)  # litros
     nivel_minimo = Column(Numeric(10, 2), default=1000)  # litros para alertar (antes nivel_alerta)
 
+    # Cisterna de origen (para cisternas que se abastecen de otra)
+    cisterna_origen_id = Column(UUID(as_uuid=True), ForeignKey("cisterna_combustible.id"), nullable=True)
+
     # Relaciones
     cargas = relationship("CargaCisterna", back_populates="cisterna")
     suministros = relationship("SuministroCombustible", back_populates="cisterna")
+    cisterna_origen = relationship("CisternaCombustible", remote_side="CisternaCombustible.id", foreign_keys=[cisterna_origen_id])
+    transferencias_salida = relationship("TransferenciaCisterna", back_populates="cisterna_origen", foreign_keys="TransferenciaCisterna.cisterna_origen_id")
+    transferencias_entrada = relationship("TransferenciaCisterna", back_populates="cisterna_destino", foreign_keys="TransferenciaCisterna.cisterna_destino_id")
 
     def __repr__(self):
         return f"<Cisterna {self.nombre}: {self.nivel_actual}/{self.capacidad_total}L>"
@@ -68,3 +74,21 @@ class SuministroCombustible(BaseModel):
 
     def __repr__(self):
         return f"<SuministroCombustible {self.litros}L - Camión {self.camion_id}>"
+
+
+class TransferenciaCisterna(BaseModel):
+    """Modelo de Transferencia entre Cisternas"""
+
+    __tablename__ = "transferencias_cisterna"
+
+    cisterna_origen_id = Column(UUID(as_uuid=True), ForeignKey("cisterna_combustible.id"), nullable=False)
+    cisterna_destino_id = Column(UUID(as_uuid=True), ForeignKey("cisterna_combustible.id"), nullable=False)
+    fecha = Column(DateTime, nullable=False)
+    litros = Column(Numeric(10, 2), nullable=False)
+    observaciones = Column(Text)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+
+    # Relaciones
+    cisterna_origen = relationship("CisternaCombustible", back_populates="transferencias_salida", foreign_keys=[cisterna_origen_id])
+    cisterna_destino = relationship("CisternaCombustible", back_populates="transferencias_entrada", foreign_keys=[cisterna_destino_id])
+    creador = relationship("Usuario", back_populates="transferencias_cisterna", foreign_keys=[created_by])

@@ -11,8 +11,9 @@ from app.core.deps import get_db, get_current_active_user, require_admin, requir
 from app.models.usuario import Usuario
 from app.schemas.combustible import (
     CisternaSchema, CisternaConfig, CisternaUpdate, CisternaCreate,
-    CargaCisternaSchema, CargaCisternaCreate,
-    SuministroCombustibleSchema, SuministroCombustibleCreate
+    CargaCisternaSchema, CargaCisternaCreate, CargaCisternaUpdate,
+    SuministroCombustibleSchema, SuministroCombustibleCreate,
+    TransferenciaCisternaSchema, TransferenciaCisternaCreate
 )
 from app.services import combustible_service
 
@@ -161,6 +162,23 @@ async def obtener_carga(
     return carga
 
 
+@router.put("/cargas/{carga_id}", response_model=CargaCisternaSchema)
+async def actualizar_carga(
+    carga_id: UUID,
+    carga_data: CargaCisternaUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Actualiza una carga de cisterna
+
+    **Requiere rol:** Administrador
+
+    Si se modifican los litros, se ajusta automáticamente el nivel de la cisterna
+    """
+    return combustible_service.actualizar_carga(db, carga_id, carga_data)
+
+
 @router.delete("/cargas/{carga_id}")
 async def eliminar_carga(
     carga_id: UUID,
@@ -250,6 +268,52 @@ async def eliminar_suministro(
     IMPORTANTE: Devuelve los litros al nivel de la cisterna
     """
     return combustible_service.eliminar_suministro(db, suministro_id)
+
+
+# ==================== TRANSFERENCIAS ENTRE CISTERNAS ====================
+
+@router.get("/transferencias", response_model=List[TransferenciaCisternaSchema])
+async def listar_transferencias(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """Lista todas las transferencias entre cisternas"""
+    return combustible_service.obtener_todas_transferencias(db, skip, limit)
+
+
+@router.post("/transferencias", response_model=TransferenciaCisternaSchema, status_code=201)
+async def crear_transferencia(
+    transferencia: TransferenciaCisternaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Registra una transferencia de combustible entre cisternas
+
+    **Requiere rol:** Administrador u Operador
+
+    - Descuenta litros de la cisterna origen
+    - Suma litros a la cisterna destino
+    """
+    return combustible_service.crear_transferencia(db, transferencia, current_user.id)
+
+
+@router.delete("/transferencias/{transferencia_id}")
+async def eliminar_transferencia(
+    transferencia_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Elimina una transferencia
+
+    **Requiere rol:** Administrador
+
+    IMPORTANTE: Revierte los litros (devuelve a origen, quita de destino)
+    """
+    return combustible_service.eliminar_transferencia(db, transferencia_id)
 
 
 # ==================== ESTADÍSTICAS ====================

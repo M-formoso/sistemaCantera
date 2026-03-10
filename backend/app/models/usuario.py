@@ -43,6 +43,7 @@ class Usuario(BaseModel):
     cargas_cisterna = relationship("CargaCisterna", back_populates="creador", foreign_keys="CargaCisterna.created_by")
     suministros = relationship("SuministroCombustible", back_populates="creador", foreign_keys="SuministroCombustible.created_by")
     movimientos_stock = relationship("MovimientoStock", back_populates="usuario")
+    transferencias_cisterna = relationship("TransferenciaCisterna", back_populates="creador", foreign_keys="TransferenciaCisterna.created_by")
 
     def __repr__(self):
         return f"<Usuario {self.email}>"

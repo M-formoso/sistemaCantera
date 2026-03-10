@@ -62,9 +62,9 @@ async def listar_repuestos_por_equipo(
 async def crear_repuesto(
     repuesto: RepuestoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_admin_or_operador)
 ):
-    """Crea un nuevo repuesto. **Requiere rol:** Administrador"""
+    """Crea un nuevo repuesto. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.crear(db, repuesto)
 
 
@@ -92,9 +92,9 @@ async def actualizar_repuesto(
     repuesto_id: UUID,
     repuesto_data: RepuestoUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_admin_or_operador)
 ):
-    """Actualiza un repuesto existente. **Requiere rol:** Administrador"""
+    """Actualiza un repuesto existente. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.actualizar(db, repuesto_id, repuesto_data)
 
 
@@ -102,9 +102,9 @@ async def actualizar_repuesto(
 async def eliminar_repuesto(
     repuesto_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_admin_or_operador)
 ):
-    """Elimina (soft delete) un repuesto. **Requiere rol:** Administrador"""
+    """Elimina (soft delete) un repuesto. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.eliminar(db, repuesto_id)
 
 
