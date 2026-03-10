@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from '@/pages/auth/LoginPage'
 import MainLayout from '@/components/layout/MainLayout'
 import ProtectedRoute from '@/components/shared/ProtectedRoute'
-import PermisoRoute from '@/components/shared/PermisoRoute'
+import PermisoRoute, { obtenerPrimeraRutaDisponible } from '@/components/shared/PermisoRoute'
+import { useAuthStore } from '@/stores/authStore'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 
 // Camiones
@@ -39,6 +40,18 @@ import EmpresasPage from '@/pages/empresas/EmpresasPage'
 // Finanzas
 import FinanzasPage from '@/pages/finanzas/FinanzasPage'
 
+// Componente para redirigir a la primera ruta disponible
+function RedirectToFirstAvailable() {
+  const { user } = useAuthStore()
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  const primeraRuta = obtenerPrimeraRutaDisponible(user)
+  return <Navigate to={primeraRuta} replace />
+}
+
 function App() {
   return (
     <Router>
@@ -55,7 +68,7 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RedirectToFirstAvailable />} />
           <Route path="dashboard" element={<PermisoRoute permiso="permiso_dashboard"><DashboardPage /></PermisoRoute>} />
 
           {/* Camiones */}

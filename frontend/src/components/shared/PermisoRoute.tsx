@@ -8,6 +8,51 @@ type PermisoKey = keyof Pick<User,
   'permiso_finanzas' | 'permiso_usuarios' | 'permiso_reportes'
 >
 
+// Mapeo de permisos a rutas
+const PERMISO_RUTA_MAP: Record<PermisoKey, string> = {
+  permiso_dashboard: '/dashboard',
+  permiso_pesajes: '/pesajes-remitos',
+  permiso_camiones: '/camiones',
+  permiso_empresas: '/empresas',
+  permiso_repuestos: '/repuestos',
+  permiso_combustible: '/combustible',
+  permiso_finanzas: '/finanzas',
+  permiso_usuarios: '/usuarios',
+  permiso_reportes: '/reportes',
+}
+
+// Orden de prioridad para redirigir
+const PERMISOS_ORDEN: PermisoKey[] = [
+  'permiso_dashboard',
+  'permiso_pesajes',
+  'permiso_camiones',
+  'permiso_empresas',
+  'permiso_repuestos',
+  'permiso_combustible',
+  'permiso_finanzas',
+  'permiso_reportes',
+  'permiso_usuarios',
+]
+
+// Función para obtener la primera ruta disponible para el usuario
+export function obtenerPrimeraRutaDisponible(user: User): string {
+  // Admin tiene acceso a todo
+  if (user.rol === 'administrador') {
+    return '/dashboard'
+  }
+
+  // Buscar el primer permiso que tenga activo
+  for (const permiso of PERMISOS_ORDEN) {
+    const valor = user[permiso]
+    if (valor === true) {
+      return PERMISO_RUTA_MAP[permiso]
+    }
+  }
+
+  // Si no tiene ningún permiso, devolver dashboard (mostrará error)
+  return '/dashboard'
+}
+
 interface PermisoRouteProps {
   children: React.ReactNode
   permiso: PermisoKey
@@ -36,22 +81,31 @@ export default function PermisoRoute({ children, permiso }: PermisoRouteProps) {
   }
 
   // Para otros usuarios, verificar permisos
-  // Si el permiso no está definido (undefined/null), asumir que tiene acceso
+  // Si el permiso no está definido (undefined/null), asumir que NO tiene acceso
   const permisoValue = user[permiso]
-  const tienePermiso = permisoValue === undefined || permisoValue === null || permisoValue === true
+  const tienePermiso = permisoValue === true
 
   // Verificar si tiene el permiso
   if (!tienePermiso) {
-    // Redirigir al dashboard si no tiene permiso (excepto si es el dashboard mismo)
+    // Obtener la primera ruta disponible
+    const primeraRuta = obtenerPrimeraRutaDisponible(user)
+
+    // Si no tiene permiso al dashboard, redirigir a la primera ruta disponible
     if (permiso === 'permiso_dashboard') {
-      // Si no tiene permiso al dashboard, mostrar mensaje
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-red-500">No tiene permisos para acceder al sistema. Contacte al administrador.</div>
-        </div>
-      )
+      // Si la primera ruta es dashboard (no tiene ningún permiso), mostrar error
+      if (primeraRuta === '/dashboard') {
+        return (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-red-500">No tiene permisos para acceder al sistema. Contacte al administrador.</div>
+          </div>
+        )
+      }
+      // Redirigir a la primera ruta disponible
+      return <Navigate to={primeraRuta} replace />
     }
-    return <Navigate to="/dashboard" replace />
+
+    // Para otros módulos, redirigir a la primera ruta disponible
+    return <Navigate to={primeraRuta} replace />
   }
 
   return <>{children}</>
