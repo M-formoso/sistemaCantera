@@ -1,25 +1,109 @@
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
 import { Pesaje } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 
+// Lista de materiales disponibles
+const MATERIALES_DISPONIBLES = [
+  '10.30',
+  '6.19',
+  '0.20',
+  '6.12',
+  'relleno',
+  'binder',
+  '0.6',
+]
+
 export default function PesajesTab() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isAdmin = useIsAdmin()
 
+  // Estados para filtros
+  const [filtroEstado, setFiltroEstado] = useState<string>('')
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState<string>('')
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState<string>('')
+  const [filtroPatente, setFiltroPatente] = useState<string>('')
+  const [filtroMaterial, setFiltroMaterial] = useState<string>('')
+  const [filtroCliente, setFiltroCliente] = useState<string>('')
+  const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false)
+
   // Query para pesajes
-  const { data: pesajes = [], isLoading } = useQuery({
+  const { data: pesajesRaw = [], isLoading } = useQuery({
     queryKey: ['pesajes'],
     queryFn: () => pesajesService.getAll(0, 500),
   })
+
+  // Filtrar pesajes según los filtros activos
+  const pesajes = useMemo(() => {
+    return pesajesRaw.filter((pesaje) => {
+      // Filtro por estado
+      if (filtroEstado && pesaje.estado !== filtroEstado) {
+        return false
+      }
+
+      // Filtro por fecha desde
+      if (filtroFechaDesde) {
+        const fechaPesaje = new Date(pesaje.fecha).toISOString().split('T')[0]
+        if (fechaPesaje < filtroFechaDesde) {
+          return false
+        }
+      }
+
+      // Filtro por fecha hasta
+      if (filtroFechaHasta) {
+        const fechaPesaje = new Date(pesaje.fecha).toISOString().split('T')[0]
+        if (fechaPesaje > filtroFechaHasta) {
+          return false
+        }
+      }
+
+      // Filtro por patente
+      if (filtroPatente) {
+        const patente = (pesaje.camion_patente || pesaje.patente_externa || '').toLowerCase()
+        if (!patente.includes(filtroPatente.toLowerCase())) {
+          return false
+        }
+      }
+
+      // Filtro por material
+      if (filtroMaterial && pesaje.material !== filtroMaterial) {
+        return false
+      }
+
+      // Filtro por cliente
+      if (filtroCliente) {
+        const cliente = (pesaje.cliente_nombre || '').toLowerCase()
+        if (!cliente.includes(filtroCliente.toLowerCase())) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [pesajesRaw, filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente])
+
+  // Verificar si hay filtros activos
+  const hayFiltrosActivos = filtroEstado || filtroFechaDesde || filtroFechaHasta || filtroPatente || filtroMaterial || filtroCliente
+
+  // Limpiar todos los filtros
+  const limpiarFiltros = () => {
+    setFiltroEstado('')
+    setFiltroFechaDesde('')
+    setFiltroFechaHasta('')
+    setFiltroPatente('')
+    setFiltroMaterial('')
+    setFiltroCliente('')
+  }
 
   // Mutation para eliminar
   const deleteMutation = useMutation({
@@ -215,13 +299,126 @@ export default function PesajesTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header con botón */}
-      <div className="flex justify-end">
+      {/* Header con botones */}
+      <div className="flex flex-col sm:flex-row justify-between gap-3">
+        <Button
+          variant="outline"
+          onClick={() => setMostrarFiltros(!mostrarFiltros)}
+          className={hayFiltrosActivos ? 'border-blue-500 text-blue-600' : ''}
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filtros
+          {hayFiltrosActivos && (
+            <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              {[filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente].filter(Boolean).length}
+            </span>
+          )}
+        </Button>
         <Button onClick={() => navigate('/pesajes-remitos/nuevo')}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Pesaje
         </Button>
       </div>
+
+      {/* Panel de Filtros */}
+      {mostrarFiltros && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="pt-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm text-gray-700">Filtrar pesajes</h3>
+                {hayFiltrosActivos && (
+                  <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="text-red-600 hover:text-red-700">
+                    <X className="h-4 w-4 mr-1" />
+                    Limpiar filtros
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                {/* Filtro Estado */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Estado</label>
+                  <select
+                    value={filtroEstado}
+                    onChange={(e) => setFiltroEstado(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  >
+                    <option value="">Todos</option>
+                    <option value="completado">Completado</option>
+                    <option value="pendiente">Pendiente</option>
+                  </select>
+                </div>
+
+                {/* Filtro Fecha Desde */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Fecha desde</label>
+                  <Input
+                    type="date"
+                    value={filtroFechaDesde}
+                    onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Filtro Fecha Hasta */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Fecha hasta</label>
+                  <Input
+                    type="date"
+                    value={filtroFechaHasta}
+                    onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Filtro Patente */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Patente</label>
+                  <Input
+                    placeholder="Buscar patente..."
+                    value={filtroPatente}
+                    onChange={(e) => setFiltroPatente(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Filtro Material */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Material</label>
+                  <select
+                    value={filtroMaterial}
+                    onChange={(e) => setFiltroMaterial(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  >
+                    <option value="">Todos</option>
+                    {MATERIALES_DISPONIBLES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtro Cliente */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Cliente</label>
+                  <Input
+                    placeholder="Buscar cliente..."
+                    value={filtroCliente}
+                    onChange={(e) => setFiltroCliente(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+
+              {hayFiltrosActivos && (
+                <div className="text-sm text-blue-600">
+                  Mostrando {pesajes.length} de {pesajesRaw.length} pesajes
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Estadísticas */}
       <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${isAdmin ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
