@@ -62,6 +62,8 @@ const pesajeBrutoSchema = z.object({
   chofer: z.string().optional(),
   observaciones: z.string().optional(),
   precio_unitario: z.number().min(0).optional(),
+  flete: z.number().min(0).optional(),
+  precio_fijo: z.number().min(0).optional(),
   importe_total: z.number().min(0).optional(),
   orden_entrega_id: z.string().optional(),
 })
@@ -140,8 +142,16 @@ export default function NuevoPesajePage() {
   const pesoTara = taraForm.watch('peso_tara') || pesajePendiente?.peso_tara || 0
   const pesoBruto = brutoForm.watch('peso_bruto') || 0
   const precioUnitario = brutoForm.watch('precio_unitario') || 0
+  const flete = brutoForm.watch('flete') || 0
+  const precioFijo = brutoForm.watch('precio_fijo') || 0
   const pesoNeto = pesoBruto > pesoTara ? pesoBruto - pesoTara : 0
-  const importeCalculado = precioUnitario > 0 && pesoNeto > 0 ? (pesoNeto / 1000) * precioUnitario : 0
+
+  // Calcular importe según escenario:
+  // 1. Si hay precio_fijo: importe = precio_fijo (ignora toneladas)
+  // 2. Si hay precio_unitario: importe = (toneladas * precio_unitario) + flete
+  const importeCalculado = precioFijo > 0
+    ? precioFijo
+    : (precioUnitario > 0 && pesoNeto > 0 ? (pesoNeto / 1000) * precioUnitario + flete : 0)
 
   // Actualizar importe calculado
   useEffect(() => {
@@ -363,6 +373,8 @@ export default function NuevoPesajePage() {
 
       // Limpiar campos vacíos/cero
       if (!cleanData.precio_unitario) delete cleanData.precio_unitario
+      if (!cleanData.flete) delete cleanData.flete
+      if (!cleanData.precio_fijo) delete cleanData.precio_fijo
       if (!cleanData.importe_total) delete cleanData.importe_total
       if (!cleanData.orden_entrega_id) delete cleanData.orden_entrega_id
 
@@ -500,12 +512,37 @@ export default function NuevoPesajePage() {
                     </span>
                   </div>
                   {createdPesaje.importe_total && createdPesaje.importe_total > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Importe Total:</span>
-                      <span className="font-bold text-green-600">
-                        ${formatNumber(createdPesaje.importe_total, 2)}
-                      </span>
-                    </div>
+                    <>
+                      {createdPesaje.precio_fijo ? (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Precio Fijo:</span>
+                          <span className="font-bold text-green-600">
+                            ${formatNumber(createdPesaje.precio_fijo, 2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          {createdPesaje.precio_unitario && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Precio/tn:</span>
+                              <span className="font-medium">${formatNumber(createdPesaje.precio_unitario, 2)}</span>
+                            </div>
+                          )}
+                          {createdPesaje.flete && createdPesaje.flete > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-500">Flete:</span>
+                              <span className="font-medium">${formatNumber(createdPesaje.flete, 2)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="flex justify-between text-sm border-t pt-1">
+                        <span className="text-gray-500">Importe Total:</span>
+                        <span className="font-bold text-green-600">
+                          ${formatNumber(createdPesaje.importe_total, 2)}
+                        </span>
+                      </div>
+                    </>
                   )}
                 </>
               )}
@@ -1077,25 +1114,50 @@ export default function NuevoPesajePage() {
                       <DollarSign className="h-4 w-4" />
                       Importe (Opcional)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Precio por Tonelada ($)</label>
                         <Input
                           type="number"
                           step="0.01"
                           {...brutoForm.register('precio_unitario', { valueAsNumber: true })}
-                          placeholder="5000"
+                          placeholder="7500"
+                          disabled={precioFijo > 0}
+                          className={precioFijo > 0 ? 'bg-gray-100' : ''}
                         />
+                        <p className="text-xs text-gray-500">Ej: 24tn × $7500 = $180.000</p>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Importe Total ($)</label>
+                        <label className="text-sm font-medium">Flete ($)</label>
                         <Input
                           type="number"
                           step="0.01"
-                          {...brutoForm.register('importe_total', { valueAsNumber: true })}
-                          placeholder="Calculado automáticamente"
-                          className="bg-gray-50"
+                          {...brutoForm.register('flete', { valueAsNumber: true })}
+                          placeholder="150"
+                          disabled={precioFijo > 0}
+                          className={precioFijo > 0 ? 'bg-gray-100' : ''}
                         />
+                        <p className="text-xs text-gray-500">Monto fijo que se suma al total</p>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Precio Fijo ($)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...brutoForm.register('precio_fijo', { valueAsNumber: true })}
+                          placeholder="420"
+                          disabled={precioUnitario > 0}
+                          className={precioUnitario > 0 ? 'bg-gray-100' : ''}
+                        />
+                        <p className="text-xs text-gray-500">Precio fijo por viaje (ignora $/tn)</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Importe Total:</span>
+                        <span className="text-xl font-bold text-green-600">
+                          ${importeCalculado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1173,7 +1235,30 @@ export default function NuevoPesajePage() {
                       <DollarSign className="h-4 w-4 text-green-600" />
                       <span className="font-semibold text-sm">Importe</span>
                     </div>
-                    <div className="flex justify-between pt-2 border-t">
+                    <div className="space-y-2 text-sm">
+                      {precioFijo > 0 ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Precio fijo:</span>
+                          <span className="font-medium">${formatNumber(precioFijo, 2)}</span>
+                        </div>
+                      ) : (
+                        <>
+                          {precioUnitario > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">{formatNumber(pesoNeto / 1000, 2)} tn × ${formatNumber(precioUnitario)}:</span>
+                              <span className="font-medium">${formatNumber((pesoNeto / 1000) * precioUnitario, 2)}</span>
+                            </div>
+                          )}
+                          {flete > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">+ Flete:</span>
+                              <span className="font-medium">${formatNumber(flete, 2)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex justify-between pt-2 border-t mt-2">
                       <span className="font-semibold">Total:</span>
                       <span className="text-xl font-bold text-green-600">
                         ${formatNumber(importeCalculado, 2)}

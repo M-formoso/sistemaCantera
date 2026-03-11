@@ -26,6 +26,8 @@ export interface PesajeCompletarCreate {
   chofer?: string
   observaciones?: string
   precio_unitario?: number
+  flete?: number
+  precio_fijo?: number
   importe_total?: number
   orden_entrega_id?: string
 }

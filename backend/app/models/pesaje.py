@@ -54,7 +54,9 @@ class Pesaje(BaseModel):
     created_by = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
 
     # Importe y vinculación con finanzas
-    precio_unitario = Column(Numeric(12, 2))  # Precio por tonelada
+    precio_unitario = Column(Numeric(12, 2))  # Precio por tonelada ($/tonelada)
+    flete = Column(Numeric(12, 2))  # Monto fijo de flete (se suma al total)
+    precio_fijo = Column(Numeric(12, 2))  # Precio fijo por viaje (ignora precio_unitario)
     importe_total = Column(Numeric(12, 2))  # Importe total del pesaje
     movimiento_financiero_id = Column(UUID(as_uuid=True), ForeignKey("movimientos_financieros.id"), nullable=True)
 

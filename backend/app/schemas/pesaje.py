@@ -59,6 +59,8 @@ class PesajeBase(BaseModel):
 
     # Importe
     precio_unitario: Optional[Decimal] = Field(None, ge=0, description="Precio por tonelada")
+    flete: Optional[Decimal] = Field(None, ge=0, description="Monto fijo de flete")
+    precio_fijo: Optional[Decimal] = Field(None, ge=0, description="Precio fijo por viaje (ignora precio por tonelada)")
     importe_total: Optional[Decimal] = Field(None, ge=0, description="Importe total del pesaje")
 
     # Orden de entrega
@@ -121,6 +123,8 @@ class PesajeUpdate(BaseModel):
     material: Optional[str] = Field(None, max_length=100)
     observaciones: Optional[str] = None
     precio_unitario: Optional[Decimal] = Field(None, ge=0)
+    flete: Optional[Decimal] = Field(None, ge=0)
+    precio_fijo: Optional[Decimal] = Field(None, ge=0)
     importe_total: Optional[Decimal] = Field(None, ge=0)
     orden_entrega_id: Optional[UUID] = None
 
@@ -166,6 +170,8 @@ class PesajeSchema(ResponseBase):
 
     # Importe
     precio_unitario: Optional[Decimal] = None
+    flete: Optional[Decimal] = None
+    precio_fijo: Optional[Decimal] = None
     importe_total: Optional[Decimal] = None
     movimiento_financiero_id: Optional[UUID] = None
 
@@ -267,6 +273,8 @@ class PesajeCompletarCreate(BaseModel):
 
     # Importe (opcional)
     precio_unitario: Optional[Decimal] = Field(None, ge=0, description="Precio por tonelada")
+    flete: Optional[Decimal] = Field(None, ge=0, description="Monto fijo de flete")
+    precio_fijo: Optional[Decimal] = Field(None, ge=0, description="Precio fijo por viaje")
     importe_total: Optional[Decimal] = Field(None, ge=0, description="Importe total")
 
     # Orden de entrega

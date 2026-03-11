@@ -288,6 +288,11 @@ async def descargar_ticket_pdf(
         "peso_neto": float(pesaje.peso_neto) if pesaje.peso_neto else 0,
         "operario": pesaje.operario,
         "observaciones": pesaje.observaciones,
+        # Datos de importe
+        "precio_unitario": float(pesaje.precio_unitario) if pesaje.precio_unitario else None,
+        "flete": float(pesaje.flete) if pesaje.flete else None,
+        "precio_fijo": float(pesaje.precio_fijo) if pesaje.precio_fijo else None,
+        "importe_total": float(pesaje.importe_total) if pesaje.importe_total else None,
     }
 
     # Generar PDF con las copias solicitadas

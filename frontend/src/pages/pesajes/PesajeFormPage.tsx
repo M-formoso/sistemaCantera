@@ -53,6 +53,8 @@ const pesajeSchema = z.object({
   observaciones: z.string().optional(),
   // Importe
   precio_unitario: z.number().min(0).optional(),
+  flete: z.number().min(0).optional(),
+  precio_fijo: z.number().min(0).optional(),
   importe_total: z.number().min(0).optional(),
   // Orden de entrega
   orden_entrega_id: z.string().optional(),
@@ -145,6 +147,8 @@ export default function PesajeFormPage() {
   const pesoBruto = watch('peso_bruto')
   const pesoTara = watch('peso_tara')
   const precioUnitario = watch('precio_unitario')
+  const fleteVal = watch('flete')
+  const precioFijoVal = watch('precio_fijo')
 
   useEffect(() => {
     const bruto = Number(pesoBruto) || 0
@@ -152,17 +156,25 @@ export default function PesajeFormPage() {
     const neto = bruto > tara ? bruto - tara : 0
     setPesoNeto(neto)
 
-    // Calcular importe automáticamente si hay precio unitario
+    // Calcular importe automáticamente según escenario:
+    // 1. Si hay precio_fijo: importe = precio_fijo
+    // 2. Si hay precio_unitario: importe = (toneladas * precio_unitario) + flete
+    const precioFijo = Number(precioFijoVal) || 0
     const precio = Number(precioUnitario) || 0
-    if (precio > 0 && neto > 0) {
+    const flete = Number(fleteVal) || 0
+
+    if (precioFijo > 0) {
+      setImporteCalculado(precioFijo)
+      setValue('importe_total', precioFijo)
+    } else if (precio > 0 && neto > 0) {
       const toneladas = neto / 1000
-      const importe = toneladas * precio
+      const importe = toneladas * precio + flete
       setImporteCalculado(importe)
       setValue('importe_total', Math.round(importe * 100) / 100)
     } else {
       setImporteCalculado(0)
     }
-  }, [pesoBruto, pesoTara, precioUnitario, setValue])
+  }, [pesoBruto, pesoTara, precioUnitario, fleteVal, precioFijoVal, setValue])
 
   useEffect(() => {
     if (pesaje) {
@@ -182,6 +194,10 @@ export default function PesajeFormPage() {
         material: pesaje.material || '',
         operario: pesaje.operario || '',
         observaciones: pesaje.observaciones || '',
+        precio_unitario: pesaje.precio_unitario || undefined,
+        flete: pesaje.flete || undefined,
+        precio_fijo: pesaje.precio_fijo || undefined,
+        importe_total: pesaje.importe_total || undefined,
       })
       if (pesaje.transportista_nombre) {
         setTransportistaBusqueda(pesaje.transportista_nombre)
@@ -336,6 +352,12 @@ export default function PesajeFormPage() {
       // Limpiar campos numéricos que son 0 o NaN (opcionales)
       if (!cleanData.precio_unitario || cleanData.precio_unitario === 0 || isNaN(cleanData.precio_unitario)) {
         delete cleanData.precio_unitario
+      }
+      if (!cleanData.flete || cleanData.flete === 0 || isNaN(cleanData.flete)) {
+        delete cleanData.flete
+      }
+      if (!cleanData.precio_fijo || cleanData.precio_fijo === 0 || isNaN(cleanData.precio_fijo)) {
+        delete cleanData.precio_fijo
       }
       if (!cleanData.importe_total || cleanData.importe_total === 0 || isNaN(cleanData.importe_total)) {
         delete cleanData.importe_total
@@ -945,9 +967,9 @@ export default function PesajeFormPage() {
                       Importe (Opcional)
                     </h3>
                     <p className="text-xs text-gray-500 mb-3">
-                      Si completa el precio por tonelada, se generará automáticamente un ingreso en Finanzas.
+                      Tres opciones de cobro: Precio/tn, Precio/tn + Flete, o Precio fijo por viaje.
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {/* Precio por tonelada */}
                       <div className="space-y-2">
                         <label htmlFor="precio_unitario" className="text-sm font-medium">
@@ -958,8 +980,45 @@ export default function PesajeFormPage() {
                           type="number"
                           step="0.01"
                           {...register('precio_unitario', { valueAsNumber: true })}
-                          placeholder="5000"
+                          placeholder="7500"
+                          disabled={Number(precioFijoVal) > 0}
+                          className={Number(precioFijoVal) > 0 ? 'bg-gray-100' : ''}
                         />
+                        <p className="text-xs text-gray-500">Ej: 24tn × $7500</p>
+                      </div>
+
+                      {/* Flete */}
+                      <div className="space-y-2">
+                        <label htmlFor="flete" className="text-sm font-medium">
+                          Flete ($)
+                        </label>
+                        <Input
+                          id="flete"
+                          type="number"
+                          step="0.01"
+                          {...register('flete', { valueAsNumber: true })}
+                          placeholder="150"
+                          disabled={Number(precioFijoVal) > 0}
+                          className={Number(precioFijoVal) > 0 ? 'bg-gray-100' : ''}
+                        />
+                        <p className="text-xs text-gray-500">Suma al total</p>
+                      </div>
+
+                      {/* Precio fijo */}
+                      <div className="space-y-2">
+                        <label htmlFor="precio_fijo" className="text-sm font-medium">
+                          Precio Fijo ($)
+                        </label>
+                        <Input
+                          id="precio_fijo"
+                          type="number"
+                          step="0.01"
+                          {...register('precio_fijo', { valueAsNumber: true })}
+                          placeholder="420"
+                          disabled={Number(precioUnitario) > 0}
+                          className={Number(precioUnitario) > 0 ? 'bg-gray-100' : ''}
+                        />
+                        <p className="text-xs text-gray-500">Ignora $/tn</p>
                       </div>
 
                       {/* Importe total */}
@@ -972,12 +1031,12 @@ export default function PesajeFormPage() {
                           type="number"
                           step="0.01"
                           {...register('importe_total', { valueAsNumber: true })}
-                          placeholder="Calculado automáticamente"
-                          className="bg-gray-50"
+                          placeholder="Calculado"
+                          className="bg-gray-50 font-semibold"
                         />
                         {importeCalculado > 0 && (
-                          <p className="text-xs text-green-600">
-                            Calculado: ${formatNumber(importeCalculado, 2)}
+                          <p className="text-xs text-green-600 font-medium">
+                            ${formatNumber(importeCalculado, 2)}
                           </p>
                         )}
                       </div>

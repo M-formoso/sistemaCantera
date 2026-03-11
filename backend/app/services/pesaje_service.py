@@ -276,8 +276,12 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     descripcion += f" ({peso_tn:.2f} tn)"
 
     # Detalle con info de precio
-    if pesaje.precio_unitario:
+    if pesaje.precio_fijo:
+        detalle = f"Precio fijo: ${pesaje.precio_fijo:,.2f}"
+    elif pesaje.precio_unitario:
         detalle = f"Precio/tn: ${pesaje.precio_unitario:,.2f}"
+        if pesaje.flete and pesaje.flete > 0:
+            detalle += f" + Flete: ${pesaje.flete:,.2f}"
     elif importe == 0:
         detalle = "Pendiente de precio"
     else:
@@ -378,7 +382,7 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
 
     # Si ya tiene remito generado y NO es admin, restringir campos
     if db_pesaje.remito_generado and not es_admin:
-        campos_permitidos = {'precio_unitario', 'importe_total', 'observaciones'}
+        campos_permitidos = {'precio_unitario', 'flete', 'precio_fijo', 'importe_total', 'observaciones'}
         campos_no_permitidos = set(update_data.keys()) - campos_permitidos
 
         if campos_no_permitidos:
@@ -403,11 +407,19 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
                 detail="El peso bruto debe ser mayor que el peso tara"
             )
 
-    # Recalcular importe_total si se actualizó precio_unitario
-    if 'precio_unitario' in update_data and db_pesaje.precio_unitario and db_pesaje.peso_neto:
-        # Convertir peso neto a toneladas y calcular importe
-        peso_toneladas = db_pesaje.peso_neto / Decimal("1000")
-        db_pesaje.importe_total = peso_toneladas * db_pesaje.precio_unitario
+    # Recalcular importe_total si se actualizaron campos de precio
+    campos_precio = {'precio_unitario', 'flete', 'precio_fijo'}
+    if campos_precio.intersection(update_data.keys()) and db_pesaje.peso_neto:
+        # Calcular según escenario:
+        # 1. Si hay precio_fijo: importe = precio_fijo
+        # 2. Si hay precio_unitario: importe = (toneladas * precio_unitario) + flete
+        if db_pesaje.precio_fijo:
+            db_pesaje.importe_total = db_pesaje.precio_fijo
+        elif db_pesaje.precio_unitario:
+            peso_toneladas = db_pesaje.peso_neto / Decimal("1000")
+            importe_material = peso_toneladas * db_pesaje.precio_unitario
+            flete = db_pesaje.flete or Decimal("0")
+            db_pesaje.importe_total = importe_material + flete
 
     # Si tiene remito asociado, actualizarlo con los nuevos datos del pesaje
     if db_pesaje.remito:
@@ -851,12 +863,33 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
         db_pesaje.chofer = pesaje_data.chofer
     if pesaje_data.observaciones:
         db_pesaje.observaciones = pesaje_data.observaciones
-    if pesaje_data.precio_unitario:
-        db_pesaje.precio_unitario = pesaje_data.precio_unitario
-    if pesaje_data.importe_total:
-        db_pesaje.importe_total = pesaje_data.importe_total
     if pesaje_data.orden_entrega_id:
         db_pesaje.orden_entrega_id = pesaje_data.orden_entrega_id
+
+    # Campos de precio
+    if pesaje_data.precio_unitario:
+        db_pesaje.precio_unitario = pesaje_data.precio_unitario
+    if pesaje_data.flete:
+        db_pesaje.flete = pesaje_data.flete
+    if pesaje_data.precio_fijo:
+        db_pesaje.precio_fijo = pesaje_data.precio_fijo
+
+    # Calcular importe_total según el escenario:
+    # 1. Si hay precio_fijo: importe = precio_fijo (ignora toneladas)
+    # 2. Si hay precio_unitario: importe = (toneladas * precio_unitario) + flete
+    # 3. Si no hay precio: importe = 0 (pendiente)
+    if pesaje_data.importe_total:
+        # Si viene explícitamente, usarlo
+        db_pesaje.importe_total = pesaje_data.importe_total
+    elif pesaje_data.precio_fijo:
+        # Escenario 3: Precio fijo por viaje
+        db_pesaje.importe_total = pesaje_data.precio_fijo
+    elif pesaje_data.precio_unitario:
+        # Escenario 1 y 2: Precio por tonelada (+ flete opcional)
+        peso_toneladas = peso_neto / Decimal("1000")
+        importe_material = peso_toneladas * pesaje_data.precio_unitario
+        flete = pesaje_data.flete or Decimal("0")
+        db_pesaje.importe_total = importe_material + flete
 
     db.commit()
     db.refresh(db_pesaje)

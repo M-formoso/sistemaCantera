@@ -341,6 +341,8 @@ export interface Pesaje {
   observaciones?: string
   // Importe
   precio_unitario?: number
+  flete?: number
+  precio_fijo?: number
   importe_total?: number
   movimiento_financiero_id?: string
   remito_generado: boolean
@@ -374,6 +376,8 @@ export interface PesajeCreate {
   observaciones?: string
   // Importe
   precio_unitario?: number
+  flete?: number
+  precio_fijo?: number
   importe_total?: number
 }
 
