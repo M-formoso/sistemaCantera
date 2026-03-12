@@ -157,7 +157,8 @@ def obtener_resumen_dia(db: Session) -> Dict[str, Any]:
             "fecha": p.fecha.isoformat(),
             "camion_patente": get_equipo_identificador(p.camion) if p.camion else (p.patente_externa or "Externo"),
             "material": p.material or "No especificado",
-            "peso_neto": float(p.peso_neto),
+            "peso_neto": float(p.peso_neto) if p.peso_neto else 0,
+            "estado": p.estado or "completado",
             "cliente_destino": (p.cliente.nombre if p.cliente else None) or p.cliente_nombre or "No especificado"
         }
         for p in ultimos_pesajes
