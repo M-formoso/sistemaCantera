@@ -28,6 +28,13 @@ const MATERIALES_DISPONIBLES = [
   '0.6',
 ]
 
+// Helper para preprocess de números
+const preprocessNumber = (val: unknown) =>
+  val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)
+
+const preprocessOptionalNumber = (val: unknown) =>
+  val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : Number(val)
+
 const pesajeSchema = z.object({
   tipo_entrega: z.enum(['propio', 'transportista']),
   // Camión propio (opcional si es transportista)
@@ -43,19 +50,19 @@ const pesajeSchema = z.object({
   fecha: z.string().min(1, 'La fecha es requerida'),
   acoplado: z.string().optional(),
   chofer: z.string().optional(),
-  // Pesos
-  peso_bruto: z.number().min(1, 'El peso bruto debe ser mayor a 0'),
-  peso_tara: z.number().min(1, 'El peso tara debe ser mayor a 0'),
+  // Pesos - con preprocess para manejar NaN
+  peso_bruto: z.preprocess(preprocessNumber, z.number().min(1, 'El peso bruto debe ser mayor a 0')),
+  peso_tara: z.preprocess(preprocessNumber, z.number().min(1, 'El peso tara debe ser mayor a 0')),
   // Material
   material: z.string().optional(),
   // Operación
   operario: z.string().optional(),
   observaciones: z.string().optional(),
-  // Importe
-  precio_unitario: z.number().min(0).optional(),
-  flete: z.number().min(0).optional(),
-  precio_fijo: z.number().min(0).optional(),
-  importe_total: z.number().min(0).optional(),
+  // Importe - con preprocess para manejar NaN
+  precio_unitario: z.preprocess(preprocessOptionalNumber, z.number().min(0).optional()),
+  flete: z.preprocess(preprocessOptionalNumber, z.number().min(0).optional()),
+  precio_fijo: z.preprocess(preprocessOptionalNumber, z.number().min(0).optional()),
+  importe_total: z.preprocess(preprocessOptionalNumber, z.number().min(0).optional()),
   // Orden de entrega
   orden_entrega_id: z.string().optional(),
 }).refine((data) => data.peso_bruto > data.peso_tara, {
