@@ -207,46 +207,6 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
 
     y -= peso_box_height + section_spacing
 
-    # ==================== IMPORTE (si existe) ====================
-    importe_total = pesaje_data.get('importe_total')
-    precio_fijo = pesaje_data.get('precio_fijo')
-    precio_unitario = pesaje_data.get('precio_unitario')
-    flete_valor = pesaje_data.get('flete')
-
-    if importe_total and float(importe_total) > 0:
-        # Formatear importes
-        def format_money(valor):
-            try:
-                return f"${float(valor):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-            except:
-                return "$0,00"
-
-        importe_y = y
-
-        if precio_fijo and float(precio_fijo) > 0:
-            # Escenario: Precio fijo por viaje
-            draw_field("Precio Fijo", format_money(precio_fijo), col1_x, importe_y)
-            y -= line_height
-        else:
-            # Escenario: Precio por tonelada + flete
-            if precio_unitario and float(precio_unitario) > 0:
-                peso_tn = float(peso_neto) / 1000
-                draw_field("Precio/tn", format_money(precio_unitario), col1_x, importe_y)
-                draw_field(f"{peso_tn:.2f} tn x", format_money(precio_unitario), col2_x, importe_y)
-                y -= line_height
-
-            if flete_valor and float(flete_valor) > 0:
-                draw_field("+ Flete", format_money(flete_valor), col1_x, y)
-                y -= line_height
-
-        # Total destacado
-        c.setFont("Helvetica-Bold", font_subtitle)
-        c.setFillColor(colors.HexColor('#006600'))
-        c.drawString(col1_x, y, "TOTAL:")
-        c.drawString(col1_x + label_width, y, format_money(importe_total))
-        c.setFillColor(colors.black)
-        y -= line_height + section_spacing
-
     # ==================== OPERARIO ====================
     draw_field("Operario", pesaje_data.get('operario', '-'), col1_x, y)
     y -= line_height + section_spacing + 4

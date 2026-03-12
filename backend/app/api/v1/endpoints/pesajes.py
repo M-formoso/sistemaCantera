@@ -273,7 +273,7 @@ async def descargar_ticket_pdf(
     # Usar fecha_completado si existe (tiene la hora real), sino usar fecha
     fecha_pesaje = pesaje.fecha_completado or pesaje.fecha
 
-    # Preparar datos para el PDF
+    # Preparar datos para el PDF (sin información de precios - es dato interno)
     pesaje_data = {
         "numero_pesaje": pesaje.numero_pesaje,
         "fecha": fecha_pesaje,
@@ -288,11 +288,6 @@ async def descargar_ticket_pdf(
         "peso_neto": float(pesaje.peso_neto) if pesaje.peso_neto else 0,
         "operario": pesaje.operario,
         "observaciones": pesaje.observaciones,
-        # Datos de importe
-        "precio_unitario": float(pesaje.precio_unitario) if pesaje.precio_unitario else None,
-        "flete": float(pesaje.flete) if pesaje.flete else None,
-        "precio_fijo": float(pesaje.precio_fijo) if pesaje.precio_fijo else None,
-        "importe_total": float(pesaje.importe_total) if pesaje.importe_total else None,
     }
 
     # Generar PDF con las copias solicitadas
