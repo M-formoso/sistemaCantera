@@ -196,6 +196,9 @@ export interface Repuesto {
   activo: boolean
   camion_id?: string
   camion_patente?: string
+  // Nuevos campos para relación N:N
+  asignado_a_equipo?: boolean
+  equipos_ids?: string[]
   created_at: string
   updated_at: string
 }

@@ -9,7 +9,7 @@ from uuid import UUID
 from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
 from app.models.usuario import Usuario
 from app.models.movimiento_stock import TipoMovimientoEnum
-from app.schemas.repuesto import RepuestoSchema, RepuestoCreate, RepuestoUpdate
+from app.schemas.repuesto import RepuestoSchema, RepuestoCreate, RepuestoUpdate, EquipoAsignado, RepuestoEquiposUpdate
 from app.services import repuesto_service
 from pydantic import BaseModel
 from decimal import Decimal
@@ -18,6 +18,10 @@ from decimal import Decimal
 class AjusteStockRequest(BaseModel):
     cantidad: Decimal
     observaciones: str | None = None
+
+
+class AsignarEquipoRequest(BaseModel):
+    camion_id: UUID
 
 router = APIRouter()
 
@@ -160,3 +164,69 @@ async def registrar_salida_stock(
         usuario_id=current_user.id,
         observaciones=data.observaciones
     )
+
+
+# ============ ENDPOINTS PARA ASIGNACIÓN N:N CON EQUIPOS ============
+
+@router.get("/{repuesto_id}/equipos", response_model=List[EquipoAsignado])
+async def obtener_equipos_asignados(
+    repuesto_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Obtiene todos los equipos a los que está asignado un repuesto.
+
+    Un repuesto puede estar asignado a múltiples equipos (relación N:N).
+    """
+    return repuesto_service.obtener_equipos_asignados(db, repuesto_id)
+
+
+@router.put("/{repuesto_id}/equipos")
+async def actualizar_equipos_asignados(
+    repuesto_id: UUID,
+    data: RepuestoEquiposUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Actualiza la lista completa de equipos asignados a un repuesto.
+
+    Reemplaza todas las asignaciones existentes con la nueva lista.
+    Un repuesto puede estar asignado a múltiples equipos.
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return repuesto_service.actualizar_equipos_asignados(db, repuesto_id, data.equipos_ids)
+
+
+@router.post("/{repuesto_id}/equipos/{camion_id}")
+async def asignar_a_equipo(
+    repuesto_id: UUID,
+    camion_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Asigna un repuesto a un equipo específico.
+
+    Un repuesto puede estar asignado a múltiples equipos.
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return repuesto_service.asignar_a_equipo(db, repuesto_id, camion_id)
+
+
+@router.delete("/{repuesto_id}/equipos/{camion_id}")
+async def desasignar_de_equipo(
+    repuesto_id: UUID,
+    camion_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador)
+):
+    """
+    Desasigna un repuesto de un equipo específico.
+
+    **Requiere rol:** Administrador u Operador
+    """
+    return repuesto_service.desasignar_de_equipo(db, repuesto_id, camion_id)

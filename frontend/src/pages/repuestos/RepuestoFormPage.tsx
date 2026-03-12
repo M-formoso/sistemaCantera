@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Check } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,16 +12,19 @@ import { repuestosService } from '@/services/repuestosService'
 import { camionesService } from '@/services/camionesService'
 import { Camion } from '@/types'
 
+// Helper para preprocess de números (evita NaN)
+const preprocessNumber = (val: unknown) =>
+  val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)
+
 const repuestoSchema = z.object({
   codigo: z.string().min(2, 'El código debe tener al menos 2 caracteres'),
   nombre: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
   descripcion: z.string().optional(),
   categoria: z.string().min(2, 'La categoría es requerida'),
-  precio_unitario: z.number().min(0, 'El precio debe ser positivo'),
-  stock_actual: z.number().min(0, 'El stock debe ser positivo'),
-  stock_minimo: z.number().min(0, 'El stock mínimo debe ser positivo'),
+  precio_unitario: z.preprocess(preprocessNumber, z.number().min(0, 'El precio debe ser positivo')),
+  stock_actual: z.preprocess(preprocessNumber, z.number().min(0, 'El stock debe ser positivo')),
+  stock_minimo: z.preprocess(preprocessNumber, z.number().min(0, 'El stock mínimo debe ser positivo')),
   ubicacion: z.string().optional(),
-  camion_id: z.string().optional(),
 })
 
 type RepuestoFormData = z.infer<typeof repuestoSchema>
@@ -32,9 +35,19 @@ export default function RepuestoFormPage() {
   const queryClient = useQueryClient()
   const isEditing = !!id
 
+  // Estado para equipos seleccionados (N:N)
+  const [equiposSeleccionados, setEquiposSeleccionados] = useState<string[]>([])
+
   const { data: repuesto } = useQuery({
     queryKey: ['repuesto', id],
     queryFn: () => repuestosService.getById(id!),
+    enabled: isEditing,
+  })
+
+  // Cargar equipos asignados al repuesto (si está editando)
+  const { data: equiposAsignados = [] } = useQuery({
+    queryKey: ['repuesto-equipos', id],
+    queryFn: () => repuestosService.getEquiposAsignados(id!),
     enabled: isEditing,
   })
 
@@ -58,6 +71,7 @@ export default function RepuestoFormPage() {
     },
   })
 
+  // Cargar datos del repuesto en edición
   useEffect(() => {
     if (repuesto) {
       reset({
@@ -69,18 +83,37 @@ export default function RepuestoFormPage() {
         stock_actual: repuesto.stock_actual,
         stock_minimo: repuesto.stock_minimo,
         ubicacion: repuesto.ubicacion || '',
-        camion_id: repuesto.camion_id || '',
       })
     }
   }, [repuesto, reset])
+
+  // Cargar equipos asignados cuando se carguen
+  useEffect(() => {
+    if (equiposAsignados.length > 0) {
+      setEquiposSeleccionados(equiposAsignados.map(e => e.id))
+    }
+  }, [equiposAsignados])
 
   // Separar camiones y máquinas
   const camiones = equipos.filter((e: Camion) => e.categoria === 'camion' && e.activo)
   const maquinas = equipos.filter((e: Camion) => e.categoria === 'maquina' && e.activo)
 
+  // Toggle selección de equipo
+  const toggleEquipo = (equipoId: string) => {
+    setEquiposSeleccionados(prev =>
+      prev.includes(equipoId)
+        ? prev.filter(id => id !== equipoId)
+        : [...prev, equipoId]
+    )
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: RepuestoFormData) => repuestosService.create(data),
-    onSuccess: () => {
+    onSuccess: async (newRepuesto) => {
+      // Si hay equipos seleccionados, asignarlos al nuevo repuesto
+      if (equiposSeleccionados.length > 0 && newRepuesto.id) {
+        await repuestosService.updateEquiposAsignados(newRepuesto.id, equiposSeleccionados)
+      }
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
       navigate('/repuestos')
     },
@@ -88,24 +121,22 @@ export default function RepuestoFormPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: RepuestoFormData) => repuestosService.update(id!, data),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Actualizar equipos asignados
+      await repuestosService.updateEquiposAsignados(id!, equiposSeleccionados)
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
       queryClient.invalidateQueries({ queryKey: ['repuesto', id] })
+      queryClient.invalidateQueries({ queryKey: ['repuesto-equipos', id] })
       navigate('/repuestos')
     },
   })
 
   const onSubmit = async (data: RepuestoFormData) => {
     try {
-      // Convertir camion_id vacío a undefined
-      const submitData = {
-        ...data,
-        camion_id: data.camion_id || undefined,
-      }
       if (isEditing) {
-        await updateMutation.mutateAsync(submitData)
+        await updateMutation.mutateAsync(data)
       } else {
-        await createMutation.mutateAsync(submitData)
+        await createMutation.mutateAsync(data)
       }
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Error al guardar el repuesto')
@@ -259,40 +290,113 @@ export default function RepuestoFormPage() {
                 )}
               </div>
 
-              {/* Asignación a Equipo */}
-              <div className="space-y-2">
-                <label htmlFor="camion_id" className="text-sm font-medium">
-                  Asignar a Equipo (opcional)
+            </div>
+
+            {/* Asignación a Equipos (N:N) */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">
+                  Equipos Compatibles
                 </label>
-                <select
-                  id="camion_id"
-                  {...register('camion_id')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Sin asignar (uso general)</option>
-                  {camiones.length > 0 && (
-                    <optgroup label="🚛 Camiones">
-                      {camiones.map((camion: Camion) => (
-                        <option key={camion.id} value={camion.id}>
-                          {camion.patente || camion.codigo_interno} - {camion.marca} {camion.modelo}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {maquinas.length > 0 && (
-                    <optgroup label="⚙️ Máquinas">
-                      {maquinas.map((maquina: Camion) => (
-                        <option key={maquina.id} value={maquina.id}>
-                          {maquina.nombre || maquina.codigo_interno} - {maquina.marca} {maquina.modelo}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  Si asigna el repuesto a un equipo, solo aparecerá disponible para ese equipo al registrar servicios.
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selecciona todos los equipos donde se puede usar este repuesto.
+                  Si no seleccionas ninguno, será de uso general.
                 </p>
               </div>
+
+              {/* Camiones */}
+              {camiones.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700">Camiones</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {camiones.map((camion: Camion) => (
+                      <label
+                        key={camion.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          equiposSeleccionados.includes(camion.id)
+                            ? 'bg-blue-50 border-blue-300'
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            equiposSeleccionados.includes(camion.id)
+                              ? 'bg-blue-600 border-blue-600'
+                              : 'border-gray-300'
+                          }`}
+                          onClick={() => toggleEquipo(camion.id)}
+                        >
+                          {equiposSeleccionados.includes(camion.id) && (
+                            <Check className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {camion.patente || camion.codigo_interno}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {camion.marca} {camion.modelo}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Máquinas */}
+              {maquinas.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700">Máquinas</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {maquinas.map((maquina: Camion) => (
+                      <label
+                        key={maquina.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          equiposSeleccionados.includes(maquina.id)
+                            ? 'bg-green-50 border-green-300'
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            equiposSeleccionados.includes(maquina.id)
+                              ? 'bg-green-600 border-green-600'
+                              : 'border-gray-300'
+                          }`}
+                          onClick={() => toggleEquipo(maquina.id)}
+                        >
+                          {equiposSeleccionados.includes(maquina.id) && (
+                            <Check className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {maquina.nombre || maquina.codigo_interno}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {maquina.marca} {maquina.modelo}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {equiposSeleccionados.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-blue-600">
+                  <Check className="w-4 h-4" />
+                  <span>{equiposSeleccionados.length} equipo(s) seleccionado(s)</span>
+                  <button
+                    type="button"
+                    onClick={() => setEquiposSeleccionados([])}
+                    className="text-red-600 hover:text-red-700 ml-2"
+                  >
+                    Limpiar selección
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Descripción */}

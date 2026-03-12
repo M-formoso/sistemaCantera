@@ -13,13 +13,20 @@ import { camionesService } from '@/services/camionesService'
 import { repuestosService } from '@/services/repuestosService'
 import { formatCurrency, getTodayLocalDate } from '@/lib/utils'
 
+// Helper para preprocess de números (evita NaN)
+const preprocessNumber = (val: unknown) =>
+  val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)
+
+const preprocessOptionalNumber = (val: unknown) =>
+  val === '' || val === undefined || val === null || Number.isNaN(val) ? null : Number(val)
+
 const servicioSchema = z.object({
   camion_id: z.string().min(1, 'Debe seleccionar un camión'),
   fecha: z.string().min(1, 'La fecha es requerida'),
   tipo: z.enum(['preventivo', 'correctivo', 'emergencia']),
   descripcion: z.string().min(5, 'La descripción debe tener al menos 5 caracteres'),
-  costo_mano_obra: z.number().min(0, 'El costo debe ser positivo'),
-  kilometraje_servicio: z.number().min(0, 'El kilometraje debe ser positivo').optional().nullable(),
+  costo_mano_obra: z.preprocess(preprocessNumber, z.number().min(0, 'El costo debe ser positivo')),
+  kilometraje_servicio: z.preprocess(preprocessOptionalNumber, z.number().min(0, 'El kilometraje debe ser positivo').nullable()),
   mecanico: z.string().optional().nullable(),
   observaciones: z.string().optional(),
 })
@@ -133,6 +140,8 @@ export default function ServicioFormPage() {
     }
   }, [servicio, reset])
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const createMutation = useMutation({
     mutationFn: (data: ServicioFormData & { repuestos: RepuestoSeleccionado[] }) =>
       serviciosService.create(data),
@@ -143,6 +152,12 @@ export default function ServicioFormPage() {
       queryClient.invalidateQueries({ queryKey: ['camion-servicios', variables.camion_id] })
       queryClient.invalidateQueries({ queryKey: ['camiones'] })
       navigate('/servicios')
+    },
+    onError: () => {
+      setIsSubmitting(false)
+    },
+    onSettled: () => {
+      // Solo resetear si hubo error (onSuccess ya navega)
     },
   })
 
@@ -156,6 +171,9 @@ export default function ServicioFormPage() {
       queryClient.invalidateQueries({ queryKey: ['camion-servicios', variables.camion_id] })
       queryClient.invalidateQueries({ queryKey: ['camiones'] })
       navigate('/servicios')
+    },
+    onError: () => {
+      setIsSubmitting(false)
     },
   })
 
@@ -196,6 +214,14 @@ export default function ServicioFormPage() {
   }
 
   const onSubmit = async (data: ServicioFormData) => {
+    // Prevenir doble submit
+    if (isSubmitting) {
+      console.log('Servicio ya se está guardando, ignorando click adicional')
+      return
+    }
+
+    setIsSubmitting(true)
+
     try {
       const payload = {
         ...data,
@@ -210,12 +236,15 @@ export default function ServicioFormPage() {
       } else {
         await createMutation.mutateAsync(payload)
       }
+      // No resetear isSubmitting aquí porque onSuccess navega automáticamente
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Error al guardar el servicio')
+      setIsSubmitting(false)
+      const errorMessage = error.response?.data?.detail || 'Error al guardar el servicio'
+      alert(errorMessage)
     }
   }
 
-  const isLoading = createMutation.isPending || updateMutation.isPending
+  const isLoading = createMutation.isPending || updateMutation.isPending || isSubmitting
 
   return (
     <div className="space-y-6">
@@ -416,11 +445,11 @@ export default function ServicioFormPage() {
                       ? 'Seleccionar repuesto...'
                       : 'Primero seleccione un equipo'}
                   </option>
-                  {/* Repuestos asignados al equipo */}
-                  {repuestos.filter(r => r.camion_id === camionIdSeleccionado).length > 0 && (
-                    <optgroup label="📦 Asignados a este equipo">
+                  {/* Repuestos asignados al equipo (N:N o legacy) */}
+                  {repuestos.filter(r => r.asignado_a_equipo || r.camion_id === camionIdSeleccionado).length > 0 && (
+                    <optgroup label="📦 Compatibles con este equipo">
                       {repuestos
-                        .filter(r => r.camion_id === camionIdSeleccionado)
+                        .filter(r => r.asignado_a_equipo || r.camion_id === camionIdSeleccionado)
                         .map((repuesto) => (
                           <option key={repuesto.id} value={repuesto.id}>
                             {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
@@ -428,11 +457,11 @@ export default function ServicioFormPage() {
                         ))}
                     </optgroup>
                   )}
-                  {/* Repuestos generales */}
-                  {repuestos.filter(r => !r.camion_id).length > 0 && (
+                  {/* Repuestos generales (sin asignación) */}
+                  {repuestos.filter(r => !r.asignado_a_equipo && !r.camion_id).length > 0 && (
                     <optgroup label="🔧 Repuestos generales">
                       {repuestos
-                        .filter(r => !r.camion_id)
+                        .filter(r => !r.asignado_a_equipo && !r.camion_id)
                         .map((repuesto) => (
                           <option key={repuesto.id} value={repuesto.id}>
                             {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}

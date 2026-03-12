@@ -2,7 +2,7 @@
 from app.models.base import BaseModel
 from app.models.usuario import Usuario
 from app.models.camion import Camion, DocumentoEquipo
-from app.models.repuesto import Repuesto
+from app.models.repuesto import Repuesto, RepuestoEquipo
 from app.models.servicio import Servicio, ServicioRepuesto
 from app.models.movimiento_stock import MovimientoStock
 from app.models.pesaje import Pesaje
@@ -23,6 +23,7 @@ __all__ = [
     "Camion",
     "DocumentoEquipo",
     "Repuesto",
+    "RepuestoEquipo",
     "Servicio",
     "ServicioRepuesto",
     "MovimientoStock",

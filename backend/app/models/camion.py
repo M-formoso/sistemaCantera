@@ -101,6 +101,9 @@ class Camion(BaseModel):
     suministros_combustible = relationship("SuministroCombustible", back_populates="camion")
     documentos = relationship("DocumentoEquipo", back_populates="equipo", cascade="all, delete-orphan")
 
+    # Nueva relación N:N con repuestos compatibles
+    repuestos_compatibles = relationship("RepuestoEquipo", back_populates="camion", cascade="all, delete-orphan")
+
     def __repr__(self):
         identificador = self.patente or self.nombre or self.codigo_interno
         return f"<Equipo {identificador}>"

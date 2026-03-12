@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
 
 from app.schemas.common import ResponseBase
@@ -16,7 +16,8 @@ class RepuestoBase(BaseModel):
     precio_unitario: Optional[Decimal] = Field(None, ge=0)
     proveedor: Optional[str] = Field(None, max_length=255)
     ubicacion_deposito: Optional[str] = Field(None, max_length=100)
-    camion_id: Optional[UUID] = Field(None, description="ID del equipo asignado (opcional)")
+    camion_id: Optional[UUID] = Field(None, description="ID del equipo asignado (legacy)")
+    equipos_ids: Optional[List[UUID]] = Field(None, description="IDs de equipos asignados (N:N)")
 
 
 class RepuestoCreate(RepuestoBase):
@@ -48,7 +49,24 @@ class RepuestoSchema(ResponseBase, RepuestoBase):
     stock_actual: Decimal
     stock_minimo: Decimal
     activo: bool
-    camion_patente: Optional[str] = None  # Patente del equipo asignado
+    camion_patente: Optional[str] = None  # Patente del equipo asignado (legacy)
+    asignado_a_equipo: Optional[bool] = None  # Si está asignado al equipo consultado
+    equipos_ids: Optional[List[UUID]] = None  # IDs de equipos asignados (N:N)
+
+
+class EquipoAsignado(BaseModel):
+    """Schema para equipo asignado a un repuesto"""
+
+    id: UUID
+    identificador: str
+    categoria: str
+    legacy: bool = False
+
+
+class RepuestoEquiposUpdate(BaseModel):
+    """Schema para actualizar equipos asignados a un repuesto"""
+
+    equipos_ids: List[UUID] = Field(..., description="Lista de IDs de equipos a asignar")
 
 
 class RepuestoStockBajo(BaseModel):

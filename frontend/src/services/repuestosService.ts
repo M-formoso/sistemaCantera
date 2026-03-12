@@ -99,4 +99,38 @@ export const repuestosService = {
     })
     return response.data
   },
+
+  /**
+   * Obtiene los equipos asignados a un repuesto
+   */
+  async getEquiposAsignados(repuestoId: string): Promise<{ id: string; identificador: string; categoria: string; legacy: boolean }[]> {
+    const response = await api.get(`/repuestos/${repuestoId}/equipos`)
+    return response.data
+  },
+
+  /**
+   * Actualiza la lista de equipos asignados a un repuesto
+   */
+  async updateEquiposAsignados(repuestoId: string, equiposIds: string[]): Promise<{ message: string }> {
+    const response = await api.put(`/repuestos/${repuestoId}/equipos`, {
+      equipos_ids: equiposIds,
+    })
+    return response.data
+  },
+
+  /**
+   * Asigna un repuesto a un equipo específico
+   */
+  async asignarAEquipo(repuestoId: string, equipoId: string): Promise<{ message: string }> {
+    const response = await api.post(`/repuestos/${repuestoId}/equipos/${equipoId}`)
+    return response.data
+  },
+
+  /**
+   * Desasigna un repuesto de un equipo
+   */
+  async desasignarDeEquipo(repuestoId: string, equipoId: string): Promise<{ message: string }> {
+    const response = await api.delete(`/repuestos/${repuestoId}/equipos/${equipoId}`)
+    return response.data
+  },
 }
