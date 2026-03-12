@@ -47,7 +47,10 @@ const pesajeTaraSchema = z.object({
   cliente_nombre: z.string().optional(),
   acoplado: z.string().optional(),
   chofer: z.string().optional(),
-  peso_tara: z.number().min(1, 'El peso tara debe ser mayor a 0'),
+  peso_tara: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)),
+    z.number().min(1, 'El peso tara debe ser mayor a 0')
+  ),
   material: z.string().optional(),
   operario: z.string().optional(),
   observaciones: z.string().optional(),
@@ -57,14 +60,29 @@ const pesajeTaraSchema = z.object({
 
 // Schema para completar pesaje (bruto)
 const pesajeBrutoSchema = z.object({
-  peso_bruto: z.number().min(1, 'El peso bruto debe ser mayor a 0'),
+  peso_bruto: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)),
+    z.number().min(1, 'El peso bruto debe ser mayor a 0')
+  ),
   material: z.string().optional(),
   chofer: z.string().optional(),
   observaciones: z.string().optional(),
-  precio_unitario: z.number().min(0).optional(),
-  flete: z.number().min(0).optional(),
-  precio_fijo: z.number().min(0).optional(),
-  importe_total: z.number().min(0).optional(),
+  precio_unitario: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : Number(val)),
+    z.number().min(0).optional()
+  ),
+  flete: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : Number(val)),
+    z.number().min(0).optional()
+  ),
+  precio_fijo: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : Number(val)),
+    z.number().min(0).optional()
+  ),
+  importe_total: z.preprocess(
+    (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? undefined : Number(val)),
+    z.number().min(0).optional()
+  ),
   orden_entrega_id: z.string().optional(),
 })
 
@@ -1172,6 +1190,18 @@ export default function NuevoPesajePage() {
                       className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     />
                   </div>
+
+                  {/* Mostrar errores de validación */}
+                  {Object.keys(brutoForm.formState.errors).length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
+                      <p className="font-medium">Errores de validación:</p>
+                      <ul className="list-disc list-inside mt-1">
+                        {Object.entries(brutoForm.formState.errors).map(([field, error]) => (
+                          <li key={field}>{field}: {error?.message?.toString() || 'Error'}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Botones */}
                   <div className="flex items-center gap-4 pt-4 border-t">
