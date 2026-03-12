@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown,
-  X, Search, Pencil
+  X, Search, Pencil, DollarSign
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
 import { facturacionService } from '@/services/facturacionService'
 import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
+import NuevoCobroModal from '@/components/cobros/NuevoCobroModal'
 
 export default function CuentaCorrienteTab() {
   const queryClient = useQueryClient()
@@ -20,6 +21,7 @@ export default function CuentaCorrienteTab() {
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [showAjusteModal, setShowAjusteModal] = useState(false)
   const [showEditarMontoModal, setShowEditarMontoModal] = useState(false)
+  const [showNuevoCobroModal, setShowNuevoCobroModal] = useState(false)
   const [movimientoAEditar, setMovimientoAEditar] = useState<any>(null)
   const [busqueda, setBusqueda] = useState('')
 
@@ -110,6 +112,15 @@ export default function CuentaCorrienteTab() {
 
   return (
     <div className="space-y-6">
+      {/* Cabecera con botón Nuevo Cobro */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold">Cuenta Corriente</h2>
+        <Button onClick={() => setShowNuevoCobroModal(true)} className="bg-green-600 hover:bg-green-700">
+          <DollarSign className="h-4 w-4 mr-2" />
+          Nuevo Cobro
+        </Button>
+      </div>
+
       {/* Estadísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
@@ -404,6 +415,18 @@ export default function CuentaCorrienteTab() {
           }}
         />
       )}
+
+      {/* Modal Nuevo Cobro */}
+      <NuevoCobroModal
+        isOpen={showNuevoCobroModal}
+        onClose={() => setShowNuevoCobroModal(false)}
+        clienteId={selectedCliente || undefined}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+          queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+          queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+        }}
+      />
     </div>
   )
 }

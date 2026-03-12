@@ -13,7 +13,7 @@ from app.models.empresa import Empresa
 from app.models.finanzas import CategoriaFinanzas, MovimientoFinanciero, CuentaBancaria
 from app.models.orden_entrega import OrdenEntrega
 from app.models.camion_cliente import CamionCliente
-from app.models.cuenta_corriente import MovimientoCuentaCorriente
+from app.models.cuenta_corriente import MovimientoCuentaCorriente, CobroCliente, ItemCobroCliente
 from app.models.trabajo import Trabajo, TrabajoRepuesto
 from app.models.factura import Factura, PagoFactura, PagoRemito, factura_remito
 
@@ -39,6 +39,8 @@ __all__ = [
     "OrdenEntrega",
     "CamionCliente",
     "MovimientoCuentaCorriente",
+    "CobroCliente",
+    "ItemCobroCliente",
     "Trabajo",
     "TrabajoRepuesto",
     "Factura",

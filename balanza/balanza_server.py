@@ -13,14 +13,28 @@ Configuración de la balanza:
 - Dato: 7 bytes (6 bytes de peso)
 """
 
-import serial
-import serial.tools.list_ports
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
-import threading
-import time
 import sys
 import os
+import time
+import json
+import threading
+
+# Verificar e instalar pyserial si no está instalado
+try:
+    import serial
+    import serial.tools.list_ports
+except ImportError:
+    print("=" * 50)
+    print("Instalando librería pyserial...")
+    print("=" * 50)
+    os.system(f'{sys.executable} -m pip install pyserial')
+    print("")
+    print("Librería instalada. Reiniciando...")
+    print("")
+    import serial
+    import serial.tools.list_ports
+
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Configuración de la balanza
 SERIAL_CONFIG = {
@@ -259,13 +273,43 @@ def main():
     try:
         server = HTTPServer(('127.0.0.1', HTTP_PORT), BalanzaHandler)
         print(f"Servidor iniciado en puerto {HTTP_PORT}")
+        print("")
+        print("*** NO CIERRE ESTA VENTANA ***")
+        print("El servidor debe permanecer abierto mientras usa el sistema.")
+        print("")
         print("Presione Ctrl+C para detener")
+        print("=" * 50)
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nServidor detenido")
+        print("\nServidor detenido por el usuario")
+    except OSError as e:
+        if "10048" in str(e) or "Address already in use" in str(e):
+            print("")
+            print("=" * 50)
+            print("ERROR: El puerto 5555 ya está en uso.")
+            print("")
+            print("Esto puede significar que:")
+            print("1. Ya hay otra ventana del servidor abierta")
+            print("2. Otro programa está usando el puerto 5555")
+            print("")
+            print("Solución: Cierre la otra ventana del servidor e intente de nuevo.")
+            print("=" * 50)
+        else:
+            print(f"Error de red: {e}")
     except Exception as e:
         print(f"Error iniciando servidor: {e}")
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print("")
+        print("=" * 50)
+        print(f"ERROR CRITICO: {e}")
+        print("=" * 50)
+
+    # SIEMPRE esperar antes de cerrar
+    print("")
+    print("=" * 50)
+    input("Presione ENTER para cerrar esta ventana...")
