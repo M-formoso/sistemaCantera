@@ -83,6 +83,7 @@ class Camion(BaseModel):
     proximo_servicio_fecha = Column(Date, nullable=True)
     intervalo_servicio_km = Column(Integer, default=10000)  # Cada cuántos km hacer servicio
     intervalo_servicio_horas = Column(Integer, default=250)  # Cada cuántas horas hacer servicio
+    intervalo_servicio_dias = Column(Integer, default=90)  # Cada cuántos días hacer servicio (por fecha)
 
     # Documentación (URLs de Cloudinary)
     tarjeta_verde_url = Column(String(500))

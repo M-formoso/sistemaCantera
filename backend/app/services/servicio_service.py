@@ -185,6 +185,12 @@ def crear_con_repuestos(
 
     # 5. Actualizar datos del equipo (camión o máquina)
     camion.ultimo_servicio = servicio_data.fecha
+
+    # Calcular próxima fecha de servicio (por defecto, 3 meses después o según intervalo configurado)
+    # Usar intervalo de días si está configurado, sino 90 días por defecto
+    intervalo_dias = camion.intervalo_servicio_dias or 90
+    camion.proximo_servicio_fecha = servicio_data.fecha + timedelta(days=intervalo_dias)
+
     if servicio_data.kilometraje_servicio:
         # Para máquinas, se usa el horómetro en lugar del kilometraje
         if camion.categoria == 'maquina':
