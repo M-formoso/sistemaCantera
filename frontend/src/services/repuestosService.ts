@@ -104,7 +104,7 @@ export const repuestosService = {
    * Obtiene los equipos asignados a un repuesto
    */
   async getEquiposAsignados(repuestoId: string): Promise<{ id: string; identificador: string; categoria: string; legacy: boolean }[]> {
-    const response = await api.get(`/repuestos/${repuestoId}/equipos`)
+    const response = await api.get<{ id: string; identificador: string; categoria: string; legacy: boolean }[]>(`/repuestos/${repuestoId}/equipos`)
     return response.data
   },
 
@@ -112,7 +112,7 @@ export const repuestosService = {
    * Actualiza la lista de equipos asignados a un repuesto
    */
   async updateEquiposAsignados(repuestoId: string, equiposIds: string[]): Promise<{ message: string }> {
-    const response = await api.put(`/repuestos/${repuestoId}/equipos`, {
+    const response = await api.put<{ message: string }>(`/repuestos/${repuestoId}/equipos`, {
       equipos_ids: equiposIds,
     })
     return response.data
@@ -122,7 +122,7 @@ export const repuestosService = {
    * Asigna un repuesto a un equipo específico
    */
   async asignarAEquipo(repuestoId: string, equipoId: string): Promise<{ message: string }> {
-    const response = await api.post(`/repuestos/${repuestoId}/equipos/${equipoId}`)
+    const response = await api.post<{ message: string }>(`/repuestos/${repuestoId}/equipos/${equipoId}`)
     return response.data
   },
 
@@ -130,7 +130,7 @@ export const repuestosService = {
    * Desasigna un repuesto de un equipo
    */
   async desasignarDeEquipo(repuestoId: string, equipoId: string): Promise<{ message: string }> {
-    const response = await api.delete(`/repuestos/${repuestoId}/equipos/${equipoId}`)
+    const response = await api.delete<{ message: string }>(`/repuestos/${repuestoId}/equipos/${equipoId}`)
     return response.data
   },
 }
