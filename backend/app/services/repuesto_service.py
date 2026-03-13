@@ -36,7 +36,14 @@ def obtener_todos(
 
 
 def _repuesto_con_patente(repuesto: Repuesto) -> dict:
-    """Convierte un repuesto a dict incluyendo la patente del camión"""
+    """Convierte un repuesto a dict incluyendo la patente del camión y equipos asignados"""
+    # Obtener IDs de equipos asignados (N:N)
+    equipos_ids = []
+    try:
+        equipos_ids = [str(eq.camion_id) for eq in repuesto.equipos_asignados]
+    except Exception:
+        pass
+
     data = {
         "id": repuesto.id,
         "codigo": repuesto.codigo,
@@ -51,6 +58,7 @@ def _repuesto_con_patente(repuesto: Repuesto) -> dict:
         "activo": repuesto.activo,
         "camion_id": getattr(repuesto, 'camion_id', None),
         "camion_patente": None,
+        "equipos_ids": equipos_ids,  # Lista de equipos asignados (N:N)
         "created_at": repuesto.created_at,
         "updated_at": repuesto.updated_at,
     }

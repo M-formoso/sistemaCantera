@@ -446,10 +446,18 @@ export default function ServicioFormPage() {
                       : 'Primero seleccione un equipo'}
                   </option>
                   {/* Repuestos asignados al equipo (N:N o legacy) */}
-                  {repuestos.filter(r => r.asignado_a_equipo || r.camion_id === camionIdSeleccionado).length > 0 && (
+                  {repuestos.filter(r =>
+                    r.asignado_a_equipo ||
+                    r.camion_id === camionIdSeleccionado ||
+                    (r.equipos_ids && r.equipos_ids.includes(camionIdSeleccionado))
+                  ).length > 0 && (
                     <optgroup label="📦 Compatibles con este equipo">
                       {repuestos
-                        .filter(r => r.asignado_a_equipo || r.camion_id === camionIdSeleccionado)
+                        .filter(r =>
+                          r.asignado_a_equipo ||
+                          r.camion_id === camionIdSeleccionado ||
+                          (r.equipos_ids && r.equipos_ids.includes(camionIdSeleccionado))
+                        )
                         .map((repuesto) => (
                           <option key={repuesto.id} value={repuesto.id}>
                             {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
@@ -457,11 +465,19 @@ export default function ServicioFormPage() {
                         ))}
                     </optgroup>
                   )}
-                  {/* Repuestos generales (sin asignación) */}
-                  {repuestos.filter(r => !r.asignado_a_equipo && !r.camion_id).length > 0 && (
+                  {/* Repuestos generales (sin asignación a ningún equipo) */}
+                  {repuestos.filter(r =>
+                    !r.asignado_a_equipo &&
+                    !r.camion_id &&
+                    (!r.equipos_ids || r.equipos_ids.length === 0)
+                  ).length > 0 && (
                     <optgroup label="🔧 Repuestos generales">
                       {repuestos
-                        .filter(r => !r.asignado_a_equipo && !r.camion_id)
+                        .filter(r =>
+                          !r.asignado_a_equipo &&
+                          !r.camion_id &&
+                          (!r.equipos_ids || r.equipos_ids.length === 0)
+                        )
                         .map((repuesto) => (
                           <option key={repuesto.id} value={repuesto.id}>
                             {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}

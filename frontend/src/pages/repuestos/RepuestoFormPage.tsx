@@ -310,8 +310,9 @@ export default function RepuestoFormPage() {
                   <h4 className="text-sm font-medium text-gray-700">Camiones</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     {camiones.map((camion: Camion) => (
-                      <label
+                      <div
                         key={camion.id}
+                        onClick={() => toggleEquipo(camion.id)}
                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                           equiposSeleccionados.includes(camion.id)
                             ? 'bg-blue-50 border-blue-300'
@@ -324,7 +325,6 @@ export default function RepuestoFormPage() {
                               ? 'bg-blue-600 border-blue-600'
                               : 'border-gray-300'
                           }`}
-                          onClick={() => toggleEquipo(camion.id)}
                         >
                           {equiposSeleccionados.includes(camion.id) && (
                             <Check className="w-3 h-3 text-white" />
@@ -338,7 +338,7 @@ export default function RepuestoFormPage() {
                             {camion.marca} {camion.modelo}
                           </p>
                         </div>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -350,8 +350,9 @@ export default function RepuestoFormPage() {
                   <h4 className="text-sm font-medium text-gray-700">Máquinas</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     {maquinas.map((maquina: Camion) => (
-                      <label
+                      <div
                         key={maquina.id}
+                        onClick={() => toggleEquipo(maquina.id)}
                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                           equiposSeleccionados.includes(maquina.id)
                             ? 'bg-green-50 border-green-300'
@@ -364,7 +365,6 @@ export default function RepuestoFormPage() {
                               ? 'bg-green-600 border-green-600'
                               : 'border-gray-300'
                           }`}
-                          onClick={() => toggleEquipo(maquina.id)}
                         >
                           {equiposSeleccionados.includes(maquina.id) && (
                             <Check className="w-3 h-3 text-white" />
@@ -378,7 +378,7 @@ export default function RepuestoFormPage() {
                             {maquina.marca} {maquina.modelo}
                           </p>
                         </div>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
