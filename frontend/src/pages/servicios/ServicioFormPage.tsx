@@ -149,8 +149,10 @@ export default function ServicioFormPage() {
       queryClient.invalidateQueries({ queryKey: ['servicios'] })
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumen'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-estadisticas-mes'] })
       queryClient.invalidateQueries({ queryKey: ['camion-servicios', variables.camion_id] })
       queryClient.invalidateQueries({ queryKey: ['camiones'] })
+      queryClient.invalidateQueries({ queryKey: ['camion', variables.camion_id] })
       navigate('/servicios')
     },
     onError: () => {

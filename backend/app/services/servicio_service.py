@@ -109,6 +109,10 @@ def crear_con_repuestos(
     repuestos_data = servicio_data.repuestos
     servicio_dict = servicio_data.model_dump(exclude={'repuestos'})
 
+    # Si la fecha es hoy o anterior, el servicio ya se realizó -> completado
+    if servicio_data.fecha <= date.today():
+        servicio_dict['estado'] = EstadoServicioEnum.COMPLETADO
+
     db_servicio = Servicio(
         **servicio_dict,
         created_by=usuario_id,

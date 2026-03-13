@@ -119,35 +119,45 @@ def obtener_por_equipo(
     Returns:
         Lista de repuestos con campo 'asignado_a_equipo' indicando si está asignado al equipo actual
     """
-    from sqlalchemy import or_, exists
+    from sqlalchemy import or_, and_, not_
+    from sqlalchemy.orm import selectinload
 
-    # Subquery para verificar si el repuesto está asignado al equipo en la tabla N:N
-    asignado_nn = db.query(RepuestoEquipo.repuesto_id).filter(
+    # Obtener IDs de repuestos asignados a este equipo via N:N
+    repuestos_asignados_nn = db.query(RepuestoEquipo.repuesto_id).filter(
         RepuestoEquipo.camion_id == camion_id
-    ).subquery()
+    ).all()
+    ids_asignados_nn = [r[0] for r in repuestos_asignados_nn]
 
-    query = db.query(Repuesto).filter(Repuesto.activo == True)
+    # Query base: solo repuestos activos, cargar relación equipos_asignados
+    query = db.query(Repuesto).filter(
+        Repuesto.activo == True
+    ).options(selectinload(Repuesto.equipos_asignados))
 
     if incluir_generales:
+        # Obtener IDs de repuestos que tienen alguna asignación N:N (a cualquier equipo)
+        repuestos_con_asignacion_nn = db.query(RepuestoEquipo.repuesto_id).distinct().all()
+        ids_con_asignacion = [r[0] for r in repuestos_con_asignacion_nn]
+
         # Incluir repuestos que:
-        # 1. Están en la tabla N:N para este equipo
+        # 1. Están asignados a este equipo via N:N
         # 2. Tienen camion_id = equipo (legacy)
-        # 3. No tienen ninguna asignación (generales)
+        # 3. No tienen ninguna asignación (ni legacy ni N:N) = generales
         query = query.filter(
             or_(
-                Repuesto.id.in_(db.query(asignado_nn.c.repuesto_id)),
+                Repuesto.id.in_(ids_asignados_nn) if ids_asignados_nn else False,
                 Repuesto.camion_id == camion_id,
-                # Repuestos generales: no tienen asignación legacy NI en tabla N:N
-                (Repuesto.camion_id.is_(None) & ~exists(
-                    db.query(RepuestoEquipo.id).filter(RepuestoEquipo.repuesto_id == Repuesto.id)
-                ))
+                # Generales: sin camion_id legacy Y sin asignaciones N:N
+                and_(
+                    Repuesto.camion_id.is_(None),
+                    not_(Repuesto.id.in_(ids_con_asignacion)) if ids_con_asignacion else True
+                )
             )
         )
     else:
         # Solo repuestos asignados al equipo (N:N o legacy)
         query = query.filter(
             or_(
-                Repuesto.id.in_(db.query(asignado_nn.c.repuesto_id)),
+                Repuesto.id.in_(ids_asignados_nn) if ids_asignados_nn else False,
                 Repuesto.camion_id == camion_id
             )
         )
