@@ -2,18 +2,23 @@ from sqlalchemy import Column, String, Numeric, Boolean, ForeignKey, DateTime, T
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from datetime import datetime
+import uuid
 
 from app.models.base import BaseModel, Base
 
 
 # Tabla intermedia para relación N:N entre Repuestos y Equipos (Camiones/Máquinas)
-class RepuestoEquipo(BaseModel):
+# No hereda de BaseModel porque la tabla solo tiene id y created_at (sin updated_at)
+class RepuestoEquipo(Base):
     """Tabla de asociación entre Repuestos y Equipos (relación muchos a muchos)"""
 
     __tablename__ = "repuestos_equipos"
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     repuesto_id = Column(UUID(as_uuid=True), ForeignKey("repuestos.id", ondelete="CASCADE"), nullable=False, index=True)
     camion_id = Column(UUID(as_uuid=True), ForeignKey("camiones.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
 
     # Relaciones
     repuesto = relationship("Repuesto", back_populates="equipos_asignados")
