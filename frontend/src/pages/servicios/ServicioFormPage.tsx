@@ -77,17 +77,13 @@ export default function ServicioFormPage() {
     },
   })
 
-  // Cargar repuestos filtrados por equipo seleccionado
+  // Cargar todos los repuestos disponibles
   const camionIdSeleccionado = watch('camion_id')
   const costoManoObra = watch('costo_mano_obra')
 
   const { data: repuestos = [] } = useQuery({
-    queryKey: ['repuestos-por-equipo', camionIdSeleccionado],
-    queryFn: () =>
-      camionIdSeleccionado
-        ? repuestosService.getByEquipo(camionIdSeleccionado, true)
-        : repuestosService.getAll(true),
-    enabled: true,
+    queryKey: ['repuestos'],
+    queryFn: () => repuestosService.getAll(true),
   })
 
   // Obtener datos del equipo seleccionado para adaptar labels
@@ -440,53 +436,13 @@ export default function ServicioFormPage() {
                     e.target.value = ''
                   }}
                   defaultValue=""
-                  disabled={!camionIdSeleccionado}
                 >
-                  <option value="">
-                    {camionIdSeleccionado
-                      ? 'Seleccionar repuesto...'
-                      : 'Primero seleccione un equipo'}
-                  </option>
-                  {/* Repuestos asignados al equipo (N:N o legacy) */}
-                  {repuestos.filter(r =>
-                    r.asignado_a_equipo ||
-                    r.camion_id === camionIdSeleccionado ||
-                    (r.equipos_ids && r.equipos_ids.includes(camionIdSeleccionado))
-                  ).length > 0 && (
-                    <optgroup label="📦 Compatibles con este equipo">
-                      {repuestos
-                        .filter(r =>
-                          r.asignado_a_equipo ||
-                          r.camion_id === camionIdSeleccionado ||
-                          (r.equipos_ids && r.equipos_ids.includes(camionIdSeleccionado))
-                        )
-                        .map((repuesto) => (
-                          <option key={repuesto.id} value={repuesto.id}>
-                            {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                  {/* Repuestos generales (sin asignación a ningún equipo) */}
-                  {repuestos.filter(r =>
-                    !r.asignado_a_equipo &&
-                    !r.camion_id &&
-                    (!r.equipos_ids || r.equipos_ids.length === 0)
-                  ).length > 0 && (
-                    <optgroup label="🔧 Repuestos generales">
-                      {repuestos
-                        .filter(r =>
-                          !r.asignado_a_equipo &&
-                          !r.camion_id &&
-                          (!r.equipos_ids || r.equipos_ids.length === 0)
-                        )
-                        .map((repuesto) => (
-                          <option key={repuesto.id} value={repuesto.id}>
-                            {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
+                  <option value="">Seleccionar repuesto...</option>
+                  {repuestos.map((repuesto) => (
+                    <option key={repuesto.id} value={repuesto.id}>
+                      {repuesto.nombre} - Stock: {repuesto.stock_actual} - {formatCurrency(repuesto.precio_unitario)}
+                    </option>
+                  ))}
                 </select>
                 <Button
                   type="button"
@@ -496,9 +452,9 @@ export default function ServicioFormPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              {camionIdSeleccionado && repuestos.length === 0 && (
+              {repuestos.length === 0 && (
                 <p className="text-sm text-muted-foreground italic">
-                  No hay repuestos disponibles para este equipo
+                  No hay repuestos disponibles
                 </p>
               )}
 
