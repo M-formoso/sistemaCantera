@@ -16,7 +16,10 @@ MATERIALES_DISPONIBLES = [
     "6.12",
     "relleno",
     "binder",
-    "0.6"
+    "0.6",
+    "piedra partida",
+    "suelo arena",
+    "retiro"
 ]
 
 # Estados de pesaje

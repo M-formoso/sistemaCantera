@@ -13,7 +13,7 @@ import { empresasService } from '@/services/empresasService'
 import { usuariosService } from '@/services/usuariosService'
 import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
 
-const MATERIALES = ['10.30', '6.19', '0.20', '6.12', 'relleno', 'binder', '0.6']
+const MATERIALES = ['10.30', '6.19', '0.20', '6.12', 'relleno', 'binder', '0.6', 'piedra partida', 'suelo arena', 'retiro']
 
 export default function OrdenesEntregaTab() {
   const queryClient = useQueryClient()

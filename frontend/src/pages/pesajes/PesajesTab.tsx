@@ -21,6 +21,9 @@ const MATERIALES_DISPONIBLES = [
   'relleno',
   'binder',
   '0.6',
+  'piedra partida',
+  'suelo arena',
+  'retiro',
 ]
 
 export default function PesajesTab() {
