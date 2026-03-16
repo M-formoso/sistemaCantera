@@ -8,8 +8,7 @@ from typing import Optional, List
 from datetime import date
 from io import BytesIO
 
-from app.core.deps import get_db
-from app.api.v1.endpoints.auth import get_current_user
+from app.core.deps import get_db, get_current_user
 from app.models.usuario import Usuario
 from app.services import reportes_service
 from app.schemas.reportes import (
