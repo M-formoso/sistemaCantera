@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   FileText, Download, TrendingUp, TrendingDown, Truck, Users,
-  Package, Calendar, Filter, BarChart3, PieChart, ArrowUpRight,
+  Package, Calendar, Filter, BarChart3, PieChart,
   DollarSign, Fuel, Wrench, Loader2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

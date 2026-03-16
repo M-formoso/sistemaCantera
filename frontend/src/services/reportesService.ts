@@ -205,7 +205,8 @@ export const reportesService = {
     })
 
     // Descargar el archivo
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const blob = response.data as Blob
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.setAttribute('download', `reporte_${tipo}_${new Date().toISOString().split('T')[0]}.pdf`)
