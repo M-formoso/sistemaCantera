@@ -40,6 +40,9 @@ import EmpresasPage from '@/pages/empresas/EmpresasPage'
 // Finanzas
 import FinanzasPage from '@/pages/finanzas/FinanzasPage'
 
+// Reportes
+import ReportesPage from '@/pages/reportes/ReportesPage'
+
 // Componente para redirigir a la primera ruta disponible
 function RedirectToFirstAvailable() {
   const { user } = useAuthStore()
@@ -114,7 +117,7 @@ function App() {
           <Route path="finanzas" element={<PermisoRoute permiso="permiso_finanzas"><FinanzasPage /></PermisoRoute>} />
 
           {/* Reportes */}
-          <Route path="reportes" element={<PermisoRoute permiso="permiso_reportes"><div className="p-4">Módulo de Reportes (en desarrollo)</div></PermisoRoute>} />
+          <Route path="reportes" element={<PermisoRoute permiso="permiso_reportes"><ReportesPage /></PermisoRoute>} />
         </Route>
 
         {/* Ruta 404 */}
