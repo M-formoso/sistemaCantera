@@ -12,7 +12,7 @@ from app.models.pesaje import Pesaje
 from app.models.empresa import Empresa
 from app.models.camion import Camion
 from app.models.servicio import Servicio
-from app.models.combustible import SuministroCombustible, CargaCombustible
+from app.models.combustible import SuministroCombustible, CargaCisterna
 from app.models.finanzas import MovimientoFinanciero
 from app.models.repuesto import Repuesto, MovimientoRepuesto
 
@@ -184,9 +184,9 @@ def obtener_reporte_gastos(
     fecha_desde, fecha_hasta = _get_fecha_default(fecha_desde, fecha_hasta)
 
     # Gastos de combustible (cargas)
-    total_combustible = db.query(func.sum(CargaCombustible.costo_total)).filter(
-        func.date(CargaCombustible.fecha) >= fecha_desde,
-        func.date(CargaCombustible.fecha) <= fecha_hasta
+    total_combustible = db.query(func.sum(CargaCisterna.costo_total)).filter(
+        func.date(CargaCisterna.fecha) >= fecha_desde,
+        func.date(CargaCisterna.fecha) <= fecha_hasta
     ).scalar() or Decimal("0")
 
     # Gastos de servicios
@@ -220,9 +220,9 @@ def obtener_reporte_gastos(
     if total_combustible > 0:
         categorias.append(GastoPorCategoria(
             categoria="Combustible",
-            cantidad=db.query(CargaCombustible).filter(
-                func.date(CargaCombustible.fecha) >= fecha_desde,
-                func.date(CargaCombustible.fecha) <= fecha_hasta
+            cantidad=db.query(CargaCisterna).filter(
+                func.date(CargaCisterna.fecha) >= fecha_desde,
+                func.date(CargaCisterna.fecha) <= fecha_hasta
             ).count(),
             total=total_combustible,
             porcentaje=round((total_combustible / total_gastos * 100) if total_gastos > 0 else Decimal("0"), 2)
