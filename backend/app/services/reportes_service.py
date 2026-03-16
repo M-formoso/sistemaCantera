@@ -14,7 +14,8 @@ from app.models.camion import Camion
 from app.models.servicio import Servicio
 from app.models.combustible import SuministroCombustible, CargaCisterna
 from app.models.finanzas import MovimientoFinanciero
-from app.models.repuesto import Repuesto, MovimientoRepuesto
+from app.models.repuesto import Repuesto
+from app.models.movimiento_stock import MovimientoStock
 
 from app.schemas.reportes import (
     VentaPorMaterial, ReporteVentasMaterial,
@@ -198,11 +199,11 @@ def obtener_reporte_gastos(
     # Gastos de repuestos (movimientos de salida valorados)
     # Usamos el costo de compra de los repuestos consumidos
     total_repuestos = db.query(
-        func.sum(MovimientoRepuesto.cantidad * Repuesto.precio_compra)
+        func.sum(MovimientoStock.cantidad * Repuesto.precio_compra)
     ).join(Repuesto).filter(
-        MovimientoRepuesto.tipo == 'salida',
-        func.date(MovimientoRepuesto.fecha) >= fecha_desde,
-        func.date(MovimientoRepuesto.fecha) <= fecha_hasta
+        MovimientoStock.tipo == 'salida',
+        func.date(MovimientoStock.fecha) >= fecha_desde,
+        func.date(MovimientoStock.fecha) <= fecha_hasta
     ).scalar() or Decimal("0")
 
     # Otros egresos de finanzas
@@ -242,10 +243,10 @@ def obtener_reporte_gastos(
     if total_repuestos > 0:
         categorias.append(GastoPorCategoria(
             categoria="Repuestos",
-            cantidad=db.query(MovimientoRepuesto).filter(
-                MovimientoRepuesto.tipo == 'salida',
-                func.date(MovimientoRepuesto.fecha) >= fecha_desde,
-                func.date(MovimientoRepuesto.fecha) <= fecha_hasta
+            cantidad=db.query(MovimientoStock).filter(
+                MovimientoStock.tipo == 'salida',
+                func.date(MovimientoStock.fecha) >= fecha_desde,
+                func.date(MovimientoStock.fecha) <= fecha_hasta
             ).count(),
             total=total_repuestos,
             porcentaje=round((total_repuestos / total_gastos * 100) if total_gastos > 0 else Decimal("0"), 2)
