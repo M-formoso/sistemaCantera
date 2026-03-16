@@ -136,8 +136,10 @@ export default function NuevoCobroModal({
       tipo_item: 'ticket',
       concepto: 'debe',
       monto: ticket.saldo_pendiente,
-      descripcion: `${ticket.tipo === 'remito' ? 'Remito' : 'Ticket'} #${ticket.numero}`,
-      remito_id: ticket.id,
+      descripcion: `${ticket.tipo === 'remito' ? 'Remito' : 'Pesaje'} #${ticket.numero}`,
+      // Si es remito usar remito_id, si es pesaje usar pesaje_id
+      remito_id: ticket.tipo === 'remito' ? ticket.id : undefined,
+      pesaje_id: ticket.tipo === 'pesaje' ? ticket.id : undefined,
     }
     setItemsDebe([...itemsDebe, nuevoItem])
   }

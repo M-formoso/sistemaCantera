@@ -127,17 +127,28 @@ def generar_desde_pesaje(db: Session, pesaje_id: UUID, usuario_id: UUID) -> Remi
     # Obtener próximo número de remito
     numero_remito = _obtener_proximo_numero(db)
 
+    # Obtener importe del pesaje (si tiene)
+    importe_pesaje = pesaje.importe_total or 0
+
+    # Determinar patente del camión
+    if pesaje.tipo_entrega == "propio" and pesaje.camion:
+        patente = pesaje.camion.patente
+    else:
+        patente = pesaje.patente_externa
+
     # Crear remito con datos del pesaje
     db_remito = Remito(
         numero_remito=numero_remito,
         pesaje_id=pesaje.id,
         fecha=pesaje.fecha.date(),
-        cliente=pesaje.cliente_destino or "Cliente no especificado",
+        cliente=pesaje.cliente_nombre or "Cliente no especificado",
         producto=pesaje.material or "Material no especificado",
         peso_neto=pesaje.peso_neto,
-        camion_patente=pesaje.camion.patente,
+        camion_patente=patente,
         chofer=pesaje.chofer,
         observaciones=pesaje.observaciones,
+        importe=importe_pesaje,
+        saldo_pendiente=importe_pesaje,  # Inicialmente todo el importe está pendiente
         created_by=usuario_id
     )
 

@@ -330,6 +330,9 @@ def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) ->
     elif pesaje.transportista:
         cliente_nombre = pesaje.transportista
 
+    # Obtener importe del pesaje (si tiene)
+    importe_pesaje = pesaje.importe_total or 0
+
     db_remito = Remito(
         numero_remito=numero_remito,
         pesaje_id=pesaje.id,
@@ -340,6 +343,8 @@ def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) ->
         camion_patente=patente,
         chofer=pesaje.chofer,
         observaciones=pesaje.observaciones,
+        importe=importe_pesaje,
+        saldo_pendiente=importe_pesaje,  # Inicialmente todo el importe está pendiente
         created_by=usuario_id
     )
 

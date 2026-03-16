@@ -509,10 +509,11 @@ def obtener_documentos_pendientes(
         for f in facturas_db
     ]
 
-    # Obtener remitos/pesajes pendientes (que no estén en facturas)
+    # Obtener remitos pendientes con saldo > 0
     remitos_db = db.query(Remito).join(Pesaje).filter(
         Pesaje.cliente_id == empresa_id,
-        Remito.saldo_pendiente > 0
+        Remito.saldo_pendiente > 0,
+        Remito.facturado == False
     ).order_by(Remito.fecha).all()
 
     tickets = [
@@ -528,6 +529,54 @@ def obtener_documentos_pendientes(
         )
         for r in remitos_db
     ]
+
+    # También buscar pesajes con importe que no tienen remito o cuyo remito no tiene saldo
+    # Esto es para pesajes históricos que no se migraron correctamente
+    pesajes_ids_con_remito = [r.pesaje_id for r in remitos_db if r.pesaje_id]
+
+    pesajes_pendientes = db.query(Pesaje).filter(
+        Pesaje.cliente_id == empresa_id,
+        Pesaje.estado == "completado",
+        Pesaje.importe_total > 0,
+        ~Pesaje.id.in_(pesajes_ids_con_remito) if pesajes_ids_con_remito else True
+    ).order_by(Pesaje.fecha).all()
+
+    # Agregar pesajes que no están en remitos con saldo
+    for p in pesajes_pendientes:
+        # Verificar si tiene remito pero sin saldo (datos históricos)
+        remito_existente = db.query(Remito).filter(Remito.pesaje_id == p.id).first()
+
+        if remito_existente:
+            # Si tiene remito pero saldo_pendiente es 0 o NULL, usar el importe del pesaje
+            if not remito_existente.saldo_pendiente or remito_existente.saldo_pendiente <= 0:
+                # Actualizar el remito con el saldo correcto
+                remito_existente.importe = p.importe_total
+                remito_existente.saldo_pendiente = p.importe_total
+                db.commit()
+
+                tickets.append(TicketPendienteSchema(
+                    id=remito_existente.id,
+                    numero=remito_existente.numero_remito,
+                    tipo="remito",
+                    fecha=remito_existente.fecha,
+                    material=remito_existente.producto,
+                    peso_neto=remito_existente.peso_neto,
+                    importe=p.importe_total,
+                    saldo_pendiente=p.importe_total
+                ))
+        else:
+            # Pesaje sin remito - mostrar como ticket directo
+            patente = p.camion.patente if p.camion else p.patente_externa
+            tickets.append(TicketPendienteSchema(
+                id=p.id,  # Usamos el ID del pesaje
+                numero=p.numero_pesaje,
+                tipo="pesaje",
+                fecha=p.fecha.date() if hasattr(p.fecha, 'date') else p.fecha,
+                material=p.material,
+                peso_neto=p.peso_neto,
+                importe=p.importe_total,
+                saldo_pendiente=p.importe_total  # Todo el importe está pendiente
+            ))
 
     total_facturas = sum(f.saldo_pendiente for f in facturas)
     total_tickets = sum(t.saldo_pendiente for t in tickets)
