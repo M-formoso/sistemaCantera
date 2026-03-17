@@ -12,7 +12,7 @@ from app.models.usuario import Usuario
 from app.schemas.combustible import (
     CisternaSchema, CisternaConfig, CisternaUpdate, CisternaCreate,
     CargaCisternaSchema, CargaCisternaCreate, CargaCisternaUpdate,
-    SuministroCombustibleSchema, SuministroCombustibleCreate,
+    SuministroCombustibleSchema, SuministroCombustibleCreate, SuministroCombustibleUpdate,
     TransferenciaCisternaSchema, TransferenciaCisternaCreate
 )
 from app.services import combustible_service
@@ -254,16 +254,33 @@ async def obtener_suministro(
     return suministro
 
 
+@router.put("/suministros/{suministro_id}", response_model=SuministroCombustibleSchema)
+async def actualizar_suministro(
+    suministro_id: UUID,
+    suministro_data: SuministroCombustibleUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_permiso_combustible)
+):
+    """
+    Actualiza un suministro existente
+
+    **Requiere:** Permiso de Combustible
+
+    Si se modifican los litros, ajusta automáticamente el nivel de la cisterna
+    """
+    return combustible_service.actualizar_suministro(db, suministro_id, suministro_data)
+
+
 @router.delete("/suministros/{suministro_id}")
 async def eliminar_suministro(
     suministro_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_permiso_combustible)
 ):
     """
     Elimina un suministro
 
-    **Requiere rol:** Administrador
+    **Requiere:** Permiso de Combustible
 
     IMPORTANTE: Devuelve los litros al nivel de la cisterna
     """

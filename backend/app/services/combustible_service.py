@@ -477,6 +477,73 @@ def crear_suministro(
     return db_suministro
 
 
+def actualizar_suministro(
+    db: Session,
+    suministro_id: UUID,
+    suministro_data: "SuministroCombustibleUpdate"
+) -> SuministroCombustible:
+    """
+    Actualiza un suministro existente
+
+    Si se modifican los litros, ajusta el nivel de la cisterna
+    """
+    from app.schemas.combustible import SuministroCombustibleUpdate
+
+    db_suministro = obtener_suministro_por_id(db, suministro_id)
+
+    if not db_suministro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Suministro no encontrado"
+        )
+
+    # Si se están modificando los litros, ajustar la cisterna
+    if suministro_data.litros is not None and suministro_data.litros != db_suministro.litros:
+        diferencia = suministro_data.litros - db_suministro.litros
+
+        # Obtener la cisterna
+        if db_suministro.cisterna_id:
+            cisterna = obtener_cisterna_por_id(db, db_suministro.cisterna_id)
+        else:
+            cisterna = obtener_cisterna(db)
+
+        if cisterna:
+            # Si aumentaron los litros, descontar más de la cisterna
+            # Si disminuyeron, devolver la diferencia
+            nuevo_nivel = cisterna.nivel_actual - diferencia
+
+            if nuevo_nivel < 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"No hay suficiente combustible en la cisterna. Disponible: {cisterna.nivel_actual} litros"
+                )
+
+            cisterna.nivel_actual = nuevo_nivel
+
+    # Actualizar campos
+    update_data = suministro_data.model_dump(exclude_unset=True)
+
+    # Mapear kilometraje -> kilometraje_actual si viene en el update
+    if 'kilometraje' in update_data:
+        update_data['kilometraje_actual'] = update_data.pop('kilometraje')
+
+    for field, value in update_data.items():
+        if hasattr(db_suministro, field):
+            setattr(db_suministro, field, value)
+
+    db.commit()
+    db.refresh(db_suministro)
+
+    # Enriquecer con datos del camión
+    camion = db_suministro.camion
+    if camion:
+        db_suministro.camion_patente = camion.patente
+        db_suministro.camion_nombre = camion.nombre
+        db_suministro.camion_codigo_interno = camion.codigo_interno
+
+    return db_suministro
+
+
 def eliminar_suministro(db: Session, suministro_id: UUID) -> dict:
     """
     Elimina un suministro
