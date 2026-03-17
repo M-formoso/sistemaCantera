@@ -1,5 +1,5 @@
 import api from './api'
-import { CisternaCombustible, CargaCisterna, SuministroCombustible } from '@/types'
+import { CisternaCombustible, CargaCisterna, SuministroCombustible, TransferenciaCisterna } from '@/types'
 
 export const combustibleService = {
   // ========== CISTERNAS ==========
@@ -158,5 +158,37 @@ export const combustibleService = {
       params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
     })
     return response.data
+  },
+
+  // ========== TRANSFERENCIAS ENTRE CISTERNAS ==========
+  /**
+   * Obtiene todas las transferencias
+   */
+  async getTransferencias(skip: number = 0, limit: number = 100): Promise<TransferenciaCisterna[]> {
+    const response = await api.get<TransferenciaCisterna[]>('/combustible/transferencias', {
+      params: { skip, limit },
+    })
+    return response.data
+  },
+
+  /**
+   * Registra una transferencia entre cisternas
+   */
+  async registrarTransferencia(data: {
+    cisterna_origen_id: string
+    cisterna_destino_id: string
+    litros: number
+    fecha: string
+    observaciones?: string
+  }): Promise<TransferenciaCisterna> {
+    const response = await api.post<TransferenciaCisterna>('/combustible/transferencias', data)
+    return response.data
+  },
+
+  /**
+   * Elimina una transferencia
+   */
+  async deleteTransferencia(id: string): Promise<void> {
+    await api.delete(`/combustible/transferencias/${id}`)
   },
 }

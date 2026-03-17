@@ -29,6 +29,7 @@ import CombustiblePage from '@/pages/combustible/CombustiblePage'
 import CargaFormPage from '@/pages/combustible/CargaFormPage'
 import SuministroFormPage from '@/pages/combustible/SuministroFormPage'
 import CisternaFormPage from '@/pages/combustible/CisternaFormPage'
+import TransferenciaFormPage from '@/pages/combustible/TransferenciaFormPage'
 
 
 // Usuarios
@@ -110,6 +111,7 @@ function App() {
           <Route path="combustible/suministro-nuevo" element={<PermisoRoute permiso="permiso_combustible"><SuministroFormPage /></PermisoRoute>} />
           <Route path="combustible/suministro/:id/editar" element={<PermisoRoute permiso="permiso_combustible"><SuministroFormPage /></PermisoRoute>} />
           <Route path="combustible/cisterna-nueva" element={<PermisoRoute permiso="permiso_usuarios"><CisternaFormPage /></PermisoRoute>} />
+          <Route path="combustible/transferencia" element={<PermisoRoute permiso="permiso_combustible"><TransferenciaFormPage /></PermisoRoute>} />
 
           {/* Usuarios */}
           <Route path="usuarios" element={<PermisoRoute permiso="permiso_usuarios"><UsuariosPage /></PermisoRoute>} />

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, Plus } from 'lucide-react'
+import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, Plus, ArrowRightLeft } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -367,6 +367,16 @@ export default function CombustiblePage() {
                     >
                       <TrendingDown className="h-4 w-4 mr-1" />
                       Suministrar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/combustible/transferencia?origen=${cisterna.id}`)}
+                      className="flex-1"
+                      title="Transferir a otra cisterna"
+                    >
+                      <ArrowRightLeft className="h-4 w-4 mr-1" />
+                      Transferir
                     </Button>
                   </div>
                 </CardContent>

@@ -452,6 +452,21 @@ export interface SuministroCombustible {
   updated_at: string
 }
 
+export interface TransferenciaCisterna {
+  id: string
+  cisterna_origen_id: string
+  cisterna_destino_id: string
+  litros: number
+  fecha: string
+  observaciones?: string
+  created_by: string
+  cisterna_origen_nombre?: string
+  cisterna_destino_nombre?: string
+  usuario_nombre?: string
+  created_at: string
+  updated_at: string
+}
+
 // ==================== DASHBOARD ====================
 
 export interface CamionRequiereServicio {
