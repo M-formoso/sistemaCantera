@@ -9,20 +9,11 @@ import { DataTable } from '@/components/ui/data-table'
 import { combustibleService } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 
 export default function CombustiblePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [selectedTab, setSelectedTab] = useState<'cisternas' | 'cargas' | 'suministros'>('cisternas')
-  const [suministroToDelete, setSuministroToDelete] = useState<SuministroCombustible | null>(null)
 
   // Mutation para eliminar suministro
   const deleteSuministroMutation = useMutation({
@@ -30,12 +21,21 @@ export default function CombustiblePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
-      setSuministroToDelete(null)
     },
     onError: () => {
       alert('Error al eliminar el suministro')
     },
   })
+
+  const handleDeleteSuministro = (suministro: SuministroCombustible) => {
+    const identificador = suministro.camion_patente || suministro.camion_nombre || 'el camión'
+    const confirmed = window.confirm(
+      `¿Eliminar el suministro de ${suministro.litros} litros a ${identificador}?\n\nLos litros serán devueltos a la cisterna.`
+    )
+    if (confirmed) {
+      deleteSuministroMutation.mutate(suministro.id)
+    }
+  }
 
   const { data: cisternas = [], isLoading: isLoadingCisternas } = useQuery({
     queryKey: ['cisternas'],
@@ -176,7 +176,7 @@ export default function CombustiblePage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSuministroToDelete(suministro)}
+              onClick={() => handleDeleteSuministro(suministro)}
               title="Eliminar suministro"
             >
               <Trash2 className="h-4 w-4 text-red-600" />
@@ -397,30 +397,6 @@ export default function CombustiblePage() {
         </Card>
       )}
 
-      {/* Modal de confirmación para eliminar suministro */}
-      <Dialog open={!!suministroToDelete} onOpenChange={() => setSuministroToDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Eliminar suministro?</DialogTitle>
-            <DialogDescription>
-              Esta acción eliminará el suministro de {suministroToDelete?.litros} litros
-              {suministroToDelete?.camion_patente && ` al camión ${suministroToDelete.camion_patente}`}.
-              Los litros serán devueltos a la cisterna.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSuministroToDelete(null)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => suministroToDelete && deleteSuministroMutation.mutate(suministroToDelete.id)}
-            >
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
