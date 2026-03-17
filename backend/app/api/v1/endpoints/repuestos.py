@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin, require_permiso_repuestos
 from app.models.usuario import Usuario
 from app.models.movimiento_stock import TipoMovimientoEnum
 from app.schemas.repuesto import RepuestoSchema, RepuestoCreate, RepuestoUpdate, EquipoAsignado, RepuestoEquiposUpdate
@@ -66,7 +66,7 @@ async def listar_repuestos_por_equipo(
 async def crear_repuesto(
     repuesto: RepuestoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """Crea un nuevo repuesto. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.crear(db, repuesto)
@@ -96,7 +96,7 @@ async def actualizar_repuesto(
     repuesto_id: UUID,
     repuesto_data: RepuestoUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """Actualiza un repuesto existente. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.actualizar(db, repuesto_id, repuesto_data)
@@ -106,7 +106,7 @@ async def actualizar_repuesto(
 async def eliminar_repuesto(
     repuesto_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """Elimina (soft delete) un repuesto. **Requiere rol:** Administrador u Operador"""
     return repuesto_service.eliminar(db, repuesto_id)
@@ -127,7 +127,7 @@ async def registrar_entrada_stock(
     repuesto_id: UUID,
     data: AjusteStockRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """
     Registra una entrada de stock (ingreso)
@@ -149,7 +149,7 @@ async def registrar_salida_stock(
     repuesto_id: UUID,
     data: AjusteStockRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """
     Registra una salida de stock (egreso)
@@ -187,7 +187,7 @@ async def actualizar_equipos_asignados(
     repuesto_id: UUID,
     data: RepuestoEquiposUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """
     Actualiza la lista completa de equipos asignados a un repuesto.
@@ -205,7 +205,7 @@ async def asignar_a_equipo(
     repuesto_id: UUID,
     camion_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """
     Asigna un repuesto a un equipo específico.
@@ -222,7 +222,7 @@ async def desasignar_de_equipo(
     repuesto_id: UUID,
     camion_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_repuestos)
 ):
     """
     Desasigna un repuesto de un equipo específico.

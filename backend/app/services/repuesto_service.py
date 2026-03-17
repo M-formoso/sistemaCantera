@@ -193,10 +193,25 @@ def crear(db: Session, repuesto_data: RepuestoCreate) -> Repuesto:
             detail=f"Ya existe un repuesto con el código {repuesto_data.codigo}"
         )
 
-    db_repuesto = Repuesto(**repuesto_data.model_dump())
+    # Extraer equipos_ids antes de crear el repuesto (es relación N:N, no columna)
+    equipos_ids = repuesto_data.equipos_ids
+    repuesto_dict = repuesto_data.model_dump(exclude={"equipos_ids"})
+
+    db_repuesto = Repuesto(**repuesto_dict)
     db.add(db_repuesto)
     db.commit()
     db.refresh(db_repuesto)
+
+    # Si hay equipos_ids, crear las asignaciones N:N
+    if equipos_ids:
+        for equipo_id in equipos_ids:
+            nueva_asignacion = RepuestoEquipo(
+                repuesto_id=db_repuesto.id,
+                camion_id=equipo_id
+            )
+            db.add(nueva_asignacion)
+        db.commit()
+        db.refresh(db_repuesto)
 
     return db_repuesto
 
