@@ -107,6 +107,7 @@ function App() {
           <Route path="combustible" element={<PermisoRoute permiso="permiso_combustible"><CombustiblePage /></PermisoRoute>} />
           <Route path="combustible/carga-nueva" element={<PermisoRoute permiso="permiso_combustible"><CargaFormPage /></PermisoRoute>} />
           <Route path="combustible/suministro-nuevo" element={<PermisoRoute permiso="permiso_combustible"><SuministroFormPage /></PermisoRoute>} />
+          <Route path="combustible/suministro/:id/editar" element={<PermisoRoute permiso="permiso_combustible"><SuministroFormPage /></PermisoRoute>} />
 
           {/* Usuarios */}
           <Route path="usuarios" element={<PermisoRoute permiso="permiso_usuarios"><UsuariosPage /></PermisoRoute>} />

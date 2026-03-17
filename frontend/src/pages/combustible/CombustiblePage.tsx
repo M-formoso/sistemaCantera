@@ -1,18 +1,45 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle } from 'lucide-react'
+import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import { combustibleService } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export default function CombustiblePage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [selectedTab, setSelectedTab] = useState<'cisternas' | 'cargas' | 'suministros'>('cisternas')
+  const [suministroToDelete, setSuministroToDelete] = useState<SuministroCombustible | null>(null)
+
+  // Mutation para eliminar suministro
+  const deleteSuministroMutation = useMutation({
+    mutationFn: (id: string) => combustibleService.deleteSuministro(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suministros'] })
+      queryClient.invalidateQueries({ queryKey: ['cisternas'] })
+      toast.success('Suministro eliminado correctamente')
+      setSuministroToDelete(null)
+    },
+    onError: () => {
+      toast.error('Error al eliminar el suministro')
+    },
+  })
 
   const { data: cisternas = [], isLoading: isLoadingCisternas } = useQuery({
     queryKey: ['cisternas'],
@@ -134,6 +161,33 @@ export default function CombustiblePage() {
           -{formatNumber(row.getValue('litros'), 0)} L
         </div>
       ),
+    },
+    {
+      id: 'acciones',
+      header: 'Acciones',
+      cell: ({ row }) => {
+        const suministro = row.original
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(`/combustible/suministro/${suministro.id}/editar`)}
+              title="Editar suministro"
+            >
+              <Pencil className="h-4 w-4 text-blue-600" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSuministroToDelete(suministro)}
+              title="Eliminar suministro"
+            >
+              <Trash2 className="h-4 w-4 text-red-600" />
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 
@@ -346,6 +400,29 @@ export default function CombustiblePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de confirmación para eliminar suministro */}
+      <AlertDialog open={!!suministroToDelete} onOpenChange={() => setSuministroToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar suministro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará el suministro de {suministroToDelete?.litros} litros
+              {suministroToDelete?.camion_patente && ` al camión ${suministroToDelete.camion_patente}`}.
+              Los litros serán devueltos a la cisterna.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => suministroToDelete && deleteSuministroMutation.mutate(suministroToDelete.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

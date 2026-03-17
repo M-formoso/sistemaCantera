@@ -81,6 +81,14 @@ export const combustibleService = {
   },
 
   /**
+   * Obtiene un suministro por ID
+   */
+  async getSuministroById(id: string): Promise<SuministroCombustible> {
+    const response = await api.get<SuministroCombustible>(`/combustible/suministros/${id}`)
+    return response.data
+  },
+
+  /**
    * Obtiene suministros por camión
    */
   async getSuministrosPorCamion(camionId: string): Promise<SuministroCombustible[]> {
@@ -103,6 +111,30 @@ export const combustibleService = {
   }): Promise<SuministroCombustible> {
     const response = await api.post<SuministroCombustible>('/combustible/suministros', data)
     return response.data
+  },
+
+  /**
+   * Actualiza un suministro de combustible
+   */
+  async updateSuministro(
+    id: string,
+    data: {
+      litros?: number
+      chofer?: string
+      kilometraje?: number
+      horometro?: number
+      observaciones?: string
+    }
+  ): Promise<SuministroCombustible> {
+    const response = await api.put<SuministroCombustible>(`/combustible/suministros/${id}`, data)
+    return response.data
+  },
+
+  /**
+   * Elimina un suministro de combustible
+   */
+  async deleteSuministro(id: string): Promise<void> {
+    await api.delete(`/combustible/suministros/${id}`)
   },
 
   /**

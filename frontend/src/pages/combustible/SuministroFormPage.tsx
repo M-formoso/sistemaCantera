@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { combustibleService } from '@/services/combustibleService'
 import { camionesService } from '@/services/camionesService'
 import { formatNumber, getTodayLocalDate } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const suministroSchema = z.object({
   cisterna_id: z.string().min(1, 'Debe seleccionar una cisterna'),
@@ -26,7 +27,9 @@ type SuministroFormData = z.infer<typeof suministroSchema>
 export default function SuministroFormPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const isEditing = !!id
 
   const { data: cisternas = [] } = useQuery({
     queryKey: ['cisternas'],
@@ -36,6 +39,13 @@ export default function SuministroFormPage() {
   const { data: camiones = [] } = useQuery({
     queryKey: ['camiones'],
     queryFn: () => camionesService.getAll(true),
+  })
+
+  // Cargar datos del suministro si estamos editando
+  const { data: suministroExistente } = useQuery({
+    queryKey: ['suministro', id],
+    queryFn: () => combustibleService.getSuministroById(id!),
+    enabled: isEditing,
   })
 
   const {
@@ -61,17 +71,32 @@ export default function SuministroFormPage() {
   const nuevoNivel = (cisternaSeleccionada?.nivel_actual || 0) - (Number(litros) || 0)
   const insuficiente = nuevoNivel < 0
 
-  // Pre-seleccionar cisterna o camión si viene del parámetro
+  // Pre-seleccionar cisterna o camión si viene del parámetro o cargar datos existentes
   useEffect(() => {
-    const cisterna = searchParams.get('cisterna')
-    const camion = searchParams.get('camion')
-    if (cisterna || camion) {
+    if (isEditing && suministroExistente) {
+      // Modo edición: cargar datos del suministro
       reset({
-        cisterna_id: cisterna || undefined,
-        camion_id: camion || undefined,
+        cisterna_id: suministroExistente.cisterna_id || '',
+        camion_id: suministroExistente.camion_id,
+        fecha: suministroExistente.fecha ? suministroExistente.fecha.split('T')[0] : getTodayLocalDate(),
+        litros: suministroExistente.litros,
+        kilometraje_actual: suministroExistente.kilometraje_actual ?? undefined,
+        observaciones: suministroExistente.observaciones || '',
       })
+    } else {
+      // Modo creación: pre-seleccionar si viene de parámetros
+      const cisterna = searchParams.get('cisterna')
+      const camion = searchParams.get('camion')
+      if (cisterna || camion) {
+        reset({
+          cisterna_id: cisterna || undefined,
+          camion_id: camion || undefined,
+          fecha: getTodayLocalDate(),
+          litros: 0,
+        })
+      }
     }
-  }, [searchParams, reset])
+  }, [searchParams, reset, isEditing, suministroExistente])
 
   const createMutation = useMutation({
     mutationFn: (data: SuministroFormData) => {
@@ -85,24 +110,47 @@ export default function SuministroFormPage() {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumen'] })
+      toast.success('Suministro registrado correctamente')
+      navigate('/combustible')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (data: SuministroFormData) => {
+      return combustibleService.updateSuministro(id!, {
+        litros: data.litros,
+        kilometraje: data.kilometraje_actual ?? undefined,
+        observaciones: data.observaciones,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suministros'] })
+      queryClient.invalidateQueries({ queryKey: ['cisternas'] })
+      queryClient.invalidateQueries({ queryKey: ['suministro', id] })
+      toast.success('Suministro actualizado correctamente')
       navigate('/combustible')
     },
   })
 
   const onSubmit = async (data: SuministroFormData) => {
-    if (insuficiente) {
-      alert('No hay suficiente combustible en la cisterna')
+    // En modo edición, solo validar insuficiencia si los litros aumentaron
+    if (!isEditing && insuficiente) {
+      toast.error('No hay suficiente combustible en la cisterna')
       return
     }
 
     try {
-      await createMutation.mutateAsync(data)
+      if (isEditing) {
+        await updateMutation.mutateAsync(data)
+      } else {
+        await createMutation.mutateAsync(data)
+      }
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Error al registrar el suministro')
+      toast.error(error.response?.data?.detail || `Error al ${isEditing ? 'actualizar' : 'registrar'} el suministro`)
     }
   }
 
-  const isLoading = createMutation.isPending
+  const isLoading = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -114,9 +162,11 @@ export default function SuministroFormPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
             <TrendingDown className="h-8 w-8 text-orange-600" />
-            Nuevo Suministro de Combustible
+            {isEditing ? 'Editar Suministro' : 'Nuevo Suministro de Combustible'}
           </h1>
-          <p className="text-gray-500 mt-1">Registra un suministro de combustible a camión</p>
+          <p className="text-gray-500 mt-1">
+            {isEditing ? 'Modifica los datos del suministro' : 'Registra un suministro de combustible a camión'}
+          </p>
         </div>
       </div>
 
@@ -137,7 +187,8 @@ export default function SuministroFormPage() {
                     <select
                       id="cisterna_id"
                       {...register('cisterna_id')}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      disabled={isEditing}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">Seleccionar cisterna</option>
                       {cisternas.map((cisterna) => (
@@ -149,6 +200,9 @@ export default function SuministroFormPage() {
                     {errors.cisterna_id && (
                       <p className="text-sm text-red-600">{errors.cisterna_id.message}</p>
                     )}
+                    {isEditing && (
+                      <p className="text-xs text-muted-foreground">No se puede cambiar la cisterna en modo edición</p>
+                    )}
                   </div>
 
                   {/* Camión */}
@@ -159,7 +213,8 @@ export default function SuministroFormPage() {
                     <select
                       id="camion_id"
                       {...register('camion_id')}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      disabled={isEditing}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">Seleccionar camión</option>
                       {camiones.map((camion) => (
@@ -170,6 +225,9 @@ export default function SuministroFormPage() {
                     </select>
                     {errors.camion_id && (
                       <p className="text-sm text-red-600">{errors.camion_id.message}</p>
+                    )}
+                    {isEditing && (
+                      <p className="text-xs text-muted-foreground">No se puede cambiar el camión en modo edición</p>
                     )}
                   </div>
 
@@ -240,9 +298,9 @@ export default function SuministroFormPage() {
 
                 {/* Botones */}
                 <div className="flex items-center gap-4 pt-4 border-t">
-                  <Button type="submit" disabled={isLoading || insuficiente}>
+                  <Button type="submit" disabled={isLoading || (!isEditing && insuficiente)}>
                     <Save className="h-4 w-4 mr-2" />
-                    {isLoading ? 'Guardando...' : 'Registrar Suministro'}
+                    {isLoading ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Registrar Suministro')}
                   </Button>
                   <Button
                     type="button"
