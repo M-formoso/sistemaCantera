@@ -16,8 +16,8 @@ const cargaSchema = z.object({
   fecha: z.string().min(1, 'La fecha es requerida'),
   litros: z.number().min(1, 'Los litros deben ser mayor a 0'),
   proveedor: z.string().min(2, 'El proveedor es requerido'),
-  numero_remito: z.string().optional(),
-  precio_por_litro: z.number().min(0, 'El precio debe ser positivo').optional().nullable(),
+  numero_factura: z.string().optional(),
+  costo_total: z.number().min(0, 'El costo debe ser positivo').optional().nullable(),
   observaciones: z.string().optional(),
 })
 
@@ -44,15 +44,15 @@ export default function CargaFormPage() {
     defaultValues: {
       fecha: getTodayLocalDate(),
       litros: 0,
-      precio_por_litro: 0,
+      costo_total: 0,
     },
   })
 
   const litros = watch('litros')
-  const precioPorLitro = watch('precio_por_litro')
+  const costoTotal = watch('costo_total')
   const cisternaId = watch('cisterna_id')
 
-  const costoTotal = (Number(litros) || 0) * (Number(precioPorLitro) || 0)
+  const precioPorLitro = litros > 0 ? (Number(costoTotal) || 0) / litros : 0
   const cisternaSeleccionada = cisternas.find(c => c.id === cisternaId)
   const nuevoNivel = (cisternaSeleccionada?.nivel_actual || 0) + (Number(litros) || 0)
   const excedeLimite = cisternaSeleccionada && nuevoNivel > cisternaSeleccionada.capacidad_total
@@ -69,7 +69,7 @@ export default function CargaFormPage() {
     mutationFn: (data: CargaFormData) => {
       const cleanData = {
         ...data,
-        precio_por_litro: data.precio_por_litro ?? undefined,
+        costo_total: data.costo_total ?? undefined,
       }
       return combustibleService.registrarCarga(cleanData)
     },
@@ -177,20 +177,25 @@ export default function CargaFormPage() {
                     )}
                   </div>
 
-                  {/* Precio por litro */}
+                  {/* Costo Total */}
                   <div className="space-y-2">
-                    <label htmlFor="precio_por_litro" className="text-sm font-medium">
-                      Precio por Litro
+                    <label htmlFor="costo_total" className="text-sm font-medium">
+                      Costo Total
                     </label>
                     <Input
-                      id="precio_por_litro"
+                      id="costo_total"
                       type="number"
                       step="0.01"
-                      {...register('precio_por_litro', { valueAsNumber: true })}
+                      {...register('costo_total', { valueAsNumber: true })}
                       placeholder="0.00"
                     />
-                    {errors.precio_por_litro && (
-                      <p className="text-sm text-red-600">{errors.precio_por_litro.message}</p>
+                    {errors.costo_total && (
+                      <p className="text-sm text-red-600">{errors.costo_total.message}</p>
+                    )}
+                    {litros > 0 && (costoTotal ?? 0) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Precio por litro: {formatCurrency(precioPorLitro)}
+                      </p>
                     )}
                   </div>
 
@@ -209,14 +214,14 @@ export default function CargaFormPage() {
                     )}
                   </div>
 
-                  {/* Número de remito */}
+                  {/* Número de factura */}
                   <div className="space-y-2">
-                    <label htmlFor="numero_remito" className="text-sm font-medium">
-                      Número de Remito
+                    <label htmlFor="numero_factura" className="text-sm font-medium">
+                      Número de Factura
                     </label>
                     <Input
-                      id="numero_remito"
-                      {...register('numero_remito')}
+                      id="numero_factura"
+                      {...register('numero_factura')}
                       placeholder="0001-00001234"
                     />
                   </div>
@@ -304,17 +309,19 @@ export default function CargaFormPage() {
                     </div>
                   )}
 
-                  {(precioPorLitro ?? 0) > 0 && (
+                  {(costoTotal ?? 0) > 0 && (
                     <div className="pt-3 border-t">
                       <div className="flex justify-between">
                         <span className="font-semibold">Costo Total:</span>
                         <span className="text-xl font-bold text-blue-600">
-                          {formatCurrency(costoTotal)}
+                          {formatCurrency(costoTotal || 0)}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground text-right mt-1">
-                        {formatNumber(litros || 0)} L × {formatCurrency(precioPorLitro || 0)}
-                      </div>
+                      {litros > 0 && (
+                        <div className="text-xs text-muted-foreground text-right mt-1">
+                          {formatNumber(litros)} L × {formatCurrency(precioPorLitro)} por litro
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

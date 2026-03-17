@@ -61,8 +61,8 @@ export const combustibleService = {
     fecha: string
     litros: number
     proveedor: string
-    numero_remito?: string
-    precio_por_litro?: number
+    numero_factura?: string
+    costo_total?: number
     observaciones?: string
   }): Promise<CargaCisterna> {
     const response = await api.post<CargaCisterna>('/combustible/cargas', data)
