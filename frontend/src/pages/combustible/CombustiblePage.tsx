@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2 } from 'lucide-react'
+import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import { combustibleService } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 export default function CombustiblePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [selectedTab, setSelectedTab] = useState<'cisternas' | 'cargas' | 'suministros'>('cisternas')
 
   // Mutation para eliminar suministro
@@ -281,7 +283,18 @@ export default function CombustiblePage() {
 
       {/* Contenido de tabs */}
       {selectedTab === 'cisternas' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <div className="space-y-4">
+          {/* Botón Nueva Cisterna - Solo Admin */}
+          {isAdmin && (
+            <div className="flex justify-end">
+              <Button onClick={() => navigate('/combustible/cisterna-nueva')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Cisterna
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {cisternas.map((cisterna) => {
             const porcentaje = (cisterna.nivel_actual / cisterna.capacidad_total) * 100
             const isLow = porcentaje <= 30
@@ -360,6 +373,7 @@ export default function CombustiblePage() {
               </Card>
             )
           })}
+          </div>
         </div>
       )}
 
