@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { combustibleService } from '@/services/combustibleService'
 import { camionesService } from '@/services/camionesService'
 import { formatNumber, getTodayLocalDate } from '@/lib/utils'
-import { toast } from 'sonner'
 
 const suministroSchema = z.object({
   cisterna_id: z.string().min(1, 'Debe seleccionar una cisterna'),
@@ -110,7 +109,6 @@ export default function SuministroFormPage() {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumen'] })
-      toast.success('Suministro registrado correctamente')
       navigate('/combustible')
     },
   })
@@ -127,7 +125,6 @@ export default function SuministroFormPage() {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
       queryClient.invalidateQueries({ queryKey: ['suministro', id] })
-      toast.success('Suministro actualizado correctamente')
       navigate('/combustible')
     },
   })
@@ -135,7 +132,7 @@ export default function SuministroFormPage() {
   const onSubmit = async (data: SuministroFormData) => {
     // En modo edición, solo validar insuficiencia si los litros aumentaron
     if (!isEditing && insuficiente) {
-      toast.error('No hay suficiente combustible en la cisterna')
+      alert('No hay suficiente combustible en la cisterna')
       return
     }
 
@@ -146,7 +143,7 @@ export default function SuministroFormPage() {
         await createMutation.mutateAsync(data)
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || `Error al ${isEditing ? 'actualizar' : 'registrar'} el suministro`)
+      alert(error.response?.data?.detail || `Error al ${isEditing ? 'actualizar' : 'registrar'} el suministro`)
     }
   }
 

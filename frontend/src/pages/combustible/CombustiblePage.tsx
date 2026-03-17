@@ -9,17 +9,14 @@ import { DataTable } from '@/components/ui/data-table'
 import { combustibleService } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
-import { toast } from 'sonner'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export default function CombustiblePage() {
   const navigate = useNavigate()
@@ -33,11 +30,10 @@ export default function CombustiblePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suministros'] })
       queryClient.invalidateQueries({ queryKey: ['cisternas'] })
-      toast.success('Suministro eliminado correctamente')
       setSuministroToDelete(null)
     },
     onError: () => {
-      toast.error('Error al eliminar el suministro')
+      alert('Error al eliminar el suministro')
     },
   })
 
@@ -402,27 +398,29 @@ export default function CombustiblePage() {
       )}
 
       {/* Modal de confirmación para eliminar suministro */}
-      <AlertDialog open={!!suministroToDelete} onOpenChange={() => setSuministroToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar suministro?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={!!suministroToDelete} onOpenChange={() => setSuministroToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar suministro?</DialogTitle>
+            <DialogDescription>
               Esta acción eliminará el suministro de {suministroToDelete?.litros} litros
               {suministroToDelete?.camion_patente && ` al camión ${suministroToDelete.camion_patente}`}.
               Los litros serán devueltos a la cisterna.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuministroToDelete(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => suministroToDelete && deleteSuministroMutation.mutate(suministroToDelete.id)}
-              className="bg-red-600 hover:bg-red-700"
             >
               Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
