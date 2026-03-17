@@ -139,3 +139,100 @@ def require_admin_or_operador(
             detail="No tiene permisos suficientes"
         )
     return current_user
+
+
+def require_permiso_camiones(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de camiones
+    (administradores siempre tienen acceso)
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_camiones', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user
+
+
+def require_permiso_repuestos(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de repuestos
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_repuestos', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user
+
+
+def require_permiso_pesajes(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de pesajes
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_pesajes', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user
+
+
+def require_permiso_combustible(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de combustible
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_combustible', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user
+
+
+def require_permiso_empresas(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de empresas
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_empresas', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user
+
+
+def require_permiso_finanzas(
+    current_user: Usuario = Depends(get_current_active_user),
+) -> Usuario:
+    """
+    Dependency para verificar que el usuario tenga permiso de finanzas
+    """
+    if current_user.rol == "administrador":
+        return current_user
+    if not getattr(current_user, 'permiso_finanzas', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos suficientes"
+        )
+    return current_user

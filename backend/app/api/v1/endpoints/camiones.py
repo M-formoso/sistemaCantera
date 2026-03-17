@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 
-from app.core.deps import get_db, get_current_active_user, require_admin
+from app.core.deps import get_db, get_current_active_user, require_admin, require_permiso_camiones
 from app.models.usuario import Usuario
 from app.schemas.camion import CamionSchema, CamionCreate, CamionUpdate
 from app.schemas.servicio import ServicioSchema
@@ -44,12 +44,12 @@ async def listar_camiones(
 async def crear_camion(
     camion: CamionCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_permiso_camiones)
 ):
     """
     Crea un nuevo camión
 
-    **Requiere rol:** Administrador
+    **Requiere:** Permiso de Camiones/Equipos
 
     Campos requeridos:
     - **patente**: Identificación única del camión
@@ -81,12 +81,12 @@ async def actualizar_camion(
     camion_id: UUID,
     camion_data: CamionUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin)
+    current_user: Usuario = Depends(require_permiso_camiones)
 ):
     """
     Actualiza un camión existente
 
-    **Requiere rol:** Administrador
+    **Requiere:** Permiso de Camiones/Equipos
     """
     return camion_service.actualizar(db, camion_id, camion_data)
 
@@ -100,7 +100,7 @@ async def eliminar_camion(
     """
     Elimina (soft delete) un camión
 
-    **Requiere rol:** Administrador
+    **Requiere rol:** Administrador (eliminar sigue siendo solo admin)
 
     Nota: El camión no se elimina físicamente, solo se marca como inactivo
     """
