@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
-from app.core.deps import get_db, get_current_active_user, require_admin, require_admin_or_operador
+from app.core.deps import get_db, get_current_active_user, require_admin, require_permiso_combustible
 from app.models.usuario import Usuario
 from app.schemas.combustible import (
     CisternaSchema, CisternaConfig, CisternaUpdate, CisternaCreate,
@@ -130,7 +130,7 @@ async def listar_cargas(
 async def crear_carga(
     carga: CargaCisternaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_combustible)
 ):
     """
     Registra una carga de combustible a la cisterna
@@ -222,7 +222,7 @@ async def listar_suministros_por_camion(
 async def crear_suministro(
     suministro: SuministroCombustibleCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_combustible)
 ):
     """
     Registra un suministro de combustible a un camión
@@ -287,7 +287,7 @@ async def listar_transferencias(
 async def crear_transferencia(
     transferencia: TransferenciaCisternaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_admin_or_operador)
+    current_user: Usuario = Depends(require_permiso_combustible)
 ):
     """
     Registra una transferencia de combustible entre cisternas
