@@ -458,12 +458,13 @@ def crear_suministro(
 
     # Verificar si quedó bajo nivel de alerta
     if cisterna.nivel_actual <= cisterna.nivel_minimo:
-        # Crear alerta con Celery
+        # Crear alerta con Celery (solo si está disponible)
         try:
             from app.tasks.alertas import verificar_nivel_cisterna
             verificar_nivel_cisterna.delay()
-        except ImportError:
-            print(f"⚠️ Alerta: Nivel de cisterna bajo ({cisterna.nivel_actual}L)")
+        except Exception:
+            # Celery/Redis no disponible - ignorar silenciosamente
+            pass
 
     db.commit()
     db.refresh(db_suministro)
