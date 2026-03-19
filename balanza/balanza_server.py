@@ -106,54 +106,76 @@ def leer_balanza(puerto_com):
     """Thread que lee continuamente la balanza."""
     global ultimo_peso
 
+    intentos_fallidos = 0
+    max_intentos_log = 5  # Solo loguear cada N intentos para no llenar la consola
+
     while True:
         try:
             # Abrir puerto serial
             with serial.Serial(puerto_com, **SERIAL_CONFIG) as ser:
-                print(f"Conectado a balanza en {puerto_com}")
+                print(f"[OK] Conectado a balanza en {puerto_com}")
+                intentos_fallidos = 0  # Resetear contador
 
                 with peso_lock:
                     ultimo_peso['conectado'] = True
                     ultimo_peso['error'] = None
 
                 while True:
-                    # Leer datos (7 bytes según especificación)
-                    if ser.in_waiting >= 7:
-                        data = ser.read(7)
-                        peso = parsear_peso(data)
-
-                        with peso_lock:
-                            ultimo_peso['peso'] = peso
-                            ultimo_peso['timestamp'] = time.time()
-                            ultimo_peso['error'] = None
-
-                        print(f"Peso leído: {peso} kg")
-
-                    # También intentar leer línea completa (por si la balanza envía diferente)
-                    elif ser.in_waiting > 0:
-                        data = ser.readline()
-                        if data:
+                    try:
+                        # Leer datos (7 bytes según especificación)
+                        if ser.in_waiting >= 7:
+                            data = ser.read(7)
                             peso = parsear_peso(data)
-                            if peso > 0:
-                                with peso_lock:
-                                    ultimo_peso['peso'] = peso
-                                    ultimo_peso['timestamp'] = time.time()
-                                    ultimo_peso['error'] = None
-                                print(f"Peso leído (línea): {peso} kg")
 
-                    time.sleep(0.1)
+                            with peso_lock:
+                                ultimo_peso['peso'] = peso
+                                ultimo_peso['timestamp'] = time.time()
+                                ultimo_peso['error'] = None
+
+                            print(f"Peso: {peso} kg")
+
+                        # También intentar leer línea completa (por si la balanza envía diferente)
+                        elif ser.in_waiting > 0:
+                            data = ser.readline()
+                            if data:
+                                peso = parsear_peso(data)
+                                if peso > 0:
+                                    with peso_lock:
+                                        ultimo_peso['peso'] = peso
+                                        ultimo_peso['timestamp'] = time.time()
+                                        ultimo_peso['error'] = None
+                                    print(f"Peso: {peso} kg")
+
+                        time.sleep(0.1)
+
+                    except Exception as e:
+                        # Error dentro del loop de lectura - continuar sin cerrar conexión
+                        print(f"[WARN] Error leyendo datos: {e}")
+                        time.sleep(0.5)
 
         except serial.SerialException as e:
-            print(f"Error de conexión serial: {e}")
+            intentos_fallidos += 1
             with peso_lock:
                 ultimo_peso['conectado'] = False
-                ultimo_peso['error'] = str(e)
+                ultimo_peso['error'] = f"Error serial: {e}"
+
+            # Solo loguear cada N intentos para no llenar la consola
+            if intentos_fallidos == 1 or intentos_fallidos % max_intentos_log == 0:
+                print(f"[ERROR] Conexión serial fallida (intento #{intentos_fallidos}): {e}")
+                print(f"        Reintentando en 5 segundos...")
+
             time.sleep(5)  # Esperar antes de reintentar
 
         except Exception as e:
-            print(f"Error inesperado: {e}")
+            intentos_fallidos += 1
             with peso_lock:
-                ultimo_peso['error'] = str(e)
+                ultimo_peso['conectado'] = False
+                ultimo_peso['error'] = f"Error: {e}"
+
+            if intentos_fallidos == 1 or intentos_fallidos % max_intentos_log == 0:
+                print(f"[ERROR] Error inesperado (intento #{intentos_fallidos}): {e}")
+                print(f"        Reintentando en 5 segundos...")
+
             time.sleep(5)
 
 
@@ -272,21 +294,25 @@ def main():
     # Iniciar servidor HTTP
     try:
         server = HTTPServer(('127.0.0.1', HTTP_PORT), BalanzaHandler)
-        print(f"Servidor iniciado en puerto {HTTP_PORT}")
+        print(f"[OK] Servidor HTTP iniciado en puerto {HTTP_PORT}")
         print("")
-        print("*** NO CIERRE ESTA VENTANA ***")
-        print("El servidor debe permanecer abierto mientras usa el sistema.")
+        print("*" * 50)
+        print("*   NO CIERRE ESTA VENTANA                       *")
+        print("*   El servidor debe permanecer abierto          *")
+        print("*   mientras usa el sistema de pesaje.           *")
+        print("*" * 50)
         print("")
         print("Presione Ctrl+C para detener")
         print("=" * 50)
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nServidor detenido por el usuario")
+        print("\n[INFO] Servidor detenido por el usuario")
+        raise  # Re-lanzar para que el loop principal lo capture
     except OSError as e:
         if "10048" in str(e) or "Address already in use" in str(e):
             print("")
             print("=" * 50)
-            print("ERROR: El puerto 5555 ya está en uso.")
+            print("[ERROR] El puerto 5555 ya está en uso.")
             print("")
             print("Esto puede significar que:")
             print("1. Ya hay otra ventana del servidor abierta")
@@ -294,22 +320,45 @@ def main():
             print("")
             print("Solución: Cierre la otra ventana del servidor e intente de nuevo.")
             print("=" * 50)
+            # No reintentar automáticamente si el puerto está ocupado
+            raise KeyboardInterrupt("Puerto en uso")
         else:
-            print(f"Error de red: {e}")
+            print(f"[ERROR] Error de red: {e}")
+            raise  # Re-lanzar para reintentar
     except Exception as e:
-        print(f"Error iniciando servidor: {e}")
+        print(f"[ERROR] Error iniciando servidor: {e}")
+        raise  # Re-lanzar para reintentar
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        print("")
-        print("=" * 50)
-        print(f"ERROR CRITICO: {e}")
-        print("=" * 50)
+    while True:
+        try:
+            main()
+            break  # Si main() termina normalmente (Ctrl+C), salir del loop
+        except KeyboardInterrupt:
+            print("\n[INFO] Servidor detenido por el usuario (Ctrl+C)")
+            break
+        except Exception as e:
+            print("")
+            print("=" * 50)
+            print(f"[ERROR CRITICO] {e}")
+            print("=" * 50)
+            print("")
+            print("El servidor se reiniciará en 10 segundos...")
+            print("(Presione Ctrl+C para salir)")
+            try:
+                time.sleep(10)
+                print("Reiniciando servidor...")
+                print("")
+            except KeyboardInterrupt:
+                print("\n[INFO] Saliendo...")
+                break
 
     # SIEMPRE esperar antes de cerrar
     print("")
     print("=" * 50)
-    input("Presione ENTER para cerrar esta ventana...")
+    try:
+        input("Presione ENTER para cerrar esta ventana...")
+    except:
+        # Si falla el input (ej: no hay terminal interactiva), esperar y salir
+        time.sleep(5)
