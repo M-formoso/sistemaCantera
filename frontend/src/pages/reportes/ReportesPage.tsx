@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   FileText, Download, TrendingUp, TrendingDown, Truck, Users,
   Package, Calendar, Filter, BarChart3, PieChart,
-  DollarSign, Fuel, Wrench, Loader2
+  DollarSign, Fuel, Wrench, Loader2, FileSpreadsheet, Receipt
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { reportesService } from '@/services/reportesService'
 import { formatNumber } from '@/lib/utils'
 
-type TipoReporte = 'resumen' | 'ventas-material' | 'ventas-semanal' | 'gastos' | 'maquinaria' | 'top-clientes'
+type TipoReporte = 'resumen' | 'ventas-material' | 'ventas-semanal' | 'gastos' | 'maquinaria' | 'top-clientes' | 'movimientos'
 
 // Función para obtener fecha hace N días
 const getFechaHace = (dias: number) => {
@@ -25,7 +25,7 @@ export default function ReportesPage() {
   const [fechaDesde, setFechaDesde] = useState(getFechaHace(30))
   const [fechaHasta, setFechaHasta] = useState(new Date().toISOString().split('T')[0])
   const [materialFiltro, setMaterialFiltro] = useState<string>('')
-  const [tipoReporteActivo, setTipoReporteActivo] = useState<TipoReporte>('resumen')
+  const [tipoReporteActivo, setTipoReporteActivo] = useState<TipoReporte>('movimientos')
   const [exportando, setExportando] = useState(false)
 
   // Queries
@@ -70,7 +70,13 @@ export default function ReportesPage() {
     enabled: tipoReporteActivo === 'top-clientes',
   })
 
-  const isLoading = loadingResumen || loadingVentasMaterial || loadingVentasSemanal || loadingGastos || loadingMaquinaria || loadingTopClientes
+  const { data: movimientos, isLoading: loadingMovimientos } = useQuery({
+    queryKey: ['reporte-movimientos', fechaDesde, fechaHasta],
+    queryFn: () => reportesService.getMovimientos(fechaDesde, fechaHasta),
+    enabled: tipoReporteActivo === 'movimientos',
+  })
+
+  const isLoading = loadingResumen || loadingVentasMaterial || loadingVentasSemanal || loadingGastos || loadingMaquinaria || loadingTopClientes || loadingMovimientos
 
   // Exportar PDF
   const handleExportarPDF = async () => {
@@ -96,7 +102,23 @@ export default function ReportesPage() {
     setFechaHasta(new Date().toISOString().split('T')[0])
   }
 
+  const [exportandoExcel, setExportandoExcel] = useState(false)
+
+  // Exportar Excel de movimientos
+  const handleExportarExcel = async () => {
+    setExportandoExcel(true)
+    try {
+      await reportesService.exportarMovimientosExcel(fechaDesde, fechaHasta)
+    } catch (error) {
+      console.error('Error exportando Excel:', error)
+      alert('Error al exportar el Excel')
+    } finally {
+      setExportandoExcel(false)
+    }
+  }
+
   const tabs = [
+    { id: 'movimientos', label: 'Movimientos', icon: Receipt },
     { id: 'resumen', label: 'Resumen', icon: BarChart3 },
     { id: 'ventas-material', label: 'Por Material', icon: Package },
     { id: 'ventas-semanal', label: 'Por Semana', icon: Calendar },
@@ -118,18 +140,34 @@ export default function ReportesPage() {
             Análisis y estadísticas del período seleccionado
           </p>
         </div>
-        <Button
-          onClick={handleExportarPDF}
-          disabled={exportando || isLoading}
-          className="bg-red-600 hover:bg-red-700"
-        >
-          {exportando ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
+        <div className="flex gap-2">
+          {tipoReporteActivo === 'movimientos' && (
+            <Button
+              onClick={handleExportarExcel}
+              disabled={exportandoExcel || isLoading}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {exportandoExcel ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+              )}
+              Exportar Excel
+            </Button>
           )}
-          Exportar PDF
-        </Button>
+          <Button
+            onClick={handleExportarPDF}
+            disabled={exportando || isLoading}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {exportando ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -235,6 +273,107 @@ export default function ReportesPage() {
         </div>
       ) : (
         <>
+          {/* MOVIMIENTOS */}
+          {tipoReporteActivo === 'movimientos' && movimientos && (
+            <div className="space-y-4">
+              {/* Cards resumen */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-blue-600">Pesajes</p>
+                    <p className="text-2xl font-bold text-blue-700">{movimientos.cantidad_pesajes}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-gray-500">Total Kg</p>
+                    <p className="text-xl font-bold">{formatNumber(movimientos.total_kg, 0)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-gray-500">Toneladas</p>
+                    <p className="text-xl font-bold">{formatNumber(movimientos.total_toneladas, 2)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-green-600">Total Importe</p>
+                    <p className="text-2xl font-bold text-green-700">${formatNumber(movimientos.total_importe, 0)}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabla de movimientos */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Detalle de Pesajes
+                    <span className="text-sm font-normal text-gray-500">
+                      ({movimientos.movimientos.length} registros)
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left py-3 px-2">N°</th>
+                          <th className="text-left py-3 px-2">Fecha</th>
+                          <th className="text-left py-3 px-2">Hora</th>
+                          <th className="text-left py-3 px-2">Cliente</th>
+                          <th className="text-left py-3 px-2">Material</th>
+                          <th className="text-right py-3 px-2">Kg</th>
+                          <th className="text-right py-3 px-2">$/Tn</th>
+                          <th className="text-right py-3 px-2">Flete</th>
+                          <th className="text-right py-3 px-2">Total</th>
+                          <th className="text-left py-3 px-2">Patente</th>
+                          <th className="text-center py-3 px-2">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {movimientos.movimientos.map((m) => (
+                          <tr key={m.id} className={`border-b hover:bg-gray-50 ${m.estado === 'pendiente' ? 'bg-yellow-50' : ''}`}>
+                            <td className="py-2 px-2 font-medium">{m.numero_pesaje}</td>
+                            <td className="py-2 px-2">{new Date(m.fecha).toLocaleDateString('es-AR')}</td>
+                            <td className="py-2 px-2">{m.hora}</td>
+                            <td className="py-2 px-2">{m.cliente_nombre || '-'}</td>
+                            <td className="py-2 px-2">{m.material || '-'}</td>
+                            <td className="text-right py-2 px-2">{m.peso_neto ? formatNumber(m.peso_neto, 0) : '-'}</td>
+                            <td className="text-right py-2 px-2">{m.precio_unitario ? `$${formatNumber(m.precio_unitario, 0)}` : '-'}</td>
+                            <td className="text-right py-2 px-2">{m.flete ? `$${formatNumber(m.flete, 0)}` : '-'}</td>
+                            <td className="text-right py-2 px-2 font-medium">{m.importe_total ? `$${formatNumber(m.importe_total, 0)}` : '-'}</td>
+                            <td className="py-2 px-2">{m.patente || '-'}</td>
+                            <td className="text-center py-2 px-2">
+                              <span className={`px-2 py-1 rounded-full text-xs ${
+                                m.estado === 'completado'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {m.estado === 'completado' ? 'OK' : 'Pendiente'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-100 font-bold">
+                          <td colSpan={5} className="py-3 px-2">TOTALES</td>
+                          <td className="text-right py-3 px-2">{formatNumber(movimientos.total_kg, 0)}</td>
+                          <td colSpan={2}></td>
+                          <td className="text-right py-3 px-2">${formatNumber(movimientos.total_importe, 0)}</td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* RESUMEN */}
           {tipoReporteActivo === 'resumen' && resumen && (
             <div className="space-y-6">

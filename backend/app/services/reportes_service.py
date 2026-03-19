@@ -23,7 +23,8 @@ from app.schemas.reportes import (
     GastoPorCategoria, ReporteGastos,
     MaquinaActividad, ReporteMaquinaria,
     ClienteTop, ReporteTopClientes,
-    ResumenGeneral
+    ResumenGeneral,
+    MovimientoPesaje, ReporteMovimientos
 )
 
 
@@ -497,3 +498,74 @@ def obtener_materiales_disponibles(db: Session) -> List[str]:
     ).distinct().all()
 
     return sorted([m[0] for m in materiales if m[0]])
+
+
+def obtener_movimientos(
+    db: Session,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None
+) -> ReporteMovimientos:
+    """
+    Obtiene el detalle de todos los pesajes en el período para cierre de caja
+    """
+    fecha_desde, fecha_hasta = _get_fecha_default(fecha_desde, fecha_hasta)
+
+    # Query de pesajes ordenados por fecha
+    pesajes = db.query(Pesaje).filter(
+        func.date(Pesaje.fecha) >= fecha_desde,
+        func.date(Pesaje.fecha) <= fecha_hasta
+    ).order_by(Pesaje.fecha.desc()).all()
+
+    movimientos = []
+    total_kg = Decimal("0")
+    total_importe = Decimal("0")
+
+    for p in pesajes:
+        # Obtener patente
+        patente = None
+        if p.camion:
+            patente = p.camion.patente
+        elif p.patente_externa:
+            patente = p.patente_externa
+
+        # Obtener nombre del cliente
+        cliente_nombre = None
+        if p.cliente:
+            cliente_nombre = p.cliente.nombre
+        elif p.cliente_nombre:
+            cliente_nombre = p.cliente_nombre
+
+        peso_neto = p.peso_neto or Decimal("0")
+        importe = p.importe_total or Decimal("0")
+
+        if p.estado == 'completado':
+            total_kg += peso_neto
+            total_importe += importe
+
+        movimientos.append(MovimientoPesaje(
+            id=p.id,
+            numero_pesaje=p.numero_pesaje,
+            fecha=p.fecha.strftime("%Y-%m-%d"),
+            hora=p.fecha.strftime("%H:%M"),
+            cliente_nombre=cliente_nombre,
+            material=p.material,
+            peso_neto=peso_neto,
+            precio_unitario=p.precio_unitario,
+            flete=p.flete,
+            importe_total=importe,
+            patente=patente,
+            chofer=p.chofer,
+            tipo_entrega=p.tipo_entrega,
+            estado=p.estado,
+            observaciones=p.observaciones
+        ))
+
+    return ReporteMovimientos(
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        movimientos=movimientos,
+        cantidad_pesajes=len([m for m in movimientos if m.estado == 'completado']),
+        total_kg=total_kg,
+        total_toneladas=total_kg / Decimal("1000"),
+        total_importe=total_importe
+    )

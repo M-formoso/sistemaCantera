@@ -116,6 +116,34 @@ export interface ResumenGeneral {
   material_top_kg?: number
 }
 
+export interface MovimientoPesaje {
+  id: string
+  numero_pesaje: number
+  fecha: string
+  hora: string
+  cliente_nombre?: string
+  material?: string
+  peso_neto?: number
+  precio_unitario?: number
+  flete?: number
+  importe_total?: number
+  patente?: string
+  chofer?: string
+  tipo_entrega?: string
+  estado: string
+  observaciones?: string
+}
+
+export interface ReporteMovimientos {
+  fecha_desde: string
+  fecha_hasta: string
+  movimientos: MovimientoPesaje[]
+  cantidad_pesajes: number
+  total_kg: number
+  total_toneladas: number
+  total_importe: number
+}
+
 // ============== SERVICIO ==============
 
 export const reportesService = {
@@ -187,9 +215,45 @@ export const reportesService = {
     return response.data
   },
 
+  // Obtener movimientos/pesajes del período
+  async getMovimientos(fechaDesde?: string, fechaHasta?: string): Promise<ReporteMovimientos> {
+    const params: Record<string, string> = {}
+    if (fechaDesde) params.fecha_desde = fechaDesde
+    if (fechaHasta) params.fecha_hasta = fechaHasta
+
+    const response = await api.get<ReporteMovimientos>('/reportes/movimientos', { params })
+    return response.data
+  },
+
+  // Exportar movimientos a Excel/CSV
+  async exportarMovimientosExcel(fechaDesde?: string, fechaHasta?: string): Promise<void> {
+    const params: Record<string, string> = {}
+    if (fechaDesde) params.fecha_desde = fechaDesde
+    if (fechaHasta) params.fecha_hasta = fechaHasta
+
+    const response = await api.get('/reportes/movimientos/exportar-excel', {
+      params,
+      responseType: 'blob'
+    })
+
+    // Descargar el archivo
+    const blob = response.data as Blob
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const fechaStr = fechaDesde && fechaHasta
+      ? `${fechaDesde.replace(/-/g, '')}_${fechaHasta.replace(/-/g, '')}`
+      : new Date().toISOString().split('T')[0].replace(/-/g, '')
+    link.setAttribute('download', `movimientos_${fechaStr}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
   // Exportar a PDF
   async exportarPDF(
-    tipo: 'resumen' | 'ventas-material' | 'ventas-semanal' | 'gastos' | 'maquinaria' | 'top-clientes',
+    tipo: 'resumen' | 'ventas-material' | 'ventas-semanal' | 'gastos' | 'maquinaria' | 'top-clientes' | 'movimientos',
     fechaDesde?: string,
     fechaHasta?: string,
     material?: string

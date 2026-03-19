@@ -162,3 +162,35 @@ class ResumenGeneral(BaseModel):
     # Material top
     material_top_nombre: Optional[str] = None
     material_top_kg: Optional[Decimal] = None
+
+
+# ============== MOVIMIENTOS / DETALLE PESAJES ==============
+
+class MovimientoPesaje(BaseModel):
+    """Detalle de un pesaje individual para el reporte de movimientos"""
+    id: UUID
+    numero_pesaje: int
+    fecha: str  # ISO format
+    hora: str
+    cliente_nombre: Optional[str] = None
+    material: Optional[str] = None
+    peso_neto: Optional[Decimal] = None
+    precio_unitario: Optional[Decimal] = None
+    flete: Optional[Decimal] = None
+    importe_total: Optional[Decimal] = None
+    patente: Optional[str] = None
+    chofer: Optional[str] = None
+    tipo_entrega: Optional[str] = None
+    estado: str
+    observaciones: Optional[str] = None
+
+
+class ReporteMovimientos(BaseModel):
+    """Reporte de movimientos/pesajes del período"""
+    fecha_desde: date
+    fecha_hasta: date
+    movimientos: List[MovimientoPesaje]
+    cantidad_pesajes: int
+    total_kg: Decimal
+    total_toneladas: Decimal
+    total_importe: Decimal
