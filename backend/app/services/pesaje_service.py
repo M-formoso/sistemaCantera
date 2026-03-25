@@ -45,7 +45,13 @@ def obtener_todos(
     if solo_cancelados:
         query = query.filter(Pesaje.estado == "cancelado")
     elif not incluir_cancelados:
-        query = query.filter(Pesaje.estado != "cancelado")
+        # Excluir cancelados - usar OR para manejar NULLs y valores antiguos
+        query = query.filter(
+            or_(
+                Pesaje.estado != "cancelado",
+                Pesaje.estado.is_(None)
+            )
+        )
 
     pesajes = query.order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
 
