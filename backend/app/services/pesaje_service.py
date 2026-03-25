@@ -33,20 +33,16 @@ def obtener_todos(
     """
     Obtiene todos los pesajes con paginación, enriquecidos con datos relacionados.
 
-    Args:
-        incluir_cancelados: Si True, incluye pesajes cancelados junto con los demás
-        solo_cancelados: Si True, solo devuelve pesajes cancelados (para auditoría)
+    Por defecto muestra todos los pesajes (pendientes, completados y cancelados).
+    - solo_cancelados=True: Solo devuelve pesajes cancelados (para auditoría)
     """
     from app.models.camion import Camion
 
     query = db.query(Pesaje)
 
-    # Filtrar por estado de cancelación
-    # SOLO filtrar si explícitamente se piden cancelados
+    # Solo filtrar si explícitamente se piden solo los cancelados
     if solo_cancelados:
         query = query.filter(Pesaje.estado == "cancelado")
-    # Si no se incluyen cancelados, excluirlos (pero solo si el campo existe y es 'cancelado')
-    # No filtrar nada más - mostrar todos los pesajes normales
 
     pesajes = query.order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
 
