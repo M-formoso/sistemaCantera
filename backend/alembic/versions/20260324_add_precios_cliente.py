@@ -17,19 +17,24 @@ depends_on = None
 
 
 def upgrade():
-    # Crear tabla precios_cliente
-    op.create_table(
-        'precios_cliente',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('cliente_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('empresas.id'), nullable=False, index=True),
-        sa.Column('material', sa.String(100), nullable=False, index=True),
-        sa.Column('precio_unitario', sa.Numeric(12, 2), nullable=False),
-        sa.Column('factor_conversion_m3', sa.Numeric(6, 3), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
-        sa.Column('updated_at', sa.DateTime(), nullable=True),
-        sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
-        sa.UniqueConstraint('cliente_id', 'material', name='uq_precio_cliente_material'),
-    )
+    # Verificar si la tabla ya existe antes de crearla
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    tables = inspector.get_table_names()
+
+    if 'precios_cliente' not in tables:
+        op.create_table(
+            'precios_cliente',
+            sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column('cliente_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('empresas.id'), nullable=False, index=True),
+            sa.Column('material', sa.String(100), nullable=False, index=True),
+            sa.Column('precio_unitario', sa.Numeric(12, 2), nullable=False),
+            sa.Column('factor_conversion_m3', sa.Numeric(6, 3), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
+            sa.UniqueConstraint('cliente_id', 'material', name='uq_precio_cliente_material'),
+        )
 
 
 def downgrade():

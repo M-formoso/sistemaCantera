@@ -17,19 +17,29 @@ depends_on = None
 
 
 def upgrade():
-    # Agregar campos de cancelación a pesajes
-    op.add_column('pesajes', sa.Column('motivo_cancelacion', sa.Text(), nullable=True))
-    op.add_column('pesajes', sa.Column('fecha_cancelacion', sa.DateTime(), nullable=True))
-    op.add_column('pesajes', sa.Column('cancelado_por', postgresql.UUID(as_uuid=True), nullable=True))
+    # Verificar qué columnas ya existen
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('pesajes')]
 
-    # Crear foreign key para cancelado_por
-    op.create_foreign_key(
-        'fk_pesajes_cancelado_por',
-        'pesajes',
-        'usuarios',
-        ['cancelado_por'],
-        ['id']
-    )
+    # Agregar campos de cancelación solo si no existen
+    if 'motivo_cancelacion' not in columns:
+        op.add_column('pesajes', sa.Column('motivo_cancelacion', sa.Text(), nullable=True))
+
+    if 'fecha_cancelacion' not in columns:
+        op.add_column('pesajes', sa.Column('fecha_cancelacion', sa.DateTime(), nullable=True))
+
+    if 'cancelado_por' not in columns:
+        op.add_column('pesajes', sa.Column('cancelado_por', postgresql.UUID(as_uuid=True), nullable=True))
+
+        # Crear foreign key para cancelado_por (solo si agregamos la columna)
+        op.create_foreign_key(
+            'fk_pesajes_cancelado_por',
+            'pesajes',
+            'usuarios',
+            ['cancelado_por'],
+            ['id']
+        )
 
 
 def downgrade():
