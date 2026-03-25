@@ -23,7 +23,7 @@ MATERIALES_DISPONIBLES = [
 ]
 
 # Estados de pesaje
-ESTADOS_PESAJE = ["pendiente", "completado"]
+ESTADOS_PESAJE = ["pendiente", "completado", "cancelado"]
 
 
 class PesajeBase(BaseModel):
@@ -185,6 +185,12 @@ class PesajeSchema(ResponseBase):
     remito_generado: bool
     created_by: UUID
 
+    # Campos de cancelación (si aplica)
+    motivo_cancelacion: Optional[str] = None
+    fecha_cancelacion: Optional[datetime] = None
+    cancelado_por: Optional[UUID] = None
+    cancelado_por_nombre: Optional[str] = None
+
 
 class PesajeStats(BaseModel):
     """Schema para estadísticas de pesajes"""
@@ -265,12 +271,20 @@ class PesajeIniciarCreate(BaseModel):
 
 
 class PesajeCompletarCreate(BaseModel):
-    """Schema para completar un pesaje (peso bruto - camión cargado)"""
+    """Schema para completar un pesaje (peso bruto - camión cargado)
+
+    IMPORTANTE: Al completar el pesaje es OBLIGATORIO tener:
+    - cliente_id: Se puede haber cargado al iniciar, o se puede agregar aquí
+    - material: Se puede haber cargado al iniciar, o se debe especificar aquí
+    """
 
     peso_bruto: Decimal = Field(..., gt=0, description="Peso del camión cargado en kg")
 
+    # Cliente (opcional aquí si ya se cargó al iniciar, pero DEBE existir al completar)
+    cliente_id: Optional[UUID] = Field(None, description="ID del cliente - obligatorio si no se cargó al iniciar")
+
     # Datos opcionales que se pueden actualizar al completar
-    material: Optional[str] = Field(None, max_length=100)
+    material: Optional[str] = Field(None, max_length=100, description="Material - obligatorio si no se cargó al iniciar")
     chofer: Optional[str] = Field(None, max_length=100)
     observaciones: Optional[str] = None
 
@@ -346,3 +360,40 @@ class BusquedaPatenteResult(BaseModel):
     pesaje_pendiente_numero: Optional[int] = None
     pesaje_pendiente_tara: Optional[float] = None
     pesaje_pendiente_fecha: Optional[str] = None
+
+
+class PesajeCancelarCreate(BaseModel):
+    """Schema para cancelar un pesaje pendiente (soft-delete con auditoría)"""
+
+    motivo: str = Field(
+        ...,
+        min_length=10,
+        max_length=500,
+        description="Motivo de la cancelación (mínimo 10 caracteres)"
+    )
+
+
+class PesajeCanceladoSchema(ResponseBase):
+    """Schema de respuesta de pesaje cancelado"""
+
+    numero_pesaje: int
+    fecha: datetime  # Fecha de la tara
+    fecha_cancelacion: datetime
+    estado: str = "cancelado"
+
+    # Identificación
+    tipo_entrega: str
+    patente: Optional[str] = None  # patente externa o del camión propio
+
+    # Cliente
+    cliente_id: Optional[UUID] = None
+    cliente_nombre: Optional[str] = None
+
+    # Datos
+    peso_tara: Optional[Decimal] = None
+    material: Optional[str] = None
+
+    # Auditoría
+    motivo_cancelacion: str
+    cancelado_por: Optional[UUID] = None
+    cancelado_por_nombre: Optional[str] = None

@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, or_
 from uuid import UUID
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from fastapi import HTTPException, status
 
 from app.models.base import get_argentina_now
@@ -18,41 +18,71 @@ from app.models.camion import Camion
 from app.models.camion_cliente import CamionCliente
 from app.models.cuenta_corriente import MovimientoCuentaCorriente
 from app.models.orden_entrega import OrdenEntrega, EstadoOrdenEntrega
-from app.schemas.pesaje import PesajeCreate, PesajeUpdate, PesajeIniciarCreate, PesajeCompletarCreate
+from app.schemas.pesaje import PesajeCreate, PesajeUpdate, PesajeIniciarCreate, PesajeCompletarCreate, PesajeCancelarCreate
+from app.models.usuario import Usuario
 from app.services import camion_service
 
 
 def obtener_todos(
     db: Session,
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    incluir_cancelados: bool = False,
+    solo_cancelados: bool = False
 ) -> List[Pesaje]:
-    """Obtiene todos los pesajes con paginación, enriquecidos con datos relacionados"""
+    """
+    Obtiene todos los pesajes con paginación, enriquecidos con datos relacionados.
+
+    Args:
+        incluir_cancelados: Si True, incluye pesajes cancelados junto con los demás
+        solo_cancelados: Si True, solo devuelve pesajes cancelados (para auditoría)
+    """
     from app.models.camion import Camion
 
-    pesajes = db.query(Pesaje).order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
+    query = db.query(Pesaje)
+
+    # Filtrar por estado
+    if solo_cancelados:
+        query = query.filter(Pesaje.estado == "cancelado")
+    elif not incluir_cancelados:
+        query = query.filter(Pesaje.estado != "cancelado")
+
+    pesajes = query.order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
 
     # Enriquecer con datos
     for p in pesajes:
-        # Patente del camión propio
-        if p.camion_id:
-            camion = db.query(Camion).filter(Camion.id == p.camion_id).first()
-            if camion:
-                p.camion_patente = camion.patente
-
-        # Nombre del transportista
-        if p.transportista_id:
-            transportista = db.query(Empresa).filter(Empresa.id == p.transportista_id).first()
-            if transportista:
-                p.transportista_nombre = transportista.nombre
-
-        # Nombre del cliente
-        if p.cliente_id:
-            cliente = db.query(Empresa).filter(Empresa.id == p.cliente_id).first()
-            if cliente:
-                p.cliente_nombre = cliente.nombre
+        _enriquecer_pesaje(db, p)
 
     return pesajes
+
+
+def _enriquecer_pesaje(db: Session, pesaje: Pesaje) -> None:
+    """Enriquece un pesaje con datos relacionados (patentes, nombres, etc)"""
+    from app.models.camion import Camion
+
+    # Patente del camión propio
+    if pesaje.camion_id:
+        camion = db.query(Camion).filter(Camion.id == pesaje.camion_id).first()
+        if camion:
+            pesaje.camion_patente = camion.patente
+
+    # Nombre del transportista
+    if pesaje.transportista_id:
+        transportista = db.query(Empresa).filter(Empresa.id == pesaje.transportista_id).first()
+        if transportista:
+            pesaje.transportista_nombre = transportista.nombre
+
+    # Nombre del cliente
+    if pesaje.cliente_id:
+        cliente = db.query(Empresa).filter(Empresa.id == pesaje.cliente_id).first()
+        if cliente:
+            pesaje.cliente_nombre = cliente.nombre
+
+    # Si está cancelado, agregar nombre de quien lo canceló
+    if pesaje.cancelado_por:
+        usuario = db.query(Usuario).filter(Usuario.id == pesaje.cancelado_por).first()
+        if usuario:
+            pesaje.cancelado_por_nombre = usuario.nombre
 
 
 def obtener_por_id(db: Session, pesaje_id: UUID) -> Optional[Pesaje]:
@@ -311,6 +341,60 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     return movimiento
 
 
+def sincronizar_pesaje_cuenta_corriente(db: Session, pesaje_id: UUID, usuario_id: UUID) -> dict:
+    """
+    Sincroniza un pesaje existente con la cuenta corriente del cliente.
+    Útil para pesajes históricos que no tienen movimiento registrado.
+
+    Retorna:
+        - {"status": "creado", "movimiento_id": ...} si se creó el movimiento
+        - {"status": "ya_existe", "movimiento_id": ...} si ya existía
+        - {"status": "sin_cliente"} si el pesaje no tiene cliente asignado
+        - {"status": "no_completado"} si el pesaje no está completado
+    """
+    from app.models.cuenta_corriente import MovimientoCuentaCorriente
+
+    # Obtener pesaje
+    pesaje = db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
+    if not pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado"
+        )
+
+    # Verificar que esté completado
+    if pesaje.estado != "completado":
+        return {"status": "no_completado", "message": "El pesaje no está completado"}
+
+    # Verificar que tenga cliente
+    if not pesaje.cliente_id:
+        return {"status": "sin_cliente", "message": "El pesaje no tiene cliente asignado"}
+
+    # Verificar si ya existe un movimiento para este pesaje
+    movimiento_existente = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.pesaje_id == pesaje_id
+    ).first()
+
+    if movimiento_existente:
+        return {
+            "status": "ya_existe",
+            "movimiento_id": str(movimiento_existente.id),
+            "message": f"Ya existe movimiento en cuenta corriente (monto: ${float(movimiento_existente.monto):.2f})"
+        }
+
+    # Crear el movimiento
+    movimiento = _registrar_en_cuenta_corriente(db, pesaje, usuario_id)
+
+    if movimiento:
+        return {
+            "status": "creado",
+            "movimiento_id": str(movimiento.id),
+            "message": f"Movimiento creado exitosamente (monto: ${float(movimiento.monto):.2f})"
+        }
+    else:
+        return {"status": "error", "message": "No se pudo crear el movimiento"}
+
+
 def _generar_remito_automatico(db: Session, pesaje: Pesaje, usuario_id: UUID) -> Remito:
     """
     Genera un remito automáticamente al crear un pesaje
@@ -456,12 +540,113 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
     return db_pesaje
 
 
-def eliminar(db: Session, pesaje_id: UUID) -> dict:
+def cancelar_pesaje(
+    db: Session,
+    pesaje_id: UUID,
+    datos_cancelacion: PesajeCancelarCreate,
+    usuario_id: UUID
+) -> Pesaje:
     """
-    Elimina un pesaje y sus referencias relacionadas
+    Cancela un pesaje (soft-delete con auditoría).
+
+    - El pesaje NO se elimina, se marca como 'cancelado'
+    - Se registra el motivo de cancelación (obligatorio)
+    - Se registra quién lo canceló y cuándo
+    - Si tenía cliente, se registra en cuenta corriente como movimiento de cancelación
+
+    Esto permite:
+    - Mantener trazabilidad completa
+    - Evitar manipulaciones indebidas
+    - Auditar todos los cambios
+    """
+    db_pesaje = obtener_por_id(db, pesaje_id)
+
+    if not db_pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado"
+        )
+
+    if db_pesaje.estado == "cancelado":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este pesaje ya fue cancelado"
+        )
+
+    ahora = get_argentina_now()
+
+    # Obtener nombre del usuario que cancela
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    nombre_usuario = usuario.nombre if usuario else "Usuario desconocido"
+
+    # Si era un pesaje completado y tenía cliente, registrar reversión en cuenta corriente
+    if db_pesaje.estado == "completado" and db_pesaje.cliente_id and db_pesaje.importe_total:
+        # Buscar el movimiento de cuenta corriente original
+        movimiento_original = db.query(MovimientoCuentaCorriente).filter(
+            MovimientoCuentaCorriente.pesaje_id == pesaje_id
+        ).first()
+
+        if movimiento_original:
+            # Obtener saldo actual del cliente
+            cliente = db.query(Empresa).filter(Empresa.id == db_pesaje.cliente_id).first()
+            saldo_anterior = cliente.saldo_cuenta_corriente if cliente else Decimal("0")
+
+            # Crear movimiento de reversión (crédito)
+            movimiento_cancelacion = MovimientoCuentaCorriente(
+                empresa_id=db_pesaje.cliente_id,
+                tipo="ajuste",
+                concepto=f"CANCELACIÓN Pesaje #{db_pesaje.numero_pesaje} - {datos_cancelacion.motivo}",
+                monto=-db_pesaje.importe_total,  # Negativo para revertir
+                saldo_anterior=saldo_anterior,
+                saldo_posterior=saldo_anterior - db_pesaje.importe_total,
+                fecha=ahora,
+                pesaje_id=pesaje_id,
+                created_by=usuario_id
+            )
+            db.add(movimiento_cancelacion)
+
+            # Actualizar saldo del cliente
+            if cliente:
+                cliente.saldo_cuenta_corriente = saldo_anterior - db_pesaje.importe_total
+
+    # Si tiene orden de entrega asociada, revertir la carga
+    if db_pesaje.orden_entrega_id and db_pesaje.peso_neto:
+        orden = db.query(OrdenEntrega).filter(OrdenEntrega.id == db_pesaje.orden_entrega_id).first()
+        if orden:
+            orden.cargas_entregadas = max(0, (orden.cargas_entregadas or 0) - 1)
+            orden.peso_total_entregado = max(
+                Decimal("0"),
+                (orden.peso_total_entregado or Decimal("0")) - db_pesaje.peso_neto
+            )
+            # Recalcular estado
+            if orden.cargas_entregadas == 0:
+                orden.estado = EstadoOrdenEntrega.PENDIENTE
+            elif orden.cargas_entregadas < orden.cantidad_cargas:
+                orden.estado = EstadoOrdenEntrega.EN_PROCESO
+
+    # Marcar pesaje como cancelado (soft-delete)
+    db_pesaje.estado = "cancelado"
+    db_pesaje.motivo_cancelacion = datos_cancelacion.motivo
+    db_pesaje.fecha_cancelacion = ahora
+    db_pesaje.cancelado_por = usuario_id
+
+    db.commit()
+    db.refresh(db_pesaje)
+
+    # Enriquecer con datos para respuesta
+    db_pesaje.cancelado_por_nombre = nombre_usuario
+
+    return db_pesaje
+
+
+def eliminar_permanente(db: Session, pesaje_id: UUID) -> dict:
+    """
+    Elimina PERMANENTEMENTE un pesaje (solo para admin, casos excepcionales).
+    ADVERTENCIA: Esto elimina el registro completamente de la base de datos.
+
+    Para cancelaciones normales, usar cancelar_pesaje() que hace soft-delete.
     """
     from app.models.remito import Remito
-    from app.models.cuenta_corriente import MovimientoCuentaCorriente
 
     db_pesaje = obtener_por_id(db, pesaje_id)
 
@@ -486,7 +671,7 @@ def eliminar(db: Session, pesaje_id: UUID) -> dict:
     db.delete(db_pesaje)
     db.commit()
 
-    return {"message": "Pesaje eliminado correctamente"}
+    return {"message": "Pesaje eliminado permanentemente"}
 
 
 def obtener_estadisticas_periodo(
@@ -830,6 +1015,10 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     """
     Completa un pesaje pendiente registrando el peso bruto (camión cargado).
     Calcula el peso neto y genera remito.
+
+    IMPORTANTE: Al completar el pesaje es OBLIGATORIO:
+    - Tener un cliente asignado (cliente_id)
+    - Tener un material especificado
     """
     db_pesaje = db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
 
@@ -845,6 +1034,62 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
             detail="Este pesaje ya fue completado"
         )
 
+    # Si viene cliente_id en los datos, actualizarlo en el pesaje
+    if pesaje_data.cliente_id:
+        # Verificar que el cliente exista
+        cliente = db.query(Empresa).filter(Empresa.id == pesaje_data.cliente_id).first()
+        if not cliente:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente no encontrado"
+            )
+        db_pesaje.cliente_id = pesaje_data.cliente_id
+
+    # ========== VALIDACIONES OBLIGATORIAS AL COMPLETAR ==========
+
+    # 1. CLIENTE - Obligatorio
+    if not db_pesaje.cliente_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe asignar un CLIENTE para completar el pesaje"
+        )
+
+    # 2. MATERIAL - Obligatorio (puede venir del pesaje pendiente o del formulario)
+    material_final = pesaje_data.material or db_pesaje.material
+    if not material_final:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe especificar el MATERIAL para completar el pesaje"
+        )
+
+    # 3. TRANSPORTE - Obligatorio (camión propio O transportista externo)
+    tiene_transporte = (
+        db_pesaje.camion_id or  # Camión propio
+        db_pesaje.transportista_id or  # Transportista registrado
+        db_pesaje.patente_externa  # Patente externa
+    )
+    if not tiene_transporte:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe especificar el TRANSPORTE (camión propio o transportista) para completar el pesaje"
+        )
+
+    # 4. PRECIO - Obligatorio (precio_unitario O precio_fijo)
+    tiene_precio = (
+        pesaje_data.precio_unitario or
+        pesaje_data.precio_fijo or
+        pesaje_data.importe_total or
+        db_pesaje.precio_unitario or
+        db_pesaje.precio_fijo
+    )
+    if not tiene_precio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe especificar el PRECIO (por tonelada o fijo) para completar el pesaje"
+        )
+
+    # ========== FIN VALIDACIONES ==========
+
     # Validar que el peso bruto sea mayor que la tara
     if pesaje_data.peso_bruto <= db_pesaje.peso_tara:
         raise HTTPException(
@@ -855,11 +1100,16 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     # Calcular peso neto
     peso_neto = pesaje_data.peso_bruto - db_pesaje.peso_tara
 
+    # Obtener fecha/hora actual de Argentina
+    ahora = get_argentina_now()
+
     # Actualizar pesaje
     db_pesaje.peso_bruto = pesaje_data.peso_bruto
     db_pesaje.peso_neto = peso_neto
     db_pesaje.estado = "completado"
-    db_pesaje.fecha_completado = get_argentina_now()
+    # IMPORTANTE: La fecha del pesaje es cuando se COMPLETA, no cuando se hizo la tara
+    db_pesaje.fecha = ahora
+    db_pesaje.fecha_completado = ahora
 
     # Actualizar campos opcionales
     if pesaje_data.material:
@@ -951,3 +1201,76 @@ def cancelar_pesaje_pendiente(db: Session, pesaje_id: UUID) -> dict:
     db.commit()
 
     return {"message": "Pesaje pendiente cancelado correctamente"}
+
+
+def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> dict:
+    """
+    Elimina pesajes pendientes que tienen más de X días sin completarse.
+
+    Los pesajes pendientes son aquellos donde solo se registró la tara
+    pero nunca se completó con el peso bruto.
+
+    Args:
+        db: Sesión de base de datos
+        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 3)
+
+    Returns:
+        dict con cantidad de pesajes eliminados y sus números
+    """
+    ahora = get_argentina_now()
+    fecha_limite = ahora - timedelta(days=dias_limite)
+
+    # Buscar pesajes pendientes más viejos que el límite
+    pesajes_viejos = db.query(Pesaje).filter(
+        Pesaje.estado == "pendiente",
+        Pesaje.created_at < fecha_limite
+    ).all()
+
+    if not pesajes_viejos:
+        return {
+            "eliminados": 0,
+            "numeros_pesaje": [],
+            "message": "No hay pesajes pendientes viejos para eliminar"
+        }
+
+    # Guardar los números antes de eliminar
+    numeros = [p.numero_pesaje for p in pesajes_viejos]
+
+    # Eliminar los pesajes
+    for pesaje in pesajes_viejos:
+        db.delete(pesaje)
+
+    db.commit()
+
+    return {
+        "eliminados": len(numeros),
+        "numeros_pesaje": numeros,
+        "message": f"Se eliminaron {len(numeros)} pesajes pendientes con más de {dias_limite} días"
+    }
+
+
+def obtener_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> List[Pesaje]:
+    """
+    Obtiene pesajes pendientes que tienen más de X días sin completarse.
+    Útil para revisar antes de eliminar.
+
+    Args:
+        db: Sesión de base de datos
+        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 3)
+
+    Returns:
+        Lista de pesajes pendientes viejos
+    """
+    ahora = get_argentina_now()
+    fecha_limite = ahora - timedelta(days=dias_limite)
+
+    pesajes = db.query(Pesaje).filter(
+        Pesaje.estado == "pendiente",
+        Pesaje.created_at < fecha_limite
+    ).order_by(Pesaje.created_at).all()
+
+    # Enriquecer con datos
+    for p in pesajes:
+        _enriquecer_pesaje(db, p)
+
+    return pesajes

@@ -310,7 +310,7 @@ export interface EmpresaCreate {
 
 export type TipoEntrega = 'propio' | 'transportista'
 
-export type EstadoPesaje = 'pendiente' | 'completado'
+export type EstadoPesaje = 'pendiente' | 'completado' | 'cancelado'
 
 export interface Pesaje {
   id: string
@@ -352,6 +352,11 @@ export interface Pesaje {
   created_by: string
   created_at: string
   updated_at: string
+  // Campos de cancelación
+  motivo_cancelacion?: string
+  fecha_cancelacion?: string
+  cancelado_por?: string
+  cancelado_por_nombre?: string
 }
 
 export interface PesajeCreate {

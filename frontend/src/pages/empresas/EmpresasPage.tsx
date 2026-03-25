@@ -11,11 +11,12 @@ import {
   getPaginationRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Building2, Plus, Pencil, Trash2, Truck, UserCheck, Car, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Truck, UserCheck, Car, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, DollarSign, RotateCcw, Archive } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { empresasService, CamionCliente, CamionClienteCreate } from '@/services/empresasService'
+import { preciosService, PrecioMultiple } from '@/services/preciosService'
 import { Empresa, EmpresaCreate, TipoEmpresa } from '@/types'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 
@@ -25,6 +26,7 @@ export default function EmpresasPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [filtroTipo, setFiltroTipo] = useState<TipoEmpresa | 'todos'>('todos')
+  const [mostrarInactivos, setMostrarInactivos] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null)
   const [formData, setFormData] = useState<EmpresaCreate>({
@@ -48,12 +50,22 @@ export default function EmpresasPage() {
     chofer_habitual: '',
   })
 
+  // Estado para gestión de precios
+  const [showPreciosModal, setShowPreciosModal] = useState(false)
+  const [preciosEditados, setPreciosEditados] = useState<Record<string, PrecioMultiple>>({})
+  const [guardandoPrecios, setGuardandoPrecios] = useState(false)
+
+  // Lista de materiales disponibles
+  const MATERIALES_DISPONIBLES = [
+    '10.30', '6.19', '0.20', '6.12', 'relleno', 'binder', '0.6', 'piedra partida', 'suelo arena', 'retiro'
+  ]
+
   const { data: empresas, isLoading } = useQuery({
-    queryKey: ['empresas', filtroTipo],
+    queryKey: ['empresas', filtroTipo, mostrarInactivos],
     queryFn: () =>
       filtroTipo === 'todos'
-        ? empresasService.getAll()
-        : empresasService.getAll(filtroTipo),
+        ? empresasService.getAll(undefined, !mostrarInactivos)
+        : empresasService.getAll(filtroTipo, !mostrarInactivos),
   })
 
   const createMutation = useMutation({
@@ -75,6 +87,13 @@ export default function EmpresasPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => empresasService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['empresas'] })
+    },
+  })
+
+  const reactivarMutation = useMutation({
+    mutationFn: (id: string) => empresasService.reactivar(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['empresas'] })
     },
@@ -228,6 +247,75 @@ export default function EmpresasPage() {
     }
   }
 
+  // Funciones para modal de precios
+  const openPreciosModal = async (empresa: Empresa) => {
+    setSelectedCliente(empresa)
+    setShowPreciosModal(true)
+    setGuardandoPrecios(false)
+
+    try {
+      const precios = await preciosService.getByCliente(empresa.id)
+
+      // Inicializar precios editados con los existentes
+      const editados: Record<string, PrecioMultiple> = {}
+      precios.forEach(p => {
+        editados[p.material] = {
+          material: p.material,
+          precio_unitario: p.precio_unitario,
+          factor_conversion_m3: p.factor_conversion_m3
+        }
+      })
+      setPreciosEditados(editados)
+    } catch (error) {
+      console.error('Error cargando precios:', error)
+      setPreciosEditados({})
+    }
+  }
+
+  const closePreciosModal = () => {
+    setShowPreciosModal(false)
+    setSelectedCliente(null)
+    setPreciosEditados({})
+  }
+
+  const handlePrecioChange = (material: string, campo: 'precio_unitario' | 'factor_conversion_m3', valor: string) => {
+    const numVal = valor === '' ? undefined : Number(valor)
+    setPreciosEditados(prev => ({
+      ...prev,
+      [material]: {
+        ...prev[material],
+        material,
+        precio_unitario: campo === 'precio_unitario' ? (numVal || 0) : (prev[material]?.precio_unitario || 0),
+        factor_conversion_m3: campo === 'factor_conversion_m3' ? (numVal || null) : (prev[material]?.factor_conversion_m3 || null)
+      }
+    }))
+  }
+
+  const handleGuardarPrecios = async () => {
+    if (!selectedCliente) return
+
+    setGuardandoPrecios(true)
+
+    try {
+      // Filtrar solo los que tienen precio
+      const preciosAGuardar = Object.values(preciosEditados).filter(p => p.precio_unitario > 0)
+
+      if (preciosAGuardar.length === 0) {
+        alert('Debe ingresar al menos un precio')
+        setGuardandoPrecios(false)
+        return
+      }
+
+      await preciosService.createMultiple(selectedCliente.id, preciosAGuardar)
+      alert('Precios guardados correctamente')
+      closePreciosModal()
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Error al guardar precios')
+    } finally {
+      setGuardandoPrecios(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.nombre.trim()) {
@@ -247,11 +335,21 @@ export default function EmpresasPage() {
   }
 
   const handleDelete = async (id: string, nombre: string) => {
-    if (window.confirm(`¿Está seguro de eliminar "${nombre}"?`)) {
+    if (window.confirm(`¿Está seguro de desactivar "${nombre}"?\n\nLa empresa quedará inactiva pero podrá reactivarla desde la sección "Ver desactivados".`)) {
       try {
         await deleteMutation.mutateAsync(id)
       } catch (error: any) {
-        alert(error.response?.data?.detail || 'Error al eliminar')
+        alert(error.response?.data?.detail || 'Error al desactivar')
+      }
+    }
+  }
+
+  const handleReactivar = async (id: string, nombre: string) => {
+    if (window.confirm(`¿Desea reactivar "${nombre}"?`)) {
+      try {
+        await reactivarMutation.mutateAsync(id)
+      } catch (error: any) {
+        alert(error.response?.data?.detail || 'Error al reactivar')
       }
     }
   }
@@ -334,18 +432,50 @@ export default function EmpresasPage() {
       header: 'Acciones',
       cell: ({ row }) => {
         const empresa = row.original
+        const esInactivo = !empresa.activo
+
+        // Si está inactivo, mostrar solo botón de reactivar
+        if (esInactivo) {
+          return (
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleReactivar(empresa.id, empresa.nombre)}
+                  className="text-green-600 hover:text-green-700"
+                  title="Reactivar"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )
+        }
+
         return (
           <div className="flex items-center gap-2">
             {empresa.tipo === 'cliente' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openCamionesModal(empresa)}
-                title="Ver Camiones/Patentes"
-                className="text-blue-600 hover:text-blue-700"
-              >
-                <Car className="h-4 w-4" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openPreciosModal(empresa)}
+                  title="Configurar Precios"
+                  className="text-green-600 hover:text-green-700"
+                >
+                  <DollarSign className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openCamionesModal(empresa)}
+                  title="Ver Camiones/Patentes"
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <Car className="h-4 w-4" />
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
@@ -360,10 +490,10 @@ export default function EmpresasPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDelete(empresa.id, empresa.nombre)}
-                className="text-red-600 hover:text-red-700"
-                title="Eliminar"
+                className="text-orange-600 hover:text-orange-700"
+                title="Desactivar"
               >
-                <Trash2 className="h-4 w-4" />
+                <Archive className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -441,7 +571,7 @@ export default function EmpresasPage() {
               }
               className="flex-1"
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant={filtroTipo === 'todos' ? 'default' : 'outline'}
                 onClick={() => setFiltroTipo('todos')}
@@ -465,8 +595,24 @@ export default function EmpresasPage() {
                 <Truck className="mr-1 h-4 w-4" />
                 Transportistas
               </Button>
+              <div className="border-l mx-2" />
+              <Button
+                variant={mostrarInactivos ? 'default' : 'outline'}
+                onClick={() => setMostrarInactivos(!mostrarInactivos)}
+                size="sm"
+                className={mostrarInactivos ? 'bg-orange-600 hover:bg-orange-700' : ''}
+              >
+                <Archive className="mr-1 h-4 w-4" />
+                {mostrarInactivos ? 'Mostrando desactivados' : 'Ver desactivados'}
+              </Button>
             </div>
           </div>
+          {mostrarInactivos && (
+            <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded-md text-sm text-orange-700">
+              <Archive className="h-4 w-4 inline mr-1" />
+              Mostrando empresas desactivadas. Puede reactivarlas usando el botón <RotateCcw className="h-3 w-3 inline mx-1" /> en la columna de acciones.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -898,6 +1044,105 @@ export default function EmpresasPage() {
               <div className="flex justify-end mt-4 pt-4 border-t">
                 <Button variant="outline" onClick={closeCamionesModal}>
                   Cerrar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal de precios del cliente */}
+      {showPreciosModal && selectedCliente && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Precios de {selectedCliente.nombre}
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Configure los precios por material para este cliente
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={closePreciosModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Info sobre conversión m³ */}
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-sm text-blue-700">
+                <p className="font-medium">Conversión a m³ (para clientes como HORIZONTE)</p>
+                <p className="mt-1">
+                  Si el cliente requiere facturación por m³, ingrese el factor de conversión.
+                  <br />
+                  Ejemplo: Para 0-20 usar <strong>1.66</strong> (toneladas ÷ 1.66 = m³)
+                  <br />
+                  Para 6-19 usar <strong>1.5</strong> (toneladas ÷ 1.5 = m³)
+                </p>
+              </div>
+
+              {/* Tabla de precios */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Material</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Precio ($/tn o $/m³)</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Factor m³ (opcional)</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500">Unidad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {MATERIALES_DISPONIBLES.map((material) => {
+                      const precioActual = preciosEditados[material]
+                      const tieneConversion = precioActual?.factor_conversion_m3 && precioActual.factor_conversion_m3 > 0
+                      return (
+                        <tr key={material} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 font-medium">{material}</td>
+                          <td className="px-4 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0"
+                              value={precioActual?.precio_unitario || ''}
+                              onChange={(e) => handlePrecioChange(material, 'precio_unitario', e.target.value)}
+                              className="w-32"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="-"
+                              value={precioActual?.factor_conversion_m3 || ''}
+                              onChange={(e) => handlePrecioChange(material, 'factor_conversion_m3', e.target.value)}
+                              className="w-24"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-500">
+                            {tieneConversion ? (
+                              <span className="text-blue-600 font-medium">$/m³</span>
+                            ) : (
+                              <span>$/tn</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Botones */}
+              <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+                <Button variant="outline" onClick={closePreciosModal}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleGuardarPrecios} disabled={guardandoPrecios}>
+                  {guardandoPrecios ? 'Guardando...' : 'Guardar Precios'}
                 </Button>
               </div>
             </CardContent>

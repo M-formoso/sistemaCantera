@@ -22,7 +22,8 @@ export interface PesajeIniciarCreate {
 
 export interface PesajeCompletarCreate {
   peso_bruto: number
-  material?: string
+  cliente_id?: string  // Obligatorio si no se cargó al iniciar
+  material?: string    // Obligatorio si no se cargó al iniciar
   chofer?: string
   observaciones?: string
   precio_unitario?: number
@@ -75,10 +76,19 @@ export interface BusquedaPatenteResult {
 export const pesajesService = {
   /**
    * Obtiene todos los pesajes
+   * @param skip - Offset para paginación
+   * @param limit - Límite de resultados
+   * @param incluirCancelados - Si es true, incluye pesajes cancelados
+   * @param soloCancelados - Si es true, solo retorna cancelados (para auditoría)
    */
-  async getAll(skip: number = 0, limit: number = 100): Promise<Pesaje[]> {
+  async getAll(
+    skip: number = 0,
+    limit: number = 100,
+    incluirCancelados: boolean = false,
+    soloCancelados: boolean = false
+  ): Promise<Pesaje[]> {
     const response = await api.get<Pesaje[]>('/pesajes', {
-      params: { skip, limit },
+      params: { skip, limit, incluir_cancelados: incluirCancelados, solo_cancelados: soloCancelados },
     })
     return response.data
   },
@@ -206,9 +216,38 @@ export const pesajesService = {
   },
 
   /**
-   * Cancela un pesaje pendiente
+   * Cancela un pesaje (soft-delete con auditoría)
+   * Requiere motivo obligatorio (mínimo 10 caracteres)
    */
-  async cancelarPendiente(pesajeId: string): Promise<void> {
-    await api.delete(`/pesajes/${pesajeId}/cancelar`)
+  async cancelarPesaje(pesajeId: string, motivo: string): Promise<Pesaje> {
+    const response = await api.post<Pesaje>(`/pesajes/${pesajeId}/cancelar`, { motivo })
+    return response.data
+  },
+
+  /**
+   * Obtiene pesajes cancelados (para auditoría)
+   */
+  async getCancelados(skip: number = 0, limit: number = 100): Promise<Pesaje[]> {
+    const response = await api.get<Pesaje[]>('/pesajes', {
+      params: { skip, limit, solo_cancelados: true },
+    })
+    return response.data
+  },
+
+  /**
+   * Sincroniza un pesaje con la cuenta corriente del cliente
+   * Útil para pesajes históricos que no tienen movimiento registrado
+   */
+  async sincronizarCuentaCorriente(pesajeId: string): Promise<{
+    status: 'creado' | 'ya_existe' | 'sin_cliente' | 'no_completado' | 'error'
+    movimiento_id?: string
+    message?: string
+  }> {
+    const response = await api.post<{
+      status: 'creado' | 'ya_existe' | 'sin_cliente' | 'no_completado' | 'error'
+      movimiento_id?: string
+      message?: string
+    }>(`/pesajes/${pesajeId}/sincronizar-cuenta-corriente`)
+    return response.data
   },
 }

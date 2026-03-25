@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X, FileDown, Archive, XCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
+import { reportesService } from '@/services/reportesService'
 import { Pesaje } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
@@ -39,11 +40,13 @@ export default function PesajesTab() {
   const [filtroMaterial, setFiltroMaterial] = useState<string>('')
   const [filtroCliente, setFiltroCliente] = useState<string>('')
   const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false)
+  const [descargandoPDF, setDescargandoPDF] = useState<boolean>(false)
+  const [mostrarCancelados, setMostrarCancelados] = useState<boolean>(false)
 
   // Query para pesajes
   const { data: pesajesRaw = [], isLoading } = useQuery({
-    queryKey: ['pesajes'],
-    queryFn: () => pesajesService.getAll(0, 500),
+    queryKey: ['pesajes', mostrarCancelados],
+    queryFn: () => pesajesService.getAll(0, 500, mostrarCancelados, mostrarCancelados),
   })
 
   // Filtrar pesajes según los filtros activos
@@ -56,16 +59,17 @@ export default function PesajesTab() {
 
       // Filtro por fecha desde
       if (filtroFechaDesde) {
-        const fechaPesaje = new Date(pesaje.fecha).toISOString().split('T')[0]
-        if (fechaPesaje < filtroFechaDesde) {
+        // Extraer solo la parte de fecha del pesaje (YYYY-MM-DD)
+        const fechaPesajeStr = pesaje.fecha.split('T')[0]
+        if (fechaPesajeStr < filtroFechaDesde) {
           return false
         }
       }
 
       // Filtro por fecha hasta
       if (filtroFechaHasta) {
-        const fechaPesaje = new Date(pesaje.fecha).toISOString().split('T')[0]
-        if (fechaPesaje > filtroFechaHasta) {
+        const fechaPesajeStr = pesaje.fecha.split('T')[0]
+        if (fechaPesajeStr > filtroFechaHasta) {
           return false
         }
       }
@@ -106,6 +110,24 @@ export default function PesajesTab() {
     setFiltroPatente('')
     setFiltroMaterial('')
     setFiltroCliente('')
+  }
+
+  // Descargar PDF de pesajes
+  const handleDescargarPDF = async () => {
+    setDescargandoPDF(true)
+    try {
+      // Usar fechas de filtro o por defecto hoy
+      const hoy = new Date().toISOString().split('T')[0]
+      const fechaDesde = filtroFechaDesde || hoy
+      const fechaHasta = filtroFechaHasta || hoy
+
+      await reportesService.exportarPDF('movimientos', fechaDesde, fechaHasta)
+    } catch (error) {
+      console.error('Error al descargar PDF:', error)
+      alert('Error al descargar el PDF')
+    } finally {
+      setDescargandoPDF(false)
+    }
   }
 
   // Mutation para eliminar
@@ -151,14 +173,17 @@ export default function PesajesTab() {
       cell: ({ row }) => {
         const estado = row.original.estado
         const esPendiente = estado === 'pendiente'
+        const esCancelado = estado === 'cancelado'
         return (
           <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded ${
-            esPendiente
+            esCancelado
+              ? 'bg-red-100 text-red-700'
+              : esPendiente
               ? 'bg-yellow-100 text-yellow-700'
               : 'bg-green-100 text-green-700'
           }`}>
-            {esPendiente ? <Clock className="h-3 w-3" /> : null}
-            {esPendiente ? 'Pendiente' : 'Completado'}
+            {esCancelado ? <XCircle className="h-3 w-3" /> : esPendiente ? <Clock className="h-3 w-3" /> : null}
+            {esCancelado ? 'Cancelado' : esPendiente ? 'Pendiente' : 'Completado'}
           </span>
         )
       },
@@ -172,12 +197,12 @@ export default function PesajesTab() {
       },
     },
     {
-      id: 'patente',
+      accessorKey: 'patente',
+      accessorFn: (row) => row.camion_patente || row.patente_externa || '',
       header: 'Patente',
       cell: ({ row }) => {
-        const pesaje = row.original
-        const patente = pesaje.camion_patente || pesaje.patente_externa || '-'
-        return <div className="font-medium">{patente}</div>
+        const patente = row.getValue('patente') as string
+        return <div className="font-medium">{patente || '-'}</div>
       },
     },
     {
@@ -193,12 +218,11 @@ export default function PesajesTab() {
       },
     },
     {
-      id: 'cliente',
+      accessorKey: 'cliente_nombre',
       header: 'Cliente',
       cell: ({ row }) => {
-        const pesaje = row.original
-        const cliente = pesaje.cliente_nombre || '-'
-        return <div className="text-sm">{cliente}</div>
+        const cliente = row.getValue('cliente_nombre') as string
+        return <div className="text-sm">{cliente || '-'}</div>
       },
     },
     {
@@ -304,24 +328,54 @@ export default function PesajesTab() {
     <div className="space-y-6">
       {/* Header con botones */}
       <div className="flex flex-col sm:flex-row justify-between gap-3">
-        <Button
-          variant="outline"
-          onClick={() => setMostrarFiltros(!mostrarFiltros)}
-          className={hayFiltrosActivos ? 'border-blue-500 text-blue-600' : ''}
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Filtros
-          {hayFiltrosActivos && (
-            <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              {[filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente].filter(Boolean).length}
-            </span>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => setMostrarFiltros(!mostrarFiltros)}
+            className={hayFiltrosActivos ? 'border-blue-500 text-blue-600' : ''}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+            {hayFiltrosActivos && (
+              <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {[filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente].filter(Boolean).length}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDescargarPDF}
+            disabled={descargandoPDF}
+            title="Descargar listado de pesajes en PDF"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {descargandoPDF ? 'Descargando...' : 'Descargar PDF'}
+          </Button>
+          {isAdmin && (
+            <Button
+              variant={mostrarCancelados ? 'default' : 'outline'}
+              onClick={() => setMostrarCancelados(!mostrarCancelados)}
+              className={mostrarCancelados ? 'bg-red-600 hover:bg-red-700' : ''}
+              title="Ver pesajes cancelados"
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              {mostrarCancelados ? 'Ver activos' : 'Ver cancelados'}
+            </Button>
           )}
-        </Button>
+        </div>
         <Button onClick={() => navigate('/pesajes-remitos/nuevo')}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Pesaje
         </Button>
       </div>
+
+      {/* Aviso de modo cancelados */}
+      {mostrarCancelados && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          <Archive className="h-4 w-4 inline mr-2" />
+          Mostrando pesajes <strong>CANCELADOS</strong>. Estos pesajes fueron anulados con auditoría completa.
+        </div>
+      )}
 
       {/* Panel de Filtros */}
       {mostrarFiltros && (
@@ -350,6 +404,7 @@ export default function PesajesTab() {
                     <option value="">Todos</option>
                     <option value="completado">Completado</option>
                     <option value="pendiente">Pendiente</option>
+                    {mostrarCancelados && <option value="cancelado">Cancelado</option>}
                   </select>
                 </div>
 

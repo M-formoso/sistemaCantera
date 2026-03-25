@@ -13,7 +13,8 @@ from app.models.usuario import Usuario
 from app.schemas.pesaje import (
     PesajeSchema, PesajeCreate, PesajeUpdate,
     PesajeIniciarCreate, PesajeCompletarCreate,
-    PesajePendienteSchema, BusquedaPatenteResult
+    PesajePendienteSchema, BusquedaPatenteResult,
+    PesajeCancelarCreate, PesajeCanceladoSchema
 )
 from app.services import pesaje_service
 
@@ -24,12 +25,20 @@ router = APIRouter()
 async def listar_pesajes(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    estado: Optional[str] = Query(None, description="Filtrar por estado: pendiente o completado"),
+    estado: Optional[str] = Query(None, description="Filtrar por estado: pendiente, completado, cancelado, todos"),
+    incluir_cancelados: bool = Query(False, description="Incluir pesajes cancelados"),
+    solo_cancelados: bool = Query(False, description="Solo pesajes cancelados (para auditoría)"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    """Lista todos los pesajes con paginación"""
-    return pesaje_service.obtener_todos(db, skip, limit)
+    """
+    Lista todos los pesajes con paginación.
+
+    Por defecto NO incluye pesajes cancelados.
+    - incluir_cancelados=true: Incluye cancelados junto con los demás
+    - solo_cancelados=true: Solo muestra cancelados (para auditoría)
+    """
+    return pesaje_service.obtener_todos(db, skip, limit, incluir_cancelados, solo_cancelados)
 
 
 @router.get("/pendientes", response_model=List[PesajePendienteSchema])
@@ -37,7 +46,14 @@ async def listar_pesajes_pendientes(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    """Lista pesajes pendientes (solo tara registrada, esperando peso bruto)"""
+    """
+    Lista pesajes pendientes (solo tara registrada, esperando peso bruto).
+
+    NOTA: Automáticamente elimina pesajes pendientes con más de 3 días de antigüedad.
+    """
+    # Limpiar pesajes pendientes viejos automáticamente (más de 3 días)
+    pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias_limite=3)
+
     return pesaje_service.obtener_pendientes(db)
 
 
@@ -138,20 +154,28 @@ async def completar_pesaje(
     return pesaje_service.completar_pesaje(db, pesaje_id, pesaje, current_user.id)
 
 
-@router.delete("/{pesaje_id}/cancelar")
-async def cancelar_pesaje_pendiente(
+@router.post("/{pesaje_id}/cancelar", response_model=PesajeSchema)
+async def cancelar_pesaje(
     pesaje_id: UUID,
+    datos: PesajeCancelarCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
     """
-    Cancela un pesaje pendiente (elimina sin generar remito)
+    Cancela un pesaje (soft-delete con auditoría obligatoria)
 
-    **Requiere rol:** Administrador u Operador
+    **Requiere rol:** Administrador
 
-    Solo funciona para pesajes en estado 'pendiente'
+    IMPORTANTE:
+    - El pesaje NO se elimina, se marca como 'cancelado'
+    - Es OBLIGATORIO proporcionar un motivo (mínimo 10 caracteres)
+    - Se registra quién canceló y cuándo
+    - Si era un pesaje completado con cliente, se revierte en cuenta corriente
+    - Los pesajes cancelados siguen visibles con filtro especial
+
+    Esto garantiza trazabilidad completa y evita manipulaciones.
     """
-    return pesaje_service.cancelar_pesaje_pendiente(db, pesaje_id)
+    return pesaje_service.cancelar_pesaje(db, pesaje_id, datos, current_user.id)
 
 
 @router.get("/{pesaje_id}", response_model=PesajeSchema)
@@ -193,20 +217,27 @@ async def actualizar_pesaje(
 
 
 @router.delete("/{pesaje_id}")
-async def eliminar_pesaje(
+async def eliminar_pesaje_permanente(
     pesaje_id: UUID,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
     """
-    Elimina un pesaje
+    Elimina PERMANENTEMENTE un pesaje (solo casos excepcionales)
 
-    **Requiere rol:** Administrador u Operador
+    **Requiere rol:** Administrador
+
+    ADVERTENCIA: Esto elimina el registro completamente de la base de datos.
+    Para cancelaciones normales, usar POST /{pesaje_id}/cancelar que hace soft-delete
+    con auditoría completa.
+
+    Solo usar este endpoint en casos excepcionales donde sea necesario
+    eliminar completamente un registro (ej: datos de prueba).
     """
     from fastapi import HTTPException
     import traceback
     try:
-        return pesaje_service.eliminar(db, pesaje_id)
+        return pesaje_service.eliminar_permanente(db, pesaje_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -224,6 +255,62 @@ async def obtener_estadisticas_periodo(
 ):
     """Obtiene estadísticas de pesajes para un período"""
     return pesaje_service.obtener_estadisticas_periodo(db, fecha_desde, fecha_hasta)
+
+
+@router.delete("/pendientes/limpiar-viejos")
+async def limpiar_pesajes_pendientes_viejos(
+    dias: int = Query(3, ge=1, le=30, description="Días máximos de antigüedad"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Elimina pesajes pendientes que tienen más de X días sin completarse.
+
+    **Requiere rol:** Administrador
+
+    Los pesajes pendientes son aquellos donde solo se registró la tara
+    pero nunca se completó con el peso bruto.
+
+    Por defecto elimina pesajes con más de 3 días de antigüedad.
+    """
+    return pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias)
+
+
+@router.get("/pendientes/viejos")
+async def obtener_pesajes_pendientes_viejos(
+    dias: int = Query(3, ge=1, le=30, description="Días máximos de antigüedad"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Lista pesajes pendientes que tienen más de X días sin completarse.
+    Útil para revisar antes de eliminar.
+    """
+    return pesaje_service.obtener_pesajes_pendientes_viejos(db, dias)
+
+
+@router.post("/{pesaje_id}/sincronizar-cuenta-corriente")
+async def sincronizar_cuenta_corriente(
+    pesaje_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    """
+    Sincroniza un pesaje existente con la cuenta corriente del cliente.
+
+    **Requiere rol:** Administrador
+
+    Útil para:
+    - Pesajes históricos que no tienen movimiento registrado
+    - Pesajes que por algún error no se registraron en cuenta corriente
+
+    Retorna el estado de la sincronización:
+    - "creado": Se creó el movimiento
+    - "ya_existe": Ya existía un movimiento para este pesaje
+    - "sin_cliente": El pesaje no tiene cliente asignado
+    - "no_completado": El pesaje no está completado
+    """
+    return pesaje_service.sincronizar_pesaje_cuenta_corriente(db, pesaje_id, current_user.id)
 
 
 @router.get("/{pesaje_id}/ticket-pdf")

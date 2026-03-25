@@ -476,6 +476,65 @@ def generar_pdf_top_clientes(db: Session, fecha_desde: date, fecha_hasta: date) 
     return buffer
 
 
+def generar_pdf_movimientos(db: Session, fecha_desde: date, fecha_hasta: date) -> BytesIO:
+    """Genera PDF del listado de movimientos/pesajes"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=15*mm, bottomMargin=15*mm)
+    styles = _get_styles()
+    elements = []
+
+    # Obtener datos
+    reporte = reportes_service.obtener_movimientos(db, fecha_desde, fecha_hasta)
+
+    # Encabezado
+    _crear_encabezado(elements, styles, "LISTADO DE PESAJES", fecha_desde, fecha_hasta)
+
+    # Tabla de movimientos
+    data = [['#', 'Fecha', 'Hora', 'Cliente', 'Material', 'Patente', 'Neto (kg)', 'Neto (t)', 'Estado']]
+    for m in reporte.movimientos:
+        peso_neto_kg = float(m.peso_neto) if m.peso_neto else 0
+        peso_neto_t = peso_neto_kg / 1000
+        data.append([
+            str(m.numero_pesaje),
+            m.fecha,
+            m.hora,
+            (m.cliente_nombre or '-')[:20],
+            (m.material or '-')[:12],
+            m.patente or '-',
+            _format_number(peso_neto_kg, 0),
+            _format_number(peso_neto_t, 2),
+            m.estado[:10] if m.estado else '-'
+        ])
+
+    # Fila de totales
+    data.append([
+        'TOTAL',
+        '',
+        '',
+        f'{reporte.cantidad_pesajes} pesajes',
+        '',
+        '',
+        _format_number(float(reporte.total_kg), 0),
+        _format_number(float(reporte.total_toneladas), 2),
+        ''
+    ])
+
+    tabla = Table(data, colWidths=[15*mm, 22*mm, 18*mm, 50*mm, 30*mm, 25*mm, 30*mm, 25*mm, 25*mm])
+    estilo = _estilo_tabla_base()
+    estilo.add('ALIGN', (0, 1), (0, -1), 'CENTER')
+    estilo.add('ALIGN', (6, 1), (7, -1), 'RIGHT')
+    estilo.add('FONTSIZE', (0, 1), (-1, -1), 8)
+    estilo.add('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
+    estilo.add('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8e8e8'))
+    tabla.setStyle(estilo)
+    elements.append(tabla)
+
+    _crear_pie_pagina(elements, styles)
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+
 def generar_pdf_reporte(
     db: Session,
     tipo: str,
@@ -504,6 +563,8 @@ def generar_pdf_reporte(
         return generar_pdf_maquinaria(db, fecha_desde, fecha_hasta)
     elif tipo == 'top-clientes':
         return generar_pdf_top_clientes(db, fecha_desde, fecha_hasta)
+    elif tipo == 'movimientos':
+        return generar_pdf_movimientos(db, fecha_desde, fecha_hasta)
     else:
         # Por defecto, resumen
         return generar_pdf_resumen(db, fecha_desde, fecha_hasta)

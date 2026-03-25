@@ -17,6 +17,7 @@ import { camionesService } from '@/services/camionesService'
 import { empresasService } from '@/services/empresasService'
 import { ordenEntregaService } from '@/services/ordenEntregaService'
 import { balanzaService } from '@/services/balanzaService'
+import { preciosService, CalculoPrecio } from '@/services/preciosService'
 import { formatNumber, getTodayLocalDate } from '@/lib/utils'
 import { Pesaje, Empresa, EmpresaCreate } from '@/types'
 
@@ -62,12 +63,14 @@ const pesajeTaraSchema = z.object({
 })
 
 // Schema para completar pesaje (bruto)
+// Material y Cliente son obligatorios para completar (se validan dinámicamente)
 const pesajeBrutoSchema = z.object({
   peso_bruto: z.preprocess(
     (val) => (val === '' || val === undefined || val === null || Number.isNaN(val) ? 0 : Number(val)),
     z.number().min(1, 'El peso bruto debe ser mayor a 0')
   ),
-  material: z.string().optional(),
+  cliente_id: z.string().optional(),  // Se valida que exista cliente (en pesaje o aquí)
+  material: z.string().optional(),     // Se valida que exista material (en pesaje o aquí)
   chofer: z.string().optional(),
   observaciones: z.string().optional(),
   precio_unitario: z.preprocess(
@@ -110,10 +113,16 @@ export default function NuevoPesajePage() {
   const [createdPesaje, setCreatedPesaje] = useState<Pesaje | null>(null)
   const [buscando, setBuscando] = useState(false)
 
-  // Estados para autocompletado de cliente
+  // Estados para autocompletado de cliente (formulario TARA)
   const [clienteBusqueda, setClienteBusqueda] = useState('')
   const [clienteSugerencias, setClienteSugerencias] = useState<Empresa[]>([])
   const [showClienteSugerencias, setShowClienteSugerencias] = useState(false)
+
+  // Estados para autocompletado de cliente (formulario BRUTO - cuando no hay cliente en el pesaje)
+  const [clienteBrutoId, setClienteBrutoId] = useState<string | null>(null)
+  const [clienteBrutoBusqueda, setClienteBrutoBusqueda] = useState('')
+  const [clienteBrutoSugerencias, setClienteBrutoSugerencias] = useState<Empresa[]>([])
+  const [showClienteBrutoSugerencias, setShowClienteBrutoSugerencias] = useState(false)
 
   // Modal para crear nueva empresa
   const [showNuevaEmpresaModal, setShowNuevaEmpresaModal] = useState(false)
@@ -125,6 +134,10 @@ export default function NuevoPesajePage() {
 
   // Estado para copias del ticket PDF
   const [copiasTicket, setCopiasTicket] = useState<1 | 2 | 3>(1)
+
+  // Estado para precio precargado y conversión m³
+  const [precioCalculado, setPrecioCalculado] = useState<CalculoPrecio | null>(null)
+  const [cargandoPrecio, setCargandoPrecio] = useState(false)
 
   // Queries
   const { data: camiones = [] } = useQuery({
@@ -202,6 +215,45 @@ export default function NuevoPesajePage() {
     }
   }, [completarPesajeId, brutoForm])
 
+  // Cargar precio precargado cuando se tiene cliente + material + peso
+  const materialBruto = brutoForm.watch('material')
+  const clienteIdParaPrecio = pesajePendiente?.cliente_id || clienteBrutoId
+
+  useEffect(() => {
+    const cargarPrecio = async () => {
+      // Obtener el material (del pesaje pendiente o del form)
+      const materialFinal = materialBruto || pesajePendiente?.material
+
+      if (!clienteIdParaPrecio || !materialFinal || pesoNeto <= 0) {
+        setPrecioCalculado(null)
+        return
+      }
+
+      setCargandoPrecio(true)
+      try {
+        const calculo = await preciosService.calcular(clienteIdParaPrecio, materialFinal, pesoNeto * 1000) // Convertir a kg
+        setPrecioCalculado(calculo)
+
+        // Auto-completar precio si se encontró
+        if (calculo.precio_encontrado && calculo.precio_unitario) {
+          brutoForm.setValue('precio_unitario', calculo.precio_unitario)
+          if (calculo.importe) {
+            brutoForm.setValue('importe_total', Math.round(calculo.importe * 100) / 100)
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando precio:', error)
+        setPrecioCalculado(null)
+      } finally {
+        setCargandoPrecio(false)
+      }
+    }
+
+    // Debounce para no hacer muchas llamadas
+    const timer = setTimeout(cargarPrecio, 500)
+    return () => clearTimeout(timer)
+  }, [clienteIdParaPrecio, materialBruto, pesajePendiente?.material, pesoNeto, brutoForm])
+
   // Buscar clientes
   const buscarClientes = useCallback(async (nombre: string) => {
     if (nombre.length >= 2) {
@@ -232,6 +284,38 @@ export default function NuevoPesajePage() {
     taraForm.setValue('cliente_nombre', empresa.nombre)
     setClienteBusqueda(empresa.nombre)
     setShowClienteSugerencias(false)
+  }
+
+  // Buscar clientes para formulario BRUTO
+  const buscarClientesBruto = useCallback(async (nombre: string) => {
+    if (nombre.length >= 2) {
+      try {
+        const resultados = await empresasService.buscar(nombre, 'cliente')
+        setClienteBrutoSugerencias(resultados)
+        setShowClienteBrutoSugerencias(true)
+      } catch {
+        setClienteBrutoSugerencias([])
+      }
+    } else {
+      setClienteBrutoSugerencias([])
+      setShowClienteBrutoSugerencias(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (clienteBrutoBusqueda) {
+        buscarClientesBruto(clienteBrutoBusqueda)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [clienteBrutoBusqueda, buscarClientesBruto])
+
+  const seleccionarClienteBruto = (empresa: Empresa) => {
+    setClienteBrutoId(empresa.id)
+    setClienteBrutoBusqueda(empresa.nombre)
+    brutoForm.setValue('cliente_id', empresa.id)
+    setShowClienteBrutoSugerencias(false)
   }
 
   // Buscar por patente
@@ -389,10 +473,31 @@ export default function NuevoPesajePage() {
   const handleSubmitBruto = async (data: PesajeBrutoFormData) => {
     if (!pesajePendiente) return
 
+    // Validación de campos obligatorios
+    const tieneCliente = pesajePendiente.cliente_id || data.cliente_id
+    const tieneMaterial = pesajePendiente.material || data.material
+    const tienePrecio = data.precio_unitario || data.precio_fijo || data.importe_total
+
+    if (!tieneCliente) {
+      alert('Debe seleccionar un CLIENTE para completar el pesaje')
+      return
+    }
+
+    if (!tieneMaterial) {
+      alert('Debe seleccionar un MATERIAL para completar el pesaje')
+      return
+    }
+
+    if (!tienePrecio) {
+      alert('Debe especificar el PRECIO (por tonelada o precio fijo) para completar el pesaje')
+      return
+    }
+
     try {
       const cleanData: PesajeCompletarCreate = { ...data }
 
       // Limpiar campos vacíos/cero
+      if (!cleanData.cliente_id) delete cleanData.cliente_id
       if (!cleanData.precio_unitario) delete cleanData.precio_unitario
       if (!cleanData.flete) delete cleanData.flete
       if (!cleanData.precio_fijo) delete cleanData.precio_fijo
@@ -1092,19 +1197,63 @@ export default function NuevoPesajePage() {
                     )}
                   </div>
 
-                  {/* Material (si no estaba) */}
+                  {/* Cliente (OBLIGATORIO si no está en el pesaje) */}
+                  {!pesajePendiente.cliente_id && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Cliente Destino <span className="text-red-500">*</span>
+                      </h3>
+                      <div className="space-y-2 relative">
+                        <Input
+                          value={clienteBrutoBusqueda}
+                          onChange={(e) => {
+                            setClienteBrutoBusqueda(e.target.value)
+                            setClienteBrutoId(null)
+                            brutoForm.setValue('cliente_id', '')
+                          }}
+                          onFocus={() => clienteBrutoSugerencias.length > 0 && setShowClienteBrutoSugerencias(true)}
+                          onBlur={() => setTimeout(() => setShowClienteBrutoSugerencias(false), 200)}
+                          placeholder="Buscar cliente... (obligatorio)"
+                          className={!clienteBrutoId ? 'border-orange-300' : 'border-green-300'}
+                        />
+                        {showClienteBrutoSugerencias && clienteBrutoSugerencias.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {clienteBrutoSugerencias.map((empresa) => (
+                              <button
+                                key={empresa.id}
+                                type="button"
+                                className="w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
+                                onMouseDown={() => seleccionarClienteBruto(empresa)}
+                              >
+                                {empresa.nombre}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {!clienteBrutoId && (
+                          <p className="text-xs text-orange-600">Debe seleccionar un cliente para completar el pesaje</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Material (OBLIGATORIO si no está en el pesaje) */}
                   {!pesajePendiente.material && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Material</label>
+                      <label className="text-sm font-medium">
+                        Material <span className="text-red-500">*</span>
+                      </label>
                       <select
                         {...brutoForm.register('material')}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm border-orange-300"
                       >
-                        <option value="">Seleccionar material</option>
+                        <option value="">Seleccionar material (obligatorio)</option>
                         {MATERIALES_DISPONIBLES.map((m) => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                       </select>
+                      <p className="text-xs text-orange-600">Debe seleccionar un material para completar el pesaje</p>
                     </div>
                   )}
 
@@ -1129,11 +1278,11 @@ export default function NuevoPesajePage() {
                     </div>
                   )}
 
-                  {/* Importe */}
+                  {/* Importe - OBLIGATORIO */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
                       <DollarSign className="h-4 w-4" />
-                      Importe (Opcional)
+                      Precio <span className="text-red-500">*</span>
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
@@ -1180,6 +1329,12 @@ export default function NuevoPesajePage() {
                           ${importeCalculado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
+                      {importeCalculado === 0 && !precioCalculado?.precio_encontrado && (
+                        <p className="text-xs text-orange-600 mt-2">
+                          <AlertCircle className="h-3 w-3 inline mr-1" />
+                          Debe especificar un precio (por tonelada o fijo) para completar el pesaje
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1255,10 +1410,47 @@ export default function NuevoPesajePage() {
                   </div>
                 </div>
 
+                {/* Mostrar conversión a m³ si aplica */}
+                {precioCalculado?.precio_encontrado && precioCalculado.factor_conversion && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-semibold text-blue-700">Conversión a m³</span>
+                    </div>
+                    <div className="space-y-1 text-blue-700">
+                      <div className="flex justify-between">
+                        <span>Factor:</span>
+                        <span className="font-medium">÷ {precioCalculado.factor_conversion}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>{formatNumber(precioCalculado.peso_toneladas || 0, 2)} tn =</span>
+                        <span className="font-bold text-lg">{formatNumber(precioCalculado.cantidad_facturada || 0, 2)} m³</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {pesoNeto <= 0 && pesoBruto > 0 && (
                   <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-700">
                     <AlertCircle className="h-4 w-4 inline mr-1" />
                     El peso bruto debe ser mayor al peso tara
+                  </div>
+                )}
+
+                {/* Precio precargado */}
+                {cargandoPrecio && (
+                  <div className="text-sm text-gray-500 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Buscando precio...
+                  </div>
+                )}
+
+                {precioCalculado?.precio_encontrado && (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-700">
+                    <div className="font-medium mb-1">Precio precargado</div>
+                    <div className="flex justify-between">
+                      <span>Precio/{precioCalculado.unidad}:</span>
+                      <span className="font-bold">${formatNumber(precioCalculado.precio_unitario || 0, 2)}</span>
+                    </div>
                   </div>
                 )}
 
@@ -1273,6 +1465,12 @@ export default function NuevoPesajePage() {
                         <div className="flex justify-between">
                           <span className="text-gray-500">Precio fijo:</span>
                           <span className="font-medium">${formatNumber(precioFijo, 2)}</span>
+                        </div>
+                      ) : precioCalculado?.precio_encontrado && precioCalculado.factor_conversion ? (
+                        // Mostrar cálculo con m³
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">{formatNumber(precioCalculado.cantidad_facturada || 0, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
+                          <span className="font-medium">${formatNumber((precioCalculado.cantidad_facturada || 0) * precioUnitario, 2)}</span>
                         </div>
                       ) : (
                         <>

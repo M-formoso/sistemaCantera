@@ -42,9 +42,11 @@ export interface BusquedaClientePorPatente {
 export const empresasService = {
   /**
    * Obtiene todas las empresas
+   * @param tipo - Filtrar por tipo (cliente/transportista)
+   * @param soloActivos - Si es true, solo retorna empresas activas (default: true)
    */
-  async getAll(tipo?: 'cliente' | 'transportista'): Promise<Empresa[]> {
-    const params: Record<string, any> = { limit: 500 }
+  async getAll(tipo?: 'cliente' | 'transportista', soloActivos: boolean = true): Promise<Empresa[]> {
+    const params: Record<string, any> = { limit: 500, solo_activos: soloActivos }
     if (tipo) {
       params.tipo = tipo
     }
@@ -105,10 +107,19 @@ export const empresasService = {
   },
 
   /**
-   * Elimina una empresa (soft delete)
+   * Desactiva una empresa (soft delete)
    */
-  async delete(id: string): Promise<void> {
-    await api.delete(`/empresas/${id}`)
+  async delete(id: string): Promise<Empresa> {
+    const response = await api.delete<Empresa>(`/empresas/${id}`)
+    return response.data
+  },
+
+  /**
+   * Reactiva una empresa desactivada
+   */
+  async reactivar(id: string): Promise<Empresa> {
+    const response = await api.put<Empresa>(`/empresas/${id}`, { activo: true })
+    return response.data
   },
 
   // ============== CAMIONES DE CLIENTES ==============

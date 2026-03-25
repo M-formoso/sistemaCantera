@@ -63,12 +63,19 @@ class Pesaje(BaseModel):
     # Vinculación con orden de entrega
     orden_entrega_id = Column(UUID(as_uuid=True), ForeignKey("ordenes_entrega.id"), nullable=True, index=True)
 
+    # Campos para cancelación (soft-delete con auditoría)
+    # Estado puede ser: 'pendiente', 'completado', 'cancelado'
+    motivo_cancelacion = Column(Text, nullable=True)  # Obligatorio si estado = 'cancelado'
+    fecha_cancelacion = Column(DateTime, nullable=True)
+    cancelado_por = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
+
     # Relaciones
     camion = relationship("Camion", back_populates="pesajes")
     movimiento_financiero = relationship("MovimientoFinanciero")
     transportista_empresa = relationship("Empresa", foreign_keys=[transportista_id])
     cliente = relationship("Empresa", foreign_keys=[cliente_id])
     creador = relationship("Usuario", back_populates="pesajes_creados", foreign_keys=[created_by])
+    usuario_cancelacion = relationship("Usuario", foreign_keys=[cancelado_por])
     remito = relationship("Remito", back_populates="pesaje", uselist=False)
     orden_entrega = relationship("OrdenEntrega", back_populates="pesajes")
 
