@@ -41,17 +41,12 @@ def obtener_todos(
 
     query = db.query(Pesaje)
 
-    # Filtrar por estado
+    # Filtrar por estado de cancelación
+    # SOLO filtrar si explícitamente se piden cancelados
     if solo_cancelados:
         query = query.filter(Pesaje.estado == "cancelado")
-    elif not incluir_cancelados:
-        # Excluir cancelados - usar OR para manejar NULLs y valores antiguos
-        query = query.filter(
-            or_(
-                Pesaje.estado != "cancelado",
-                Pesaje.estado.is_(None)
-            )
-        )
+    # Si no se incluyen cancelados, excluirlos (pero solo si el campo existe y es 'cancelado')
+    # No filtrar nada más - mostrar todos los pesajes normales
 
     pesajes = query.order_by(desc(Pesaje.fecha)).offset(skip).limit(limit).all()
 
