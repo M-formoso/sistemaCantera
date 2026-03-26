@@ -76,19 +76,10 @@ export interface BusquedaPatenteResult {
 export const pesajesService = {
   /**
    * Obtiene todos los pesajes
-   * @param skip - Offset para paginación
-   * @param limit - Límite de resultados
-   * @param incluirCancelados - Si es true, incluye pesajes cancelados
-   * @param soloCancelados - Si es true, solo retorna cancelados (para auditoría)
    */
-  async getAll(
-    skip: number = 0,
-    limit: number = 100,
-    incluirCancelados: boolean = false,
-    soloCancelados: boolean = false
-  ): Promise<Pesaje[]> {
+  async getAll(skip: number = 0, limit: number = 100): Promise<Pesaje[]> {
     const response = await api.get<Pesaje[]>('/pesajes', {
-      params: { skip, limit, incluir_cancelados: incluirCancelados, solo_cancelados: soloCancelados },
+      params: { skip, limit },
     })
     return response.data
   },

@@ -49,10 +49,10 @@ async def listar_pesajes_pendientes(
     """
     Lista pesajes pendientes (solo tara registrada, esperando peso bruto).
 
-    NOTA: Automáticamente elimina pesajes pendientes con más de 3 días de antigüedad.
+    NOTA: Automáticamente elimina pesajes pendientes con más de 1 día de antigüedad.
     """
-    # Limpiar pesajes pendientes viejos automáticamente (más de 3 días)
-    pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias_limite=3)
+    # Limpiar pesajes pendientes viejos automáticamente (más de 1 día)
+    pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias_limite=1)
 
     return pesaje_service.obtener_pendientes(db)
 
@@ -259,7 +259,7 @@ async def obtener_estadisticas_periodo(
 
 @router.delete("/pendientes/limpiar-viejos")
 async def limpiar_pesajes_pendientes_viejos(
-    dias: int = Query(3, ge=1, le=30, description="Días máximos de antigüedad"),
+    dias: int = Query(1, ge=1, le=30, description="Días máximos de antigüedad"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
@@ -271,14 +271,14 @@ async def limpiar_pesajes_pendientes_viejos(
     Los pesajes pendientes son aquellos donde solo se registró la tara
     pero nunca se completó con el peso bruto.
 
-    Por defecto elimina pesajes con más de 3 días de antigüedad.
+    Por defecto elimina pesajes con más de 1 día de antigüedad.
     """
     return pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias)
 
 
 @router.get("/pendientes/viejos")
 async def obtener_pesajes_pendientes_viejos(
-    dias: int = Query(3, ge=1, le=30, description="Días máximos de antigüedad"),
+    dias: int = Query(1, ge=1, le=30, description="Días máximos de antigüedad"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):

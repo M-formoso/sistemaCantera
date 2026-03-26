@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X, FileDown, Archive, XCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X, FileDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,12 +41,11 @@ export default function PesajesTab() {
   const [filtroCliente, setFiltroCliente] = useState<string>('')
   const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false)
   const [descargandoPDF, setDescargandoPDF] = useState<boolean>(false)
-  const [mostrarCancelados, setMostrarCancelados] = useState<boolean>(false)
 
   // Query para pesajes
   const { data: pesajesRaw = [], isLoading } = useQuery({
-    queryKey: ['pesajes', mostrarCancelados],
-    queryFn: () => pesajesService.getAll(0, 500, mostrarCancelados, mostrarCancelados),
+    queryKey: ['pesajes'],
+    queryFn: () => pesajesService.getAll(0, 500),
   })
 
   // Filtrar pesajes según los filtros activos
@@ -173,17 +172,14 @@ export default function PesajesTab() {
       cell: ({ row }) => {
         const estado = row.original.estado
         const esPendiente = estado === 'pendiente'
-        const esCancelado = estado === 'cancelado'
         return (
           <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded ${
-            esCancelado
-              ? 'bg-red-100 text-red-700'
-              : esPendiente
+            esPendiente
               ? 'bg-yellow-100 text-yellow-700'
               : 'bg-green-100 text-green-700'
           }`}>
-            {esCancelado ? <XCircle className="h-3 w-3" /> : esPendiente ? <Clock className="h-3 w-3" /> : null}
-            {esCancelado ? 'Cancelado' : esPendiente ? 'Pendiente' : 'Completado'}
+            {esPendiente ? <Clock className="h-3 w-3" /> : null}
+            {esPendiente ? 'Pendiente' : 'Completado'}
           </span>
         )
       },
@@ -351,31 +347,12 @@ export default function PesajesTab() {
             <FileDown className="h-4 w-4 mr-2" />
             {descargandoPDF ? 'Descargando...' : 'Descargar PDF'}
           </Button>
-          {isAdmin && (
-            <Button
-              variant={mostrarCancelados ? 'default' : 'outline'}
-              onClick={() => setMostrarCancelados(!mostrarCancelados)}
-              className={mostrarCancelados ? 'bg-red-600 hover:bg-red-700' : ''}
-              title="Ver pesajes cancelados"
-            >
-              <Archive className="h-4 w-4 mr-2" />
-              {mostrarCancelados ? 'Ver activos' : 'Ver cancelados'}
-            </Button>
-          )}
         </div>
         <Button onClick={() => navigate('/pesajes-remitos/nuevo')}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Pesaje
         </Button>
       </div>
-
-      {/* Aviso de modo cancelados */}
-      {mostrarCancelados && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-          <Archive className="h-4 w-4 inline mr-2" />
-          Mostrando pesajes <strong>CANCELADOS</strong>. Estos pesajes fueron anulados con auditoría completa.
-        </div>
-      )}
 
       {/* Panel de Filtros */}
       {mostrarFiltros && (
@@ -404,7 +381,6 @@ export default function PesajesTab() {
                     <option value="">Todos</option>
                     <option value="completado">Completado</option>
                     <option value="pendiente">Pendiente</option>
-                    {mostrarCancelados && <option value="cancelado">Cancelado</option>}
                   </select>
                 </div>
 

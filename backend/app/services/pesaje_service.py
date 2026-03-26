@@ -1200,7 +1200,7 @@ def cancelar_pesaje_pendiente(db: Session, pesaje_id: UUID) -> dict:
     return {"message": "Pesaje pendiente cancelado correctamente"}
 
 
-def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> dict:
+def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 1) -> dict:
     """
     Elimina pesajes pendientes que tienen más de X días sin completarse.
 
@@ -1209,7 +1209,7 @@ def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> dict
 
     Args:
         db: Sesión de base de datos
-        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 3)
+        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 1)
 
     Returns:
         dict con cantidad de pesajes eliminados y sus números
@@ -1246,14 +1246,14 @@ def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> dict
     }
 
 
-def obtener_pesajes_pendientes_viejos(db: Session, dias_limite: int = 3) -> List[Pesaje]:
+def obtener_pesajes_pendientes_viejos(db: Session, dias_limite: int = 1) -> List[Pesaje]:
     """
     Obtiene pesajes pendientes que tienen más de X días sin completarse.
     Útil para revisar antes de eliminar.
 
     Args:
         db: Sesión de base de datos
-        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 3)
+        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 1)
 
     Returns:
         Lista de pesajes pendientes viejos
