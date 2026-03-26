@@ -425,6 +425,37 @@ def aplicar_cobro(
             else:
                 factura.estado = "parcial"
 
+    # Aplicar a remitos/tickets
+    items_remito = db.query(ItemCobroCliente).filter(
+        ItemCobroCliente.cobro_id == cobro_id,
+        ItemCobroCliente.concepto == "debe",
+        ItemCobroCliente.remito_id.isnot(None)
+    ).all()
+
+    for item in items_remito:
+        remito = db.query(Remito).filter(Remito.id == item.remito_id).first()
+        if remito:
+            # Actualizar saldo pendiente del remito
+            remito.saldo_pendiente = (remito.saldo_pendiente or Decimal("0")) - item.monto
+            if remito.saldo_pendiente < 0:
+                remito.saldo_pendiente = Decimal("0")
+
+    # Aplicar a pesajes directos (sin remito)
+    items_pesaje = db.query(ItemCobroCliente).filter(
+        ItemCobroCliente.cobro_id == cobro_id,
+        ItemCobroCliente.concepto == "debe",
+        ItemCobroCliente.pesaje_id.isnot(None),
+        ItemCobroCliente.remito_id.is_(None)  # Solo pesajes sin remito
+    ).all()
+
+    for item in items_pesaje:
+        pesaje = db.query(Pesaje).filter(Pesaje.id == item.pesaje_id).first()
+        if pesaje and pesaje.remito:
+            # Si el pesaje tiene remito, actualizar el remito
+            pesaje.remito.saldo_pendiente = (pesaje.remito.saldo_pendiente or Decimal("0")) - item.monto
+            if pesaje.remito.saldo_pendiente < 0:
+                pesaje.remito.saldo_pendiente = Decimal("0")
+
     # Calcular diferencia
     diferencia = total_haber - total_debe
     saldo_a_favor = None
