@@ -18,6 +18,22 @@ import os
 import time
 import json
 import threading
+import signal
+
+# Deshabilitar Ctrl+C para evitar cierre accidental
+def ignorar_signal(signum, frame):
+    print("")
+    print("[AVISO] Para cerrar el servidor, cierre la ventana con la X")
+    print("        El servidor debe permanecer abierto para que funcione la balanza.")
+    print("")
+
+# Capturar señales de cierre
+signal.signal(signal.SIGINT, ignorar_signal)   # Ctrl+C
+signal.signal(signal.SIGTERM, ignorar_signal)  # kill
+
+# En Windows, también capturar Ctrl+Break
+if sys.platform == 'win32':
+    signal.signal(signal.SIGBREAK, ignorar_signal)
 
 # Verificar e instalar pyserial si no está instalado
 try:
@@ -351,14 +367,13 @@ def main():
         print("*   NO CIERRE ESTA VENTANA                       *")
         print("*   El servidor debe permanecer abierto          *")
         print("*   mientras usa el sistema de pesaje.           *")
+        print("*                                                *")
+        print("*   Ctrl+C está deshabilitado.                   *")
+        print("*   Para cerrar, use la X de la ventana.         *")
         print("*" * 50)
         print("")
-        print("Presione Ctrl+C para detener")
         print("=" * 50)
         server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[INFO] Servidor detenido por el usuario")
-        raise  # Re-lanzar para que el loop principal lo capture
     except OSError as e:
         if "10048" in str(e) or "Address already in use" in str(e):
             print("")
@@ -371,8 +386,9 @@ def main():
             print("")
             print("Solución: Cierre la otra ventana del servidor e intente de nuevo.")
             print("=" * 50)
-            # No reintentar automáticamente si el puerto está ocupado
-            raise KeyboardInterrupt("Puerto en uso")
+            # Esperar y salir
+            time.sleep(10)
+            sys.exit(1)
         else:
             print(f"[ERROR] Error de red: {e}")
             raise  # Re-lanzar para reintentar
@@ -385,31 +401,13 @@ if __name__ == '__main__':
     while True:
         try:
             main()
-            break  # Si main() termina normalmente (Ctrl+C), salir del loop
-        except KeyboardInterrupt:
-            print("\n[INFO] Servidor detenido por el usuario (Ctrl+C)")
-            break
         except Exception as e:
             print("")
             print("=" * 50)
             print(f"[ERROR CRITICO] {e}")
             print("=" * 50)
             print("")
-            print("El servidor se reiniciará en 10 segundos...")
-            print("(Presione Ctrl+C para salir)")
-            try:
-                time.sleep(10)
-                print("Reiniciando servidor...")
-                print("")
-            except KeyboardInterrupt:
-                print("\n[INFO] Saliendo...")
-                break
-
-    # SIEMPRE esperar antes de cerrar
-    print("")
-    print("=" * 50)
-    try:
-        input("Presione ENTER para cerrar esta ventana...")
-    except:
-        # Si falla el input (ej: no hay terminal interactiva), esperar y salir
-        time.sleep(5)
+            print("El servidor se reiniciará en 5 segundos...")
+            time.sleep(5)
+            print("Reiniciando servidor...")
+            print("")
