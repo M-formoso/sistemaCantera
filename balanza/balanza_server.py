@@ -108,50 +108,101 @@ def leer_balanza(puerto_com):
 
     intentos_fallidos = 0
     max_intentos_log = 5  # Solo loguear cada N intentos para no llenar la consola
+    ultimo_log_peso = 0  # Para no spamear la consola con el mismo peso
+    lecturas_consecutivas = 0  # Contador de lecturas exitosas
 
     while True:
         try:
-            # Abrir puerto serial
-            with serial.Serial(puerto_com, **SERIAL_CONFIG) as ser:
-                print(f"[OK] Conectado a balanza en {puerto_com}")
-                intentos_fallidos = 0  # Resetear contador
+            # Abrir puerto serial con configuración más robusta
+            ser = serial.Serial(
+                port=puerto_com,
+                baudrate=SERIAL_CONFIG['baudrate'],
+                bytesize=SERIAL_CONFIG['bytesize'],
+                parity=SERIAL_CONFIG['parity'],
+                stopbits=SERIAL_CONFIG['stopbits'],
+                timeout=SERIAL_CONFIG['timeout'],
+                write_timeout=1,
+                inter_byte_timeout=0.1
+            )
 
-                with peso_lock:
-                    ultimo_peso['conectado'] = True
-                    ultimo_peso['error'] = None
+            print(f"[OK] Conectado a balanza en {puerto_com}")
+            intentos_fallidos = 0  # Resetear contador
+            lecturas_consecutivas = 0
 
-                while True:
-                    try:
-                        # Leer datos (7 bytes según especificación)
-                        if ser.in_waiting >= 7:
-                            data = ser.read(7)
-                            peso = parsear_peso(data)
+            with peso_lock:
+                ultimo_peso['conectado'] = True
+                ultimo_peso['error'] = None
 
-                            with peso_lock:
-                                ultimo_peso['peso'] = peso
-                                ultimo_peso['timestamp'] = time.time()
-                                ultimo_peso['error'] = None
+            # Limpiar buffer inicial
+            ser.reset_input_buffer()
 
+            sin_datos_contador = 0  # Contador de ciclos sin datos
+
+            while True:
+                try:
+                    bytes_disponibles = ser.in_waiting
+
+                    # Leer datos (7 bytes según especificación)
+                    if bytes_disponibles >= 7:
+                        data = ser.read(7)
+                        peso = parsear_peso(data)
+                        sin_datos_contador = 0  # Resetear contador
+                        lecturas_consecutivas += 1
+
+                        with peso_lock:
+                            ultimo_peso['peso'] = peso
+                            ultimo_peso['timestamp'] = time.time()
+                            ultimo_peso['error'] = None
+                            ultimo_peso['conectado'] = True
+
+                        # Solo mostrar si el peso cambió significativamente
+                        if abs(peso - ultimo_log_peso) > 0.5 or lecturas_consecutivas % 100 == 1:
                             print(f"Peso: {peso} kg")
+                            ultimo_log_peso = peso
 
-                        # También intentar leer línea completa (por si la balanza envía diferente)
-                        elif ser.in_waiting > 0:
-                            data = ser.readline()
-                            if data:
-                                peso = parsear_peso(data)
-                                if peso > 0:
-                                    with peso_lock:
-                                        ultimo_peso['peso'] = peso
-                                        ultimo_peso['timestamp'] = time.time()
-                                        ultimo_peso['error'] = None
+                    # También intentar leer línea completa (por si la balanza envía diferente)
+                    elif bytes_disponibles > 0:
+                        data = ser.readline()
+                        if data:
+                            peso = parsear_peso(data)
+                            sin_datos_contador = 0
+                            if peso > 0:
+                                lecturas_consecutivas += 1
+                                with peso_lock:
+                                    ultimo_peso['peso'] = peso
+                                    ultimo_peso['timestamp'] = time.time()
+                                    ultimo_peso['error'] = None
+                                    ultimo_peso['conectado'] = True
+                                if abs(peso - ultimo_log_peso) > 0.5:
                                     print(f"Peso: {peso} kg")
+                                    ultimo_log_peso = peso
+                    else:
+                        sin_datos_contador += 1
+                        # Si pasan 30 segundos sin datos, mostrar advertencia
+                        if sin_datos_contador == 300:  # 300 * 0.1s = 30 segundos
+                            print(f"[WARN] Sin datos de la balanza por 30 segundos...")
+                        # Si pasan 60 segundos sin datos, intentar reconectar
+                        if sin_datos_contador >= 600:  # 60 segundos
+                            print(f"[WARN] Sin datos por 60 segundos, reconectando...")
+                            break  # Salir del loop para reconectar
 
-                        time.sleep(0.1)
+                    time.sleep(0.1)
 
-                    except Exception as e:
-                        # Error dentro del loop de lectura - continuar sin cerrar conexión
-                        print(f"[WARN] Error leyendo datos: {e}")
-                        time.sleep(0.5)
+                except serial.SerialException as e:
+                    # Error de puerto serial - necesita reconectar
+                    print(f"[ERROR] Error de puerto serial: {e}")
+                    break  # Salir para reconectar
+
+                except Exception as e:
+                    # Error dentro del loop de lectura - continuar sin cerrar conexión
+                    print(f"[WARN] Error leyendo datos: {e}")
+                    time.sleep(0.5)
+
+            # Cerrar puerto antes de reintentar
+            try:
+                ser.close()
+            except:
+                pass
 
         except serial.SerialException as e:
             intentos_fallidos += 1
@@ -162,9 +213,9 @@ def leer_balanza(puerto_com):
             # Solo loguear cada N intentos para no llenar la consola
             if intentos_fallidos == 1 or intentos_fallidos % max_intentos_log == 0:
                 print(f"[ERROR] Conexión serial fallida (intento #{intentos_fallidos}): {e}")
-                print(f"        Reintentando en 5 segundos...")
+                print(f"        Reintentando en 3 segundos...")
 
-            time.sleep(5)  # Esperar antes de reintentar
+            time.sleep(3)  # Reducido de 5 a 3 segundos
 
         except Exception as e:
             intentos_fallidos += 1
@@ -174,9 +225,9 @@ def leer_balanza(puerto_com):
 
             if intentos_fallidos == 1 or intentos_fallidos % max_intentos_log == 0:
                 print(f"[ERROR] Error inesperado (intento #{intentos_fallidos}): {e}")
-                print(f"        Reintentando en 5 segundos...")
+                print(f"        Reintentando en 3 segundos...")
 
-            time.sleep(5)
+            time.sleep(3)
 
 
 class BalanzaHandler(BaseHTTPRequestHandler):
