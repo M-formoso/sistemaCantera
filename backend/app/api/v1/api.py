@@ -18,7 +18,8 @@ from app.api.v1.endpoints import (
     facturacion,
     cobros,
     reportes,
-    precios
+    precios,
+    tesoreria
 )
 
 # Crear router principal de la API v1
@@ -50,3 +51,4 @@ api_router.include_router(facturacion.router, prefix="/facturacion", tags=["Fact
 api_router.include_router(cobros.router, prefix="/cobros", tags=["Cobros"])
 api_router.include_router(reportes.router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(precios.router, prefix="/precios", tags=["Precios por Cliente"])
+api_router.include_router(tesoreria.router, prefix="/tesoreria", tags=["Tesorería"])

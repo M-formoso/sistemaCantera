@@ -1,5 +1,6 @@
 """
 Servicio para Cobros de Clientes con control cruzado
+Integrado con módulo de Tesorería
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -14,7 +15,12 @@ from app.models.empresa import Empresa
 from app.models.factura import Factura, PagoFactura
 from app.models.remito import Remito
 from app.models.pesaje import Pesaje
-from app.models.finanzas import MovimientoFinanciero, CategoriaFinanzas
+from app.models.finanzas import MovimientoFinanciero, CategoriaFinanzas, CuentaBancaria
+from app.models.tesoreria import (
+    Cheque, MovimientoTesoreria, CajaEfectivo, MovimientoCaja, MovimientoBancario, Recibo,
+    EstadoChequeEnum, OrigenChequeEnum, TipoChequeEnum, MetodoPagoEnum
+)
+from app.models.base import get_argentina_now
 from app.schemas.cobro import (
     CobroClienteCreate, CobroClienteCreateWithItems, CobroClienteUpdate,
     ItemCobroCreate, ValidacionCobroResponse, AplicarCobroResponse,
@@ -304,13 +310,16 @@ def confirmar_cobro(db: Session, cobro_id: UUID, usuario_id: UUID) -> CobroClien
 def aplicar_cobro(
     db: Session,
     cobro_id: UUID,
-    usuario_id: UUID
+    usuario_id: UUID,
+    caja_efectivo_id: Optional[UUID] = None,
+    cuenta_bancaria_id: Optional[UUID] = None
 ) -> AplicarCobroResponse:
     """
-    Aplica el cobro generando los movimientos de cuenta corriente.
+    Aplica el cobro generando los movimientos de cuenta corriente Y tesorería.
     - Genera un pago por cada item del HABER
     - Aplica cada pago a las facturas/tickets del DEBE
     - Si hay diferencia, genera saldo a favor o pendiente
+    - Integra con tesorería: crea cheques, movimientos de caja y bancarios
     """
     cobro = obtener_cobro(db, cobro_id)
     if not cobro:
@@ -387,14 +396,166 @@ def aplicar_cobro(
     # Actualizar saldo del cliente
     empresa.saldo_cuenta_corriente = saldo_posterior
 
-    # Actualizar items del HABER con el movimiento generado
+    # Obtener items del HABER
     items_haber = db.query(ItemCobroCliente).filter(
         ItemCobroCliente.cobro_id == cobro_id,
         ItemCobroCliente.concepto == "haber"
     ).all()
 
+    # =====================================================
+    # INTEGRACIÓN CON TESORERÍA - Procesar cada medio de pago
+    # =====================================================
+
+    # Obtener caja principal si no se especificó una
+    if not caja_efectivo_id:
+        caja_principal = db.query(CajaEfectivo).filter(
+            CajaEfectivo.activo == True,
+            CajaEfectivo.es_principal == True
+        ).first()
+        if caja_principal:
+            caja_efectivo_id = caja_principal.id
+
     for item in items_haber:
         item.movimiento_cc_id = mov_cc.id
+
+        # Procesar según tipo de medio de pago
+        if item.tipo_item in ["cheque", "e_cheque"]:
+            # Crear cheque en tesorería
+            cheque = _crear_cheque_desde_cobro(
+                db=db,
+                item=item,
+                cobro=cobro,
+                empresa=empresa,
+                usuario_id=usuario_id
+            )
+            if cheque:
+                movimientos_generados += 1
+
+                # Crear movimiento de tesorería para el cheque
+                mov_tesoreria = MovimientoTesoreria(
+                    tipo="ingreso_cheque",
+                    concepto=f"Cheque #{item.numero_cheque} - Cobro #{cobro.numero_cobro}",
+                    descripcion=f"Cheque recibido de {empresa.nombre}",
+                    monto=item.monto,
+                    es_ingreso=True,
+                    fecha_movimiento=cobro.fecha,
+                    metodo_pago=MetodoPagoEnum.CHEQUE.value if item.tipo_item == "cheque" else MetodoPagoEnum.E_CHEQUE.value,
+                    banco_origen=item.banco,
+                    cheque_id=cheque.id,
+                    empresa_id=cobro.empresa_id,
+                    cobro_id=cobro.id,
+                    registrado_por_id=usuario_id
+                )
+                db.add(mov_tesoreria)
+
+        elif item.tipo_item == "efectivo":
+            # Crear movimiento en caja de efectivo
+            if caja_efectivo_id:
+                caja = db.query(CajaEfectivo).filter(CajaEfectivo.id == caja_efectivo_id).first()
+                if caja:
+                    saldo_caja_anterior = caja.saldo_actual
+                    saldo_caja_posterior = saldo_caja_anterior + item.monto
+
+                    mov_caja = MovimientoCaja(
+                        caja_id=caja_efectivo_id,
+                        tipo="ingreso",
+                        concepto=f"Cobro #{cobro.numero_cobro} - {empresa.nombre}",
+                        descripcion=f"Pago en efectivo",
+                        monto=item.monto,
+                        saldo_anterior=saldo_caja_anterior,
+                        saldo_posterior=saldo_caja_posterior,
+                        fecha=cobro.fecha,
+                        empresa_id=cobro.empresa_id,
+                        registrado_por_id=usuario_id
+                    )
+                    db.add(mov_caja)
+                    caja.saldo_actual = saldo_caja_posterior
+                    movimientos_generados += 1
+
+            # Crear movimiento de tesorería
+            mov_tesoreria = MovimientoTesoreria(
+                tipo="ingreso_efectivo",
+                concepto=f"Cobro #{cobro.numero_cobro} - {empresa.nombre}",
+                descripcion=f"Pago en efectivo",
+                monto=item.monto,
+                es_ingreso=True,
+                fecha_movimiento=cobro.fecha,
+                metodo_pago=MetodoPagoEnum.EFECTIVO.value,
+                empresa_id=cobro.empresa_id,
+                cobro_id=cobro.id,
+                registrado_por_id=usuario_id
+            )
+            db.add(mov_tesoreria)
+
+        elif item.tipo_item == "transferencia":
+            # Crear movimiento bancario si hay cuenta destino
+            if cuenta_bancaria_id:
+                cuenta = db.query(CuentaBancaria).filter(CuentaBancaria.id == cuenta_bancaria_id).first()
+                if cuenta:
+                    saldo_banco_anterior = cuenta.saldo_actual
+                    saldo_banco_posterior = saldo_banco_anterior + item.monto
+
+                    mov_bancario = MovimientoBancario(
+                        cuenta_id=cuenta_bancaria_id,
+                        tipo="ingreso",
+                        concepto=f"Cobro #{cobro.numero_cobro} - {empresa.nombre}",
+                        descripcion=f"Transferencia recibida",
+                        monto=item.monto,
+                        saldo_anterior=saldo_banco_anterior,
+                        saldo_posterior=saldo_banco_posterior,
+                        fecha=cobro.fecha,
+                        numero_operacion=item.referencia_transferencia,
+                        empresa_id=cobro.empresa_id,
+                        registrado_por_id=usuario_id
+                    )
+                    db.add(mov_bancario)
+                    cuenta.saldo_actual = saldo_banco_posterior
+                    movimientos_generados += 1
+
+            # Crear movimiento de tesorería
+            mov_tesoreria = MovimientoTesoreria(
+                tipo="ingreso_transferencia",
+                concepto=f"Cobro #{cobro.numero_cobro} - {empresa.nombre}",
+                descripcion=f"Transferencia recibida - Ref: {item.referencia_transferencia or 'N/A'}",
+                monto=item.monto,
+                es_ingreso=True,
+                fecha_movimiento=cobro.fecha,
+                metodo_pago=MetodoPagoEnum.TRANSFERENCIA.value,
+                numero_transferencia=item.referencia_transferencia,
+                cuenta_destino_id=cuenta_bancaria_id,
+                empresa_id=cobro.empresa_id,
+                cobro_id=cobro.id,
+                registrado_por_id=usuario_id
+            )
+            db.add(mov_tesoreria)
+
+        elif item.tipo_item in ["retencion_iibb", "retencion_ganancias", "retencion_suss"]:
+            # Crear movimiento de tesorería para retenciones
+            mov_tesoreria = MovimientoTesoreria(
+                tipo=f"ingreso_{item.tipo_item}",
+                concepto=f"Retención - Cobro #{cobro.numero_cobro}",
+                descripcion=f"Certificado: {item.numero_certificado or 'N/A'}",
+                monto=item.monto,
+                es_ingreso=True,
+                fecha_movimiento=cobro.fecha,
+                metodo_pago=item.tipo_item,
+                empresa_id=cobro.empresa_id,
+                cobro_id=cobro.id,
+                comprobante=item.numero_certificado,
+                registrado_por_id=usuario_id
+            )
+            db.add(mov_tesoreria)
+
+    # Generar recibo consolidado
+    recibo = _generar_recibo_cobro(
+        db=db,
+        cobro=cobro,
+        empresa=empresa,
+        total_haber=total_haber,
+        usuario_id=usuario_id
+    )
+    if recibo:
+        movimientos_generados += 1
 
     # Aplicar a facturas
     items_factura = db.query(ItemCobroCliente).filter(
@@ -478,6 +639,83 @@ def aplicar_cobro(
         saldo_a_favor=saldo_a_favor,
         mensaje=f"Cobro aplicado exitosamente. {'Saldo a favor: $' + str(saldo_a_favor) if saldo_a_favor else 'Balance correcto.'}"
     )
+
+
+def _crear_cheque_desde_cobro(
+    db: Session,
+    item: ItemCobroCliente,
+    cobro: CobroCliente,
+    empresa: Empresa,
+    usuario_id: UUID
+) -> Optional[Cheque]:
+    """Crea un cheque en tesorería desde un item de cobro"""
+    if not item.numero_cheque:
+        return None
+
+    # Determinar tipo de cheque
+    tipo_cheque = TipoChequeEnum.FISICO.value if item.tipo_item == "cheque" else TipoChequeEnum.ECHEQ.value
+
+    cheque = Cheque(
+        numero=item.numero_cheque,
+        tipo=tipo_cheque,
+        origen=OrigenChequeEnum.RECIBIDO_CLIENTE.value,
+        estado=EstadoChequeEnum.EN_CARTERA.value,
+        monto=item.monto,
+        fecha_emision=cobro.fecha,
+        fecha_vencimiento=item.fecha_cheque or cobro.fecha,
+        banco_origen=item.banco,
+        empresa_id=cobro.empresa_id,
+        librador=empresa.nombre,
+        cuit_librador=item.cuit_emisor or empresa.cuit,
+        notas=f"Registrado automáticamente desde Cobro #{cobro.numero_cobro}",
+        registrado_por_id=usuario_id,
+        fecha_registro=get_argentina_now()
+    )
+
+    db.add(cheque)
+    db.flush()
+
+    return cheque
+
+
+def _generar_recibo_cobro(
+    db: Session,
+    cobro: CobroCliente,
+    empresa: Empresa,
+    total_haber: Decimal,
+    usuario_id: UUID
+) -> Optional[Recibo]:
+    """Genera un recibo consolidado para el cobro"""
+    # Generar número de recibo
+    hoy = date.today()
+    prefijo = f"REC-{hoy.strftime('%y%m%d')}"
+
+    # Buscar último recibo del día
+    ultimo = db.query(Recibo).filter(
+        Recibo.numero_recibo.like(f"{prefijo}%")
+    ).order_by(Recibo.numero_recibo.desc()).first()
+
+    if ultimo:
+        ultimo_num = int(ultimo.numero_recibo.split("-")[-1])
+        numero = f"{prefijo}-{ultimo_num + 1:04d}"
+    else:
+        numero = f"{prefijo}-0001"
+
+    recibo = Recibo(
+        numero_recibo=numero,
+        fecha=cobro.fecha,
+        empresa_id=cobro.empresa_id,
+        monto=total_haber,
+        concepto=f"Cobro #{cobro.numero_cobro}",
+        metodo_pago="multiple",
+        cobro_id=cobro.id,
+        registrado_por_id=usuario_id
+    )
+
+    db.add(recibo)
+    db.flush()
+
+    return recibo
 
 
 def anular_cobro(

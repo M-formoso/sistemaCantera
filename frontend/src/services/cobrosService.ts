@@ -187,9 +187,17 @@ export const cobrosService = {
     return response.data
   },
 
-  // Aplicar cobro (genera movimientos en CC)
-  async aplicar(cobroId: string): Promise<AplicarCobroResponse> {
-    const response = await api.post<AplicarCobroResponse>(`/cobros/${cobroId}/aplicar`)
+  // Aplicar cobro (genera movimientos en CC y tesorería)
+  async aplicar(
+    cobroId: string,
+    options?: {
+      caja_efectivo_id?: string
+      cuenta_bancaria_id?: string
+    }
+  ): Promise<AplicarCobroResponse> {
+    const response = await api.post<AplicarCobroResponse>(`/cobros/${cobroId}/aplicar`, null, {
+      params: options
+    })
     return response.data
   },
 

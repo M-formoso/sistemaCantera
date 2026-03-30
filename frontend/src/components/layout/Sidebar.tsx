@@ -10,6 +10,7 @@ import {
   X,
   Building2,
   DollarSign,
+  Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,12 @@ const menuItems = [
     title: 'Finanzas',
     icon: DollarSign,
     path: '/finanzas',
+    permiso: 'permiso_finanzas' as const,
+  },
+  {
+    title: 'Tesorería',
+    icon: Wallet,
+    path: '/tesoreria',
     permiso: 'permiso_finanzas' as const,
   },
   {

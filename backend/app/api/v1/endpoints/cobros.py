@@ -282,16 +282,26 @@ async def confirmar_cobro(
 @router.post("/{cobro_id}/aplicar", response_model=AplicarCobroResponse)
 async def aplicar_cobro(
     cobro_id: UUID,
+    caja_efectivo_id: Optional[UUID] = Query(None, description="ID de la caja para ingresar efectivo"),
+    cuenta_bancaria_id: Optional[UUID] = Query(None, description="ID de la cuenta bancaria para transferencias"),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin_or_operador)
 ):
     """
-    Aplica el cobro generando los movimientos de cuenta corriente.
+    Aplica el cobro generando los movimientos de cuenta corriente y tesorería.
     - Genera un pago por cada medio de pago (HABER)
     - Aplica a las facturas/tickets seleccionados (DEBE)
     - Si hay diferencia, queda como saldo a favor o pendiente
+    - Crea cheques en tesorería si hay pagos con cheque
+    - Actualiza saldos de cajas/bancos según corresponda
     """
-    return cobro_service.aplicar_cobro(db, cobro_id, current_user.id)
+    return cobro_service.aplicar_cobro(
+        db,
+        cobro_id,
+        current_user.id,
+        caja_efectivo_id=caja_efectivo_id,
+        cuenta_bancaria_id=cuenta_bancaria_id
+    )
 
 
 @router.post("/{cobro_id}/anular")

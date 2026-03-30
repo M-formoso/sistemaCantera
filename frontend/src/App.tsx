@@ -42,6 +42,9 @@ import EmpresasPage from '@/pages/empresas/EmpresasPage'
 // Finanzas
 import FinanzasPage from '@/pages/finanzas/FinanzasPage'
 
+// Tesorería
+import TesoreriaPage from '@/pages/tesoreria/TesoreriaPage'
+
 // Reportes
 import ReportesPage from '@/pages/reportes/ReportesPage'
 
@@ -120,6 +123,9 @@ function App() {
 
           {/* Finanzas */}
           <Route path="finanzas" element={<PermisoRoute permiso="permiso_finanzas"><FinanzasPage /></PermisoRoute>} />
+
+          {/* Tesorería */}
+          <Route path="tesoreria" element={<PermisoRoute permiso="permiso_finanzas"><TesoreriaPage /></PermisoRoute>} />
 
           {/* Reportes */}
           <Route path="reportes" element={<PermisoRoute permiso="permiso_reportes"><ReportesPage /></PermisoRoute>} />
