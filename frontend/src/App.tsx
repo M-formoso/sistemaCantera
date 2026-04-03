@@ -39,6 +39,9 @@ import UsuarioFormPage from '@/pages/usuarios/UsuarioFormPage'
 // Empresas (Clientes/Transportistas)
 import EmpresasPage from '@/pages/empresas/EmpresasPage'
 
+// Listas de Precios
+import ListasPreciosPage from '@/pages/listas-precios/ListasPreciosPage'
+
 // Finanzas
 import FinanzasPage from '@/pages/finanzas/FinanzasPage'
 
@@ -87,6 +90,9 @@ function App() {
 
           {/* Empresas (Clientes/Transportistas) */}
           <Route path="empresas" element={<PermisoRoute permiso="permiso_empresas"><EmpresasPage /></PermisoRoute>} />
+
+          {/* Listas de Precios */}
+          <Route path="listas-precios" element={<PermisoRoute permiso="permiso_empresas"><ListasPreciosPage /></PermisoRoute>} />
 
           {/* Repuestos */}
           <Route path="repuestos" element={<PermisoRoute permiso="permiso_repuestos"><RepuestosPage /></PermisoRoute>} />

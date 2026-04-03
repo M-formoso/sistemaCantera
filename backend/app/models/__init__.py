@@ -17,6 +17,7 @@ from app.models.cuenta_corriente import MovimientoCuentaCorriente, CobroCliente,
 from app.models.trabajo import Trabajo, TrabajoRepuesto
 from app.models.factura import Factura, PagoFactura, PagoRemito, factura_remito
 from app.models.precio_cliente import PrecioCliente
+from app.models.lista_precio import ListaPrecio, ItemListaPrecio
 from app.models.tesoreria import (
     Cheque, MovimientoTesoreria, CajaEfectivo, MovimientoCaja,
     MovimientoBancario, Gasto, Recibo
@@ -54,6 +55,9 @@ __all__ = [
     "PagoRemito",
     "factura_remito",
     "PrecioCliente",
+    # Listas de precios
+    "ListaPrecio",
+    "ItemListaPrecio",
     # Tesorería
     "Cheque",
     "MovimientoTesoreria",

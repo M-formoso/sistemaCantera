@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     cobros,
     reportes,
     precios,
+    listas_precios,
     tesoreria
 )
 
@@ -51,4 +52,5 @@ api_router.include_router(facturacion.router, prefix="/facturacion", tags=["Fact
 api_router.include_router(cobros.router, prefix="/cobros", tags=["Cobros"])
 api_router.include_router(reportes.router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(precios.router, prefix="/precios", tags=["Precios por Cliente"])
+api_router.include_router(listas_precios.router, prefix="/listas-precios", tags=["Listas de Precios"])
 api_router.include_router(tesoreria.router, prefix="/tesoreria", tags=["Tesorería"])

@@ -11,6 +11,7 @@ import {
   Building2,
   DollarSign,
   Wallet,
+  ListOrdered,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,12 @@ const menuItems = [
     title: 'Clientes/Transportistas',
     icon: Building2,
     path: '/empresas',
+    permiso: 'permiso_empresas' as const,
+  },
+  {
+    title: 'Listas de Precios',
+    icon: ListOrdered,
+    path: '/listas-precios',
     permiso: 'permiso_empresas' as const,
   },
   {
