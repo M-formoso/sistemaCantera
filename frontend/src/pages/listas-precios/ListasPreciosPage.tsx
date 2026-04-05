@@ -11,7 +11,8 @@ import {
   listasPreciosService,
   ListaPrecio,
   ListaPrecioCreate,
-  ItemBatchUpdate
+  ItemBatchUpdate,
+  ItemListaPrecioCreate
 } from '@/services/listasPreciosService'
 import { formatNumber } from '@/lib/utils'
 
@@ -39,6 +40,7 @@ interface ItemEditable {
   material: string
   precio_unitario: number | ''
   factor_conversion_m3: number | '' | null
+  unidad: 'tn' | 'm3'
 }
 
 export default function ListasPreciosPage() {
@@ -50,10 +52,11 @@ export default function ListasPreciosPage() {
   const [editandoItems, setEditandoItems] = useState<string | null>(null)
   const [itemsEditables, setItemsEditables] = useState<ItemEditable[]>([])
 
-  // Modal nueva lista
+  // Modal nueva lista - ahora con items
   const [showNuevaLista, setShowNuevaLista] = useState(false)
   const [nuevaListaNombre, setNuevaListaNombre] = useState('')
   const [nuevaListaDescripcion, setNuevaListaDescripcion] = useState('')
+  const [nuevosItems, setNuevosItems] = useState<ItemEditable[]>([])
 
   // Modal duplicar
   const [showDuplicar, setShowDuplicar] = useState<string | null>(null)
@@ -74,9 +77,7 @@ export default function ListasPreciosPage() {
     mutationFn: (data: ListaPrecioCreate) => listasPreciosService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listas-precios'] })
-      setShowNuevaLista(false)
-      setNuevaListaNombre('')
-      setNuevaListaDescripcion('')
+      cerrarModalNuevaLista()
     },
   })
 
@@ -115,6 +116,28 @@ export default function ListasPreciosPage() {
       setItemsEditables([])
     },
   })
+
+  // Inicializar items para nueva lista
+  const abrirModalNuevaLista = () => {
+    setNuevaListaNombre('')
+    setNuevaListaDescripcion('')
+    // Crear items vacíos para todos los materiales
+    const items: ItemEditable[] = MATERIALES_DISPONIBLES.map((material) => ({
+      material,
+      precio_unitario: '',
+      factor_conversion_m3: FACTORES_SUGERIDOS[material] || null,
+      unidad: FACTORES_SUGERIDOS[material] ? 'm3' : 'tn',
+    }))
+    setNuevosItems(items)
+    setShowNuevaLista(true)
+  }
+
+  const cerrarModalNuevaLista = () => {
+    setShowNuevaLista(false)
+    setNuevaListaNombre('')
+    setNuevaListaDescripcion('')
+    setNuevosItems([])
+  }
 
   // Handlers
   const handleExpandir = (listaId: string) => {
@@ -157,43 +180,46 @@ export default function ListasPreciosPage() {
       return {
         material,
         precio_unitario: itemExistente?.precio_unitario || '',
-        factor_conversion_m3: itemExistente?.factor_conversion_m3 || null,
+        factor_conversion_m3: itemExistente?.factor_conversion_m3 || FACTORES_SUGERIDOS[material] || null,
+        unidad: itemExistente?.factor_conversion_m3 || FACTORES_SUGERIDOS[material] ? 'm3' : 'tn',
       }
     })
     setItemsEditables(items)
   }
 
   const handleItemChange = (
+    items: ItemEditable[],
+    setItems: React.Dispatch<React.SetStateAction<ItemEditable[]>>,
     index: number,
-    field: 'precio_unitario' | 'factor_conversion_m3',
+    field: 'precio_unitario' | 'factor_conversion_m3' | 'unidad',
     value: string
   ) => {
-    const newItems = [...itemsEditables]
+    const newItems = [...items]
     if (field === 'precio_unitario') {
       newItems[index].precio_unitario = value === '' ? '' : parseFloat(value)
-    } else {
+    } else if (field === 'factor_conversion_m3') {
       newItems[index].factor_conversion_m3 = value === '' ? null : parseFloat(value)
+    } else if (field === 'unidad') {
+      newItems[index].unidad = value as 'tn' | 'm3'
+      // Si cambia a tn, quitar factor
+      if (value === 'tn') {
+        newItems[index].factor_conversion_m3 = null
+      } else {
+        // Si cambia a m3, poner factor sugerido si existe
+        newItems[index].factor_conversion_m3 = FACTORES_SUGERIDOS[newItems[index].material] || 1.5
+      }
     }
-    setItemsEditables(newItems)
-  }
-
-  const handleAplicarFactorSugerido = (index: number, material: string) => {
-    const factor = FACTORES_SUGERIDOS[material]
-    if (factor) {
-      const newItems = [...itemsEditables]
-      newItems[index].factor_conversion_m3 = factor
-      setItemsEditables(newItems)
-    }
+    setItems(newItems)
   }
 
   const handleGuardarItems = (listaId: string) => {
     // Filtrar solo items con precio
     const itemsConPrecio = itemsEditables
-      .filter((item) => item.precio_unitario !== '' && item.precio_unitario > 0)
+      .filter((item) => item.precio_unitario !== '' && Number(item.precio_unitario) > 0)
       .map((item) => ({
         material: item.material,
         precio_unitario: Number(item.precio_unitario),
-        factor_conversion_m3: item.factor_conversion_m3 ? Number(item.factor_conversion_m3) : null,
+        factor_conversion_m3: item.unidad === 'm3' && item.factor_conversion_m3 ? Number(item.factor_conversion_m3) : null,
       }))
 
     actualizarItemsMutation.mutate({ listaId, items: itemsConPrecio })
@@ -202,11 +228,20 @@ export default function ListasPreciosPage() {
   const handleCrearLista = () => {
     if (!nuevaListaNombre.trim()) return
 
+    // Convertir items editables a items de creación
+    const itemsConPrecio: ItemListaPrecioCreate[] = nuevosItems
+      .filter((item) => item.precio_unitario !== '' && Number(item.precio_unitario) > 0)
+      .map((item) => ({
+        material: item.material,
+        precio_unitario: Number(item.precio_unitario),
+        factor_conversion_m3: item.unidad === 'm3' && item.factor_conversion_m3 ? Number(item.factor_conversion_m3) : null,
+      }))
+
     crearListaMutation.mutate({
       nombre: nuevaListaNombre.trim(),
       descripcion: nuevaListaDescripcion.trim() || null,
       activo: true,
-      items: [],
+      items: itemsConPrecio,
     })
   }
 
@@ -220,6 +255,94 @@ export default function ListasPreciosPage() {
       eliminarListaMutation.mutate(lista.id)
     }
   }
+
+  // Componente de tabla de items reutilizable
+  const TablaItemsEditable = ({
+    items,
+    setItems,
+    readOnly = false,
+  }: {
+    items: ItemEditable[]
+    setItems: React.Dispatch<React.SetStateAction<ItemEditable[]>>
+    readOnly?: boolean
+  }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-gray-50">
+            <th className="text-left py-3 px-3 font-semibold">Material</th>
+            <th className="text-left py-3 px-3 font-semibold">Unidad</th>
+            <th className="text-left py-3 px-3 font-semibold">Precio ($)</th>
+            <th className="text-left py-3 px-3 font-semibold">Factor Conversión</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={item.material} className="border-b hover:bg-gray-50">
+              <td className="py-3 px-3 font-medium">{item.material}</td>
+              <td className="py-3 px-3">
+                {readOnly ? (
+                  <span className={item.unidad === 'm3' ? 'text-blue-600 font-medium' : 'text-gray-600'}>
+                    {item.unidad === 'm3' ? 'm³' : 'Tonelada'}
+                  </span>
+                ) : (
+                  <select
+                    value={item.unidad}
+                    onChange={(e) => handleItemChange(items, setItems, index, 'unidad', e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                  >
+                    <option value="tn">Tonelada</option>
+                    <option value="m3">m³</option>
+                  </select>
+                )}
+              </td>
+              <td className="py-3 px-3">
+                {readOnly ? (
+                  item.precio_unitario ? (
+                    <span className="font-mono">${formatNumber(Number(item.precio_unitario), 2)}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )
+                ) : (
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={item.precio_unitario}
+                    onChange={(e) => handleItemChange(items, setItems, index, 'precio_unitario', e.target.value)}
+                    placeholder="0.00"
+                    className="w-32"
+                  />
+                )}
+              </td>
+              <td className="py-3 px-3">
+                {item.unidad === 'm3' ? (
+                  readOnly ? (
+                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">
+                      ÷ {item.factor_conversion_m3}
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.factor_conversion_m3 || ''}
+                        onChange={(e) => handleItemChange(items, setItems, index, 'factor_conversion_m3', e.target.value)}
+                        placeholder="1.66"
+                        className="w-20"
+                      />
+                      <span className="text-xs text-gray-500">tn ÷ factor = m³</span>
+                    </div>
+                  )
+                ) : (
+                  <span className="text-gray-400 text-xs">No aplica</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
 
   if (isLoading) {
     return (
@@ -239,7 +362,7 @@ export default function ListasPreciosPage() {
             Gestiona las listas de precios para asignar a clientes en pesajes
           </p>
         </div>
-        <Button onClick={() => setShowNuevaLista(true)}>
+        <Button onClick={abrirModalNuevaLista}>
           <Plus className="h-4 w-4 mr-2" />
           Nueva Lista
         </Button>
@@ -251,12 +374,15 @@ export default function ListasPreciosPage() {
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
             <div className="text-sm text-blue-700">
-              <p className="font-medium">Factores de conversión a m³</p>
+              <p className="font-medium">Cómo funcionan las unidades</p>
               <p className="mt-1">
-                Para materiales que se facturan en m³, usa los factores: <strong>0.20 → 1.66</strong>, <strong>6.19 → 1.5</strong>
+                <strong>Tonelada:</strong> El precio se cobra por tonelada pesada directamente.
               </p>
               <p className="mt-1">
-                Fórmula: <code className="bg-blue-100 px-1 rounded">m³ = toneladas ÷ factor</code>
+                <strong>m³:</strong> Se convierte el peso a metros cúbicos usando el factor. Ej: 20tn ÷ 1.66 = 12.05 m³
+              </p>
+              <p className="mt-1">
+                Factores comunes: <strong>0.20 → 1.66</strong>, <strong>6.19 → 1.5</strong>
               </p>
             </div>
           </div>
@@ -270,7 +396,7 @@ export default function ListasPreciosPage() {
             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">No hay listas de precios</h3>
             <p className="text-gray-500 mt-2">Crea tu primera lista para comenzar</p>
-            <Button onClick={() => setShowNuevaLista(true)} className="mt-4">
+            <Button onClick={abrirModalNuevaLista} className="mt-4">
               <Plus className="h-4 w-4 mr-2" />
               Crear Lista
             </Button>
@@ -423,66 +549,10 @@ export default function ListasPreciosPage() {
                     </div>
 
                     {editandoItems === lista.id ? (
-                      // Modo edición
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left py-2 px-2 w-32">Material</th>
-                              <th className="text-left py-2 px-2 w-40">Precio ($)</th>
-                              <th className="text-left py-2 px-2 w-48">Factor m³</th>
-                              <th className="text-left py-2 px-2">Unidad</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {itemsEditables.map((item, index) => (
-                              <tr key={item.material} className="border-b hover:bg-gray-50">
-                                <td className="py-2 px-2 font-medium">{item.material}</td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={item.precio_unitario}
-                                    onChange={(e) =>
-                                      handleItemChange(index, 'precio_unitario', e.target.value)
-                                    }
-                                    placeholder="Precio"
-                                    className="w-32"
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      value={item.factor_conversion_m3 || ''}
-                                      onChange={(e) =>
-                                        handleItemChange(index, 'factor_conversion_m3', e.target.value)
-                                      }
-                                      placeholder="Ej: 1.66"
-                                      className="w-24"
-                                    />
-                                    {FACTORES_SUGERIDOS[item.material] && (
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleAplicarFactorSugerido(index, item.material)}
-                                        className="text-xs whitespace-nowrap"
-                                      >
-                                        Usar {FACTORES_SUGERIDOS[item.material]}
-                                      </Button>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="py-2 px-2 text-gray-500">
-                                  {item.factor_conversion_m3 ? '$/m³' : '$/tn'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <TablaItemsEditable
+                        items={itemsEditables}
+                        setItems={setItemsEditables}
+                      />
                     ) : (
                       // Modo visualización
                       <div className="overflow-x-auto">
@@ -493,34 +563,34 @@ export default function ListasPreciosPage() {
                         ) : (
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b">
-                                <th className="text-left py-2 px-2">Material</th>
-                                <th className="text-right py-2 px-2">Precio</th>
-                                <th className="text-center py-2 px-2">Factor m³</th>
-                                <th className="text-center py-2 px-2">Unidad</th>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left py-3 px-3 font-semibold">Material</th>
+                                <th className="text-left py-3 px-3 font-semibold">Unidad</th>
+                                <th className="text-right py-3 px-3 font-semibold">Precio</th>
+                                <th className="text-center py-3 px-3 font-semibold">Factor</th>
                               </tr>
                             </thead>
                             <tbody>
                               {lista.items.map((item) => (
                                 <tr key={item.id} className="border-b hover:bg-gray-50">
-                                  <td className="py-2 px-2 font-medium">{item.material}</td>
-                                  <td className="py-2 px-2 text-right font-mono">
+                                  <td className="py-3 px-3 font-medium">{item.material}</td>
+                                  <td className="py-3 px-3">
+                                    {item.factor_conversion_m3 ? (
+                                      <span className="text-blue-600 font-medium">m³</span>
+                                    ) : (
+                                      <span className="text-gray-600">Tonelada</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-3 text-right font-mono">
                                     ${formatNumber(item.precio_unitario, 2)}
                                   </td>
-                                  <td className="py-2 px-2 text-center">
+                                  <td className="py-3 px-3 text-center">
                                     {item.factor_conversion_m3 ? (
                                       <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">
                                         ÷ {item.factor_conversion_m3}
                                       </span>
                                     ) : (
                                       <span className="text-gray-400">-</span>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-2 text-center">
-                                    {item.factor_conversion_m3 ? (
-                                      <span className="text-blue-600 font-medium">m³</span>
-                                    ) : (
-                                      <span className="text-gray-600">tn</span>
                                     )}
                                   </td>
                                 </tr>
@@ -538,42 +608,62 @@ export default function ListasPreciosPage() {
         </div>
       )}
 
-      {/* Modal Nueva Lista */}
+      {/* Modal Nueva Lista - COMPLETO */}
       {showNuevaLista && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <CardHeader className="border-b">
               <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5" />
                 Nueva Lista de Precios
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Nombre y descripción */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Nombre de la lista *</label>
+                  <Input
+                    value={nuevaListaNombre}
+                    onChange={(e) => setNuevaListaNombre(e.target.value)}
+                    placeholder="Ej: Lista Mayorista, Lista 2024"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Descripción (opcional)</label>
+                  <Input
+                    value={nuevaListaDescripcion}
+                    onChange={(e) => setNuevaListaDescripcion(e.target.value)}
+                    placeholder="Descripción de la lista"
+                  />
+                </div>
+              </div>
+
+              {/* Tabla de materiales */}
               <div>
-                <label className="text-sm font-medium mb-2 block">Nombre *</label>
-                <Input
-                  value={nuevaListaNombre}
-                  onChange={(e) => setNuevaListaNombre(e.target.value)}
-                  placeholder="Ej: Lista Mayorista"
-                  autoFocus
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  Precios por Material
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Completa los precios para los materiales que desees incluir. Los materiales sin precio no se guardarán.
+                </p>
+                <TablaItemsEditable
+                  items={nuevosItems}
+                  setItems={setNuevosItems}
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Descripción</label>
-                <Input
-                  value={nuevaListaDescripcion}
-                  onChange={(e) => setNuevaListaDescripcion(e.target.value)}
-                  placeholder="Descripción opcional"
-                />
-              </div>
-              <div className="flex gap-2 justify-end pt-4">
+            </CardContent>
+
+            {/* Footer con botones */}
+            <div className="border-t p-4 bg-gray-50 flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                {nuevosItems.filter(i => i.precio_unitario !== '' && Number(i.precio_unitario) > 0).length} materiales con precio
+              </p>
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setShowNuevaLista(false)
-                    setNuevaListaNombre('')
-                    setNuevaListaDescripcion('')
-                  }}
+                  onClick={cerrarModalNuevaLista}
                 >
                   Cancelar
                 </Button>
@@ -581,10 +671,10 @@ export default function ListasPreciosPage() {
                   onClick={handleCrearLista}
                   disabled={!nuevaListaNombre.trim() || crearListaMutation.isPending}
                 >
-                  {crearListaMutation.isPending ? 'Creando...' : 'Crear Lista'}
+                  {crearListaMutation.isPending ? 'Creando...' : 'Crear Lista de Precios'}
                 </Button>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}
