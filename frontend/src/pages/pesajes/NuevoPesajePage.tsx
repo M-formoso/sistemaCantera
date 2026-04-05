@@ -144,6 +144,9 @@ export default function NuevoPesajePage() {
   const [listaSeleccionada, setListaSeleccionada] = useState<string | null>(null)
   const [precioLista, setPrecioLista] = useState<CalculoPrecioLista | null>(null)
 
+  // Estado para unidad de facturación (tn o m3)
+  const [unidadFacturacion, setUnidadFacturacion] = useState<'tn' | 'm3'>('tn')
+
   // Queries
   const { data: camiones = [] } = useQuery({
     queryKey: ['camiones'],
@@ -246,9 +249,14 @@ export default function NuevoPesajePage() {
           // Auto-completar precio si se encontró
           if (calculo.precio_encontrado && calculo.precio_unitario) {
             brutoForm.setValue('precio_unitario', calculo.precio_unitario)
-            if (calculo.importe) {
-              brutoForm.setValue('importe_total', Math.round(calculo.importe * 100) / 100)
+
+            // Calcular importe según unidad seleccionada
+            let cantidad = calculo.peso_toneladas || (pesoNeto / 1000)
+            if (calculo.factor_conversion && unidadFacturacion === 'm3') {
+              cantidad = calculo.cantidad_facturada || (cantidad / calculo.factor_conversion)
             }
+            const importe = cantidad * calculo.precio_unitario
+            brutoForm.setValue('importe_total', Math.round(importe * 100) / 100)
           }
         } catch (error) {
           console.error('Error cargando precio de lista:', error)
@@ -290,7 +298,7 @@ export default function NuevoPesajePage() {
     // Debounce para no hacer muchas llamadas
     const timer = setTimeout(cargarPrecio, 500)
     return () => clearTimeout(timer)
-  }, [listaSeleccionada, clienteIdParaPrecio, materialBruto, pesajePendiente?.material, pesoNeto, brutoForm])
+  }, [listaSeleccionada, clienteIdParaPrecio, materialBruto, pesajePendiente?.material, pesoNeto, brutoForm, unidadFacturacion])
 
   // Buscar clientes
   const buscarClientes = useCallback(async (nombre: string) => {
@@ -1022,6 +1030,40 @@ export default function NuevoPesajePage() {
                     </div>
                   </div>
 
+                  {/* Lista de Precios */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Lista de Precios
+                    </h3>
+                    {listasPrecios.length > 0 ? (
+                      <>
+                        <select
+                          value={listaSeleccionada || ''}
+                          onChange={(e) => setListaSeleccionada(e.target.value || null)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Seleccionar lista de precios...</option>
+                          {listasPrecios.map((lista) => (
+                            <option key={lista.id} value={lista.id}>
+                              {lista.nombre} ({lista.cantidad_items} materiales)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          La lista de precios se aplicará al completar el pesaje (peso bruto)
+                        </p>
+                      </>
+                    ) : (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-700">
+                        No hay listas de precios creadas.{' '}
+                        <a href="/listas-precios" className="text-blue-600 underline font-medium">
+                          Crear una lista de precios
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Peso Tara */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
@@ -1336,12 +1378,49 @@ export default function NuevoPesajePage() {
                             </option>
                           ))}
                         </select>
+
+                        {/* Selector de unidad cuando hay factor de conversión */}
+                        {precioLista?.precio_encontrado && precioLista.factor_conversion && (
+                          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                            <label className="text-sm font-medium text-blue-700 mb-2 block">
+                              Unidad de facturación:
+                            </label>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setUnidadFacturacion('tn')}
+                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                                  unidadFacturacion === 'tn'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-blue-600 border border-blue-300 hover:bg-blue-50'
+                                }`}
+                              >
+                                Toneladas (tn)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setUnidadFacturacion('m3')}
+                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                                  unidadFacturacion === 'm3'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-blue-600 border border-blue-300 hover:bg-blue-50'
+                                }`}
+                              >
+                                Metros cúbicos (m³)
+                              </button>
+                            </div>
+                            <p className="text-xs text-blue-600 mt-2">
+                              {unidadFacturacion === 'm3'
+                                ? `${formatNumber(precioLista.peso_toneladas || 0, 2)} tn ÷ ${precioLista.factor_conversion} = ${formatNumber(precioLista.cantidad_facturada || 0, 2)} m³`
+                                : `Se facturará por ${formatNumber(precioLista.peso_toneladas || 0, 2)} toneladas`
+                              }
+                            </p>
+                          </div>
+                        )}
+
                         {precioLista?.precio_encontrado && (
                           <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
-                            <strong>{precioLista.lista_nombre}:</strong> ${formatNumber(precioLista.precio_unitario || 0, 2)}/{precioLista.unidad}
-                            {precioLista.factor_conversion && (
-                              <span className="ml-2 text-blue-600">(factor ÷{precioLista.factor_conversion})</span>
-                            )}
+                            <strong>{precioLista.lista_nombre}:</strong> ${formatNumber(precioLista.precio_unitario || 0, 2)}/{precioLista.factor_conversion ? (unidadFacturacion === 'm3' ? 'm³' : 'tn') : 'tn'}
                           </div>
                         )}
                         {listaSeleccionada && precioLista && !precioLista.precio_encontrado && (
@@ -1492,10 +1571,11 @@ export default function NuevoPesajePage() {
 
                 {/* Mostrar conversión a m³ si aplica (lista de precios) */}
                 {precioLista?.precio_encontrado && precioLista.factor_conversion && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                  <div className={`rounded-md p-3 text-sm ${unidadFacturacion === 'm3' ? 'bg-blue-100 border-2 border-blue-400' : 'bg-blue-50 border border-blue-200'}`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold text-blue-700">Conversión a m³</span>
-                      <span className="text-xs bg-blue-100 px-1 rounded">{precioLista.lista_nombre}</span>
+                      <span className="font-semibold text-blue-700">
+                        {unidadFacturacion === 'm3' ? '✓ Facturando en m³' : 'Conversión disponible'}
+                      </span>
                     </div>
                     <div className="space-y-1 text-blue-700">
                       <div className="flex justify-between">
@@ -1505,6 +1585,15 @@ export default function NuevoPesajePage() {
                       <div className="flex justify-between">
                         <span>{formatNumber(precioLista.peso_toneladas || 0, 2)} tn =</span>
                         <span className="font-bold text-lg">{formatNumber(precioLista.cantidad_facturada || 0, 2)} m³</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span>Cantidad a facturar:</span>
+                        <span className="font-bold">
+                          {unidadFacturacion === 'm3'
+                            ? `${formatNumber(precioLista.cantidad_facturada || 0, 2)} m³`
+                            : `${formatNumber(precioLista.peso_toneladas || 0, 2)} tn`
+                          }
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1551,7 +1640,7 @@ export default function NuevoPesajePage() {
                       Precio de lista: {precioLista.lista_nombre}
                     </div>
                     <div className="flex justify-between">
-                      <span>Precio/{precioLista.unidad}:</span>
+                      <span>Precio/{precioLista.factor_conversion ? (unidadFacturacion === 'm3' ? 'm³' : 'tn') : 'tn'}:</span>
                       <span className="font-bold">${formatNumber(precioLista.precio_unitario || 0, 2)}</span>
                     </div>
                   </div>
@@ -1580,8 +1669,8 @@ export default function NuevoPesajePage() {
                           <span className="text-gray-500">Precio fijo:</span>
                           <span className="font-medium">${formatNumber(precioFijo, 2)}</span>
                         </div>
-                      ) : precioLista?.precio_encontrado && precioLista.factor_conversion ? (
-                        // Mostrar cálculo con m³ (desde lista)
+                      ) : precioLista?.precio_encontrado && precioLista.factor_conversion && unidadFacturacion === 'm3' ? (
+                        // Mostrar cálculo con m³ (desde lista, unidad m³ seleccionada)
                         <div className="flex justify-between">
                           <span className="text-gray-500">{formatNumber(precioLista.cantidad_facturada || 0, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
                           <span className="font-medium">${formatNumber((precioLista.cantidad_facturada || 0) * precioUnitario, 2)}</span>
