@@ -61,8 +61,7 @@ def crear(db: Session, lista_data: ListaPrecioCreate, usuario_id: UUID) -> Lista
     db_lista = ListaPrecio(
         nombre=lista_data.nombre,
         descripcion=lista_data.descripcion,
-        activo=lista_data.activo,
-        created_by=usuario_id
+        activo=lista_data.activo
     )
     db.add(db_lista)
     db.flush()  # Para obtener el ID
@@ -74,8 +73,7 @@ def crear(db: Session, lista_data: ListaPrecioCreate, usuario_id: UUID) -> Lista
                 lista_id=db_lista.id,
                 material=item_data.material,
                 precio_unitario=item_data.precio_unitario,
-                factor_conversion_m3=item_data.factor_conversion_m3,
-                created_by=usuario_id
+                factor_conversion_m3=item_data.factor_conversion_m3
             )
             db.add(db_item)
 
@@ -158,8 +156,7 @@ def duplicar(db: Session, lista_id: UUID, nuevo_nombre: str, usuario_id: UUID) -
     nueva_lista = ListaPrecio(
         nombre=nuevo_nombre,
         descripcion=f"Copia de {db_lista.nombre}",
-        activo=True,
-        created_by=usuario_id
+        activo=True
     )
     db.add(nueva_lista)
     db.flush()
@@ -170,8 +167,7 @@ def duplicar(db: Session, lista_id: UUID, nuevo_nombre: str, usuario_id: UUID) -
             lista_id=nueva_lista.id,
             material=item.material,
             precio_unitario=item.precio_unitario,
-            factor_conversion_m3=item.factor_conversion_m3,
-            created_by=usuario_id
+            factor_conversion_m3=item.factor_conversion_m3
         )
         db.add(nuevo_item)
 
@@ -210,8 +206,7 @@ def agregar_item(
         lista_id=lista_id,
         material=item_data.material,
         precio_unitario=item_data.precio_unitario,
-        factor_conversion_m3=item_data.factor_conversion_m3,
-        created_by=usuario_id
+        factor_conversion_m3=item_data.factor_conversion_m3
     )
     db.add(db_item)
     db.commit()
@@ -309,8 +304,7 @@ def actualizar_items_batch(
                 lista_id=lista_id,
                 material=item_data.material,
                 precio_unitario=item_data.precio_unitario,
-                factor_conversion_m3=item_data.factor_conversion_m3,
-                created_by=usuario_id
+                factor_conversion_m3=item_data.factor_conversion_m3
             )
             db.add(db_item)
 
