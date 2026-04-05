@@ -260,5 +260,57 @@ async def startup_event():
                 conn.commit()
                 print("✅ Tabla trabajos_repuestos creada exitosamente")
 
+            # Crear tabla listas_precios si no existe
+            if 'listas_precios' not in tablas_existentes:
+                print("⚠️ Tabla listas_precios no existe, creándola...")
+                conn.execute(text("""
+                    CREATE TABLE listas_precios (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        nombre VARCHAR(100) NOT NULL UNIQUE,
+                        descripcion TEXT,
+                        activo BOOLEAN NOT NULL DEFAULT true,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
+                        created_by UUID REFERENCES usuarios(id)
+                    )
+                """))
+                conn.execute(text("CREATE INDEX ix_listas_precios_nombre ON listas_precios(nombre)"))
+                conn.execute(text("CREATE INDEX ix_listas_precios_activo ON listas_precios(activo)"))
+                conn.commit()
+                print("✅ Tabla listas_precios creada exitosamente")
+
+            # Crear tabla items_lista_precio si no existe
+            if 'items_lista_precio' not in tablas_existentes:
+                print("⚠️ Tabla items_lista_precio no existe, creándola...")
+                conn.execute(text("""
+                    CREATE TABLE items_lista_precio (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        lista_id UUID NOT NULL REFERENCES listas_precios(id) ON DELETE CASCADE,
+                        material VARCHAR(100) NOT NULL,
+                        precio_unitario NUMERIC(12,2) NOT NULL,
+                        factor_conversion_m3 NUMERIC(6,3),
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
+                        created_by UUID REFERENCES usuarios(id),
+                        UNIQUE(lista_id, material)
+                    )
+                """))
+                conn.execute(text("CREATE INDEX ix_items_lista_precio_lista_id ON items_lista_precio(lista_id)"))
+                conn.execute(text("CREATE INDEX ix_items_lista_precio_material ON items_lista_precio(material)"))
+                conn.commit()
+                print("✅ Tabla items_lista_precio creada exitosamente")
+
+            # Agregar columna lista_precio_id a pesajes si no existe
+            if 'pesajes' in tablas_existentes:
+                columns = [col['name'] for col in inspector.get_columns('pesajes')]
+                if 'lista_precio_id' not in columns:
+                    print("⚠️ Columna lista_precio_id no existe en pesajes, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE pesajes ADD COLUMN lista_precio_id UUID REFERENCES listas_precios(id)
+                    """))
+                    conn.execute(text("CREATE INDEX ix_pesajes_lista_precio_id ON pesajes(lista_precio_id)"))
+                    conn.commit()
+                    print("✅ Columna lista_precio_id creada exitosamente")
+
     except Exception as e:
         print(f"⚠️ Error en startup verificando BD: {e}")

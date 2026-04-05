@@ -1317,40 +1317,46 @@ export default function NuevoPesajePage() {
                   )}
 
                   {/* Lista de Precios */}
-                  {listasPrecios.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Lista de Precios
-                      </h3>
-                      <select
-                        value={listaSeleccionada || ''}
-                        onChange={(e) => setListaSeleccionada(e.target.value || null)}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">Seleccionar lista de precios...</option>
-                        {listasPrecios.map((lista) => (
-                          <option key={lista.id} value={lista.id}>
-                            {lista.nombre} ({lista.cantidad_items} materiales)
-                          </option>
-                        ))}
-                      </select>
-                      {precioLista?.precio_encontrado && (
-                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
-                          <strong>{precioLista.lista_nombre}:</strong> ${formatNumber(precioLista.precio_unitario || 0, 2)}/{precioLista.unidad}
-                          {precioLista.factor_conversion && (
-                            <span className="ml-2 text-blue-600">(factor ÷{precioLista.factor_conversion})</span>
-                          )}
-                        </div>
-                      )}
-                      {listaSeleccionada && precioLista && !precioLista.precio_encontrado && (
-                        <p className="mt-2 text-xs text-orange-600">
-                          <AlertCircle className="h-3 w-3 inline mr-1" />
-                          {precioLista.mensaje || 'No hay precio para este material en la lista seleccionada'}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Lista de Precios
+                    </h3>
+                    {listasPrecios.length > 0 ? (
+                      <>
+                        <select
+                          value={listaSeleccionada || ''}
+                          onChange={(e) => setListaSeleccionada(e.target.value || null)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Seleccionar lista de precios...</option>
+                          {listasPrecios.map((lista) => (
+                            <option key={lista.id} value={lista.id}>
+                              {lista.nombre} ({lista.cantidad_items} materiales)
+                            </option>
+                          ))}
+                        </select>
+                        {precioLista?.precio_encontrado && (
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                            <strong>{precioLista.lista_nombre}:</strong> ${formatNumber(precioLista.precio_unitario || 0, 2)}/{precioLista.unidad}
+                            {precioLista.factor_conversion && (
+                              <span className="ml-2 text-blue-600">(factor ÷{precioLista.factor_conversion})</span>
+                            )}
+                          </div>
+                        )}
+                        {listaSeleccionada && precioLista && !precioLista.precio_encontrado && (
+                          <p className="mt-2 text-xs text-orange-600">
+                            <AlertCircle className="h-3 w-3 inline mr-1" />
+                            {precioLista.mensaje || 'No hay precio para este material en la lista seleccionada'}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">
+                        No hay listas de precios creadas. <a href="/listas-precios" className="text-blue-600 underline">Crear una lista</a>
+                      </p>
+                    )}
+                  </div>
 
                   {/* Importe - OBLIGATORIO */}
                   <div>
