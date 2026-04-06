@@ -34,7 +34,30 @@ async def listar_empresas(
     - tipo: Filtrar por tipo (cliente/transportista)
     - solo_activos: Si es True, solo retorna empresas activas
     """
-    return empresa_service.obtener_todos(db, tipo, solo_activos, skip, limit)
+    empresas = empresa_service.obtener_todos(db, tipo, solo_activos, skip, limit)
+
+    # Agregar nombre de lista de precios
+    result = []
+    for empresa in empresas:
+        empresa_dict = {
+            "id": empresa.id,
+            "nombre": empresa.nombre,
+            "tipo": empresa.tipo,
+            "cuit": empresa.cuit,
+            "direccion": empresa.direccion,
+            "telefono": empresa.telefono,
+            "email": empresa.email,
+            "contacto": empresa.contacto,
+            "activo": empresa.activo,
+            "saldo_cuenta_corriente": float(empresa.saldo_cuenta_corriente) if empresa.saldo_cuenta_corriente else 0,
+            "lista_precio_id": empresa.lista_precio_id,
+            "lista_precio_nombre": empresa.lista_precio.nombre if empresa.lista_precio else None,
+            "created_at": empresa.created_at,
+            "updated_at": empresa.updated_at,
+        }
+        result.append(empresa_dict)
+
+    return result
 
 
 @router.get("/clientes", response_model=List[EmpresaSchema])
@@ -131,6 +154,59 @@ async def eliminar_empresa(
     **Requiere rol:** Administrador
     """
     return empresa_service.eliminar(db, empresa_id)
+
+
+@router.put("/{empresa_id}/lista-precio")
+async def asignar_lista_precio(
+    empresa_id: UUID,
+    lista_precio_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Asigna una lista de precios a un cliente.
+    Si lista_precio_id es None, quita la lista asignada.
+    """
+    from app.models.empresa import Empresa
+    from app.models.lista_precio import ListaPrecio
+
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa no encontrada"
+        )
+
+    if empresa.tipo != 'cliente':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se puede asignar lista de precios a clientes"
+        )
+
+    # Verificar que la lista existe
+    if lista_precio_id:
+        lista = db.query(ListaPrecio).filter(ListaPrecio.id == lista_precio_id).first()
+        if not lista:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Lista de precios no encontrada"
+            )
+        empresa.lista_precio_id = lista_precio_id
+        lista_nombre = lista.nombre
+    else:
+        empresa.lista_precio_id = None
+        lista_nombre = None
+
+    db.commit()
+    db.refresh(empresa)
+
+    return {
+        "message": "Lista de precios asignada correctamente" if lista_precio_id else "Lista de precios removida",
+        "empresa_id": str(empresa.id),
+        "empresa_nombre": empresa.nombre,
+        "lista_precio_id": str(empresa.lista_precio_id) if empresa.lista_precio_id else None,
+        "lista_precio_nombre": lista_nombre
+    }
 
 
 # ============== ENDPOINTS PARA CAMIONES DE CLIENTES ==============

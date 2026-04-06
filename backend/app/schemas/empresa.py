@@ -52,7 +52,7 @@ class EmpresaBase(BaseModel):
 
 class EmpresaCreate(EmpresaBase):
     """Schema para crear Empresa"""
-    pass
+    lista_precio_id: Optional[UUID] = None
 
 
 class EmpresaUpdate(BaseModel):
@@ -64,6 +64,7 @@ class EmpresaUpdate(BaseModel):
     email: Optional[str] = Field(None, max_length=100)
     contacto: Optional[str] = Field(None, max_length=100)
     activo: Optional[bool] = None
+    lista_precio_id: Optional[UUID] = None
 
 
 class EmpresaSchema(EmpresaBase):
@@ -71,6 +72,8 @@ class EmpresaSchema(EmpresaBase):
     id: UUID
     activo: bool
     saldo_cuenta_corriente: Optional[float] = 0
+    lista_precio_id: Optional[UUID] = None
+    lista_precio_nombre: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

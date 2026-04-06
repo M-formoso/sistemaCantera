@@ -292,6 +292,8 @@ export interface Empresa {
   email?: string
   contacto?: string
   activo: boolean
+  lista_precio_id?: string
+  lista_precio_nombre?: string
   created_at: string
   updated_at: string
 }

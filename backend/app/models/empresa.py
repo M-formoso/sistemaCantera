@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Boolean, Enum, Numeric
+from sqlalchemy import Column, String, Boolean, Enum, Numeric, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
 
@@ -27,9 +28,13 @@ class Empresa(BaseModel):
     # Cuenta corriente
     saldo_cuenta_corriente = Column(Numeric(12, 2), default=0, nullable=False)
 
+    # Lista de precios asignada
+    lista_precio_id = Column(UUID(as_uuid=True), ForeignKey("listas_precios.id", ondelete="SET NULL"), nullable=True)
+
     # Relaciones
     movimientos_cuenta_corriente = relationship("MovimientoCuentaCorriente", back_populates="empresa")
     facturas = relationship("Factura", back_populates="empresa")
+    lista_precio = relationship("ListaPrecio", foreign_keys=[lista_precio_id])
 
     def __repr__(self):
         return f"<Empresa {self.nombre} ({self.tipo})>"

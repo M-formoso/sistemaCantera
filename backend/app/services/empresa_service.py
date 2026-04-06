@@ -1,7 +1,7 @@
 """
 Servicio de lógica de negocio para Empresas (Clientes y Transportistas)
 """
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from uuid import UUID
 from typing import List, Optional, Literal
@@ -19,7 +19,7 @@ def obtener_todos(
     limit: int = 500
 ) -> List[Empresa]:
     """Obtiene todas las empresas, opcionalmente filtradas por tipo"""
-    query = db.query(Empresa)
+    query = db.query(Empresa).options(joinedload(Empresa.lista_precio))
 
     if tipo:
         query = query.filter(Empresa.tipo == tipo)

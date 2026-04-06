@@ -164,4 +164,20 @@ export const empresasService = {
     )
     return response.data
   },
+
+  /**
+   * Asigna una lista de precios a un cliente
+   */
+  async asignarListaPrecio(empresaId: string, listaPrecioId: string | null): Promise<{
+    message: string
+    empresa_id: string
+    empresa_nombre: string
+    lista_precio_id: string | null
+    lista_precio_nombre: string | null
+  }> {
+    const response = await api.put(`/empresas/${empresaId}/lista-precio`, null, {
+      params: listaPrecioId ? { lista_precio_id: listaPrecioId } : {}
+    })
+    return response.data
+  },
 }

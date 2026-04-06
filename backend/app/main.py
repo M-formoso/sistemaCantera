@@ -312,5 +312,17 @@ async def startup_event():
                     conn.commit()
                     print("✅ Columna lista_precio_id creada exitosamente")
 
+            # Agregar columna lista_precio_id a empresas si no existe
+            if 'empresas' in tablas_existentes:
+                columns = [col['name'] for col in inspector.get_columns('empresas')]
+                if 'lista_precio_id' not in columns:
+                    print("⚠️ Columna lista_precio_id no existe en empresas, creándola...")
+                    conn.execute(text("""
+                        ALTER TABLE empresas ADD COLUMN lista_precio_id UUID REFERENCES listas_precios(id) ON DELETE SET NULL
+                    """))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_empresas_lista_precio_id ON empresas(lista_precio_id)"))
+                    conn.commit()
+                    print("✅ Columna lista_precio_id en empresas creada exitosamente")
+
     except Exception as e:
         print(f"⚠️ Error en startup verificando BD: {e}")
