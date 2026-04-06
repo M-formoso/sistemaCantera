@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { empresasService, CamionCliente, CamionClienteCreate } from '@/services/empresasService'
-import { listasPreciosService, ListaPrecioResumen } from '@/services/listasPreciosService'
+import { listasPreciosService } from '@/services/listasPreciosService'
 import { Empresa, EmpresaCreate, TipoEmpresa } from '@/types'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 

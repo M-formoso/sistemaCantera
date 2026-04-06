@@ -175,7 +175,13 @@ export const empresasService = {
     lista_precio_id: string | null
     lista_precio_nombre: string | null
   }> {
-    const response = await api.put(`/empresas/${empresaId}/lista-precio`, null, {
+    const response = await api.put<{
+      message: string
+      empresa_id: string
+      empresa_nombre: string
+      lista_precio_id: string | null
+      lista_precio_nombre: string | null
+    }>(`/empresas/${empresaId}/lista-precio`, null, {
       params: listaPrecioId ? { lista_precio_id: listaPrecioId } : {}
     })
     return response.data
