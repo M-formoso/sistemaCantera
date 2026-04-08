@@ -255,9 +255,12 @@ export default function NuevoPesajePage() {
             // Solo calcular importe si hay peso neto real
             if (pesoNeto > 0) {
               // Calcular importe según unidad seleccionada
-              let cantidad = calculo.peso_toneladas || (pesoNeto)
+              // Usar pesoNeto real (en kg), convertir a toneladas
+              const pesoEnToneladas = pesoNeto / 1000
+              let cantidad = pesoEnToneladas
               if (calculo.factor_conversion && unidadFacturacion === 'm3') {
-                cantidad = calculo.cantidad_facturada || (cantidad / calculo.factor_conversion)
+                // Convertir toneladas a m³ usando el factor
+                cantidad = pesoEnToneladas / calculo.factor_conversion
               }
               const importe = cantidad * calculo.precio_unitario
               brutoForm.setValue('importe_total', Math.round(importe * 100) / 100)
@@ -1592,15 +1595,15 @@ export default function NuevoPesajePage() {
                         <span className="font-medium">÷ {precioLista.factor_conversion}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>{formatNumber(precioLista.peso_toneladas || 0, 2)} tn =</span>
-                        <span className="font-bold text-lg">{formatNumber(precioLista.cantidad_facturada || 0, 2)} m³</span>
+                        <span>{formatNumber(pesoNeto / 1000, 2)} tn =</span>
+                        <span className="font-bold text-lg">{formatNumber((pesoNeto / 1000) / precioLista.factor_conversion, 2)} m³</span>
                       </div>
                       <div className="flex justify-between border-t pt-1 mt-1">
                         <span>Cantidad a facturar:</span>
                         <span className="font-bold">
                           {unidadFacturacion === 'm3'
-                            ? `${formatNumber(precioLista.cantidad_facturada || 0, 2)} m³`
-                            : `${formatNumber(precioLista.peso_toneladas || 0, 2)} tn`
+                            ? `${formatNumber((pesoNeto / 1000) / precioLista.factor_conversion, 2)} m³`
+                            : `${formatNumber(pesoNeto / 1000, 2)} tn`
                           }
                         </span>
                       </div>
@@ -1681,14 +1684,14 @@ export default function NuevoPesajePage() {
                       ) : precioLista?.precio_encontrado && precioLista.factor_conversion && unidadFacturacion === 'm3' ? (
                         // Mostrar cálculo con m³ (desde lista, unidad m³ seleccionada)
                         <div className="flex justify-between">
-                          <span className="text-gray-500">{formatNumber(precioLista.cantidad_facturada || 0, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
-                          <span className="font-medium">${formatNumber((precioLista.cantidad_facturada || 0) * precioUnitario, 2)}</span>
+                          <span className="text-gray-500">{formatNumber((pesoNeto / 1000) / precioLista.factor_conversion, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
+                          <span className="font-medium">${formatNumber(((pesoNeto / 1000) / precioLista.factor_conversion) * precioUnitario, 2)}</span>
                         </div>
                       ) : precioCalculado?.precio_encontrado && precioCalculado.factor_conversion ? (
                         // Mostrar cálculo con m³ (desde precio cliente)
                         <div className="flex justify-between">
-                          <span className="text-gray-500">{formatNumber(precioCalculado.cantidad_facturada || 0, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
-                          <span className="font-medium">${formatNumber((precioCalculado.cantidad_facturada || 0) * precioUnitario, 2)}</span>
+                          <span className="text-gray-500">{formatNumber((pesoNeto / 1000) / precioCalculado.factor_conversion, 2)} m³ × ${formatNumber(precioUnitario)}:</span>
+                          <span className="font-medium">${formatNumber(((pesoNeto / 1000) / precioCalculado.factor_conversion) * precioUnitario, 2)}</span>
                         </div>
                       ) : (
                         <>
