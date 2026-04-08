@@ -347,6 +347,9 @@ def calcular_importe(
     if not item:
         return {
             "precio_encontrado": False,
+            "lista_id": str(db_lista.id),
+            "lista_nombre": db_lista.nombre,
+            "material": material,
             "mensaje": f"No hay precio configurado para '{material}' en la lista '{db_lista.nombre}'"
         }
 

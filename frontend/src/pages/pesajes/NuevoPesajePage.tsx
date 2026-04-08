@@ -238,11 +238,13 @@ export default function NuevoPesajePage() {
       // Obtener el material (del pesaje pendiente o del form)
       const materialFinal = materialBruto || pesajePendiente?.material
 
-      // Si hay lista seleccionada, usar esa
-      if (listaSeleccionada && materialFinal && pesoNeto > 0) {
+      // Si hay lista seleccionada y material, buscar precio (aunque no haya peso todavía)
+      if (listaSeleccionada && materialFinal) {
         setCargandoPrecio(true)
         try {
-          const calculo = await listasPreciosService.calcular(listaSeleccionada, materialFinal, pesoNeto * 1000)
+          // Usar peso 1000kg (1tn) como base para obtener precio unitario
+          const pesoParaCalculo = pesoNeto > 0 ? pesoNeto * 1000 : 1000
+          const calculo = await listasPreciosService.calcular(listaSeleccionada, materialFinal, pesoParaCalculo)
           setPrecioLista(calculo)
           setPrecioCalculado(null) // Limpiar el anterior
 
@@ -250,13 +252,19 @@ export default function NuevoPesajePage() {
           if (calculo.precio_encontrado && calculo.precio_unitario) {
             brutoForm.setValue('precio_unitario', calculo.precio_unitario)
 
-            // Calcular importe según unidad seleccionada
-            let cantidad = calculo.peso_toneladas || (pesoNeto / 1000)
-            if (calculo.factor_conversion && unidadFacturacion === 'm3') {
-              cantidad = calculo.cantidad_facturada || (cantidad / calculo.factor_conversion)
+            // Solo calcular importe si hay peso neto real
+            if (pesoNeto > 0) {
+              // Calcular importe según unidad seleccionada
+              let cantidad = calculo.peso_toneladas || (pesoNeto)
+              if (calculo.factor_conversion && unidadFacturacion === 'm3') {
+                cantidad = calculo.cantidad_facturada || (cantidad / calculo.factor_conversion)
+              }
+              const importe = cantidad * calculo.precio_unitario
+              brutoForm.setValue('importe_total', Math.round(importe * 100) / 100)
             }
-            const importe = cantidad * calculo.precio_unitario
-            brutoForm.setValue('importe_total', Math.round(importe * 100) / 100)
+          } else {
+            // Material no encontrado en la lista - limpiar precio
+            brutoForm.setValue('precio_unitario', undefined)
           }
         } catch (error) {
           console.error('Error cargando precio de lista:', error)
@@ -1424,10 +1432,11 @@ export default function NuevoPesajePage() {
                           </div>
                         )}
                         {listaSeleccionada && precioLista && !precioLista.precio_encontrado && (
-                          <p className="mt-2 text-xs text-orange-600">
-                            <AlertCircle className="h-3 w-3 inline mr-1" />
-                            {precioLista.mensaje || 'No hay precio para este material en la lista seleccionada'}
-                          </p>
+                          <div className="mt-2 p-3 bg-orange-50 border border-orange-300 rounded text-sm text-orange-700">
+                            <AlertCircle className="h-4 w-4 inline mr-2" />
+                            <strong>Material no encontrado:</strong> "{pesajePendiente?.material || materialBruto}" no está configurado en la lista "{precioLista.lista_nombre || 'seleccionada'}".
+                            <p className="mt-1 text-xs">Debe ingresar el precio manualmente o agregar el material a la lista de precios.</p>
+                          </div>
                         )}
                       </>
                     ) : (
