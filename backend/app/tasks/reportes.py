@@ -90,6 +90,11 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     peso_tara = pesaje_data.get('peso_tara', 0)
     peso_neto = pesaje_data.get('peso_neto', 0)
 
+    # Datos de conversión m3
+    factor_conversion = pesaje_data.get('factor_conversion')
+    cantidad_m3 = pesaje_data.get('cantidad_m3')
+    peso_neto_tn = pesaje_data.get('peso_neto_tn', peso_neto / 1000 if peso_neto else 0)
+
     # Tamaños de fuente más grandes y legibles
     font_title = 14
     font_subtitle = 12
@@ -206,6 +211,28 @@ def _dibujar_ticket_compacto(c, pesaje_data: dict, tipo_copia: str, x: float, y_
     c.setFillColor(colors.black)
 
     y -= peso_box_height + section_spacing
+
+    # ==================== CONVERSIÓN A M³ (si aplica) ====================
+    if factor_conversion and cantidad_m3:
+        # Recuadro para conversión m³
+        conversion_box_height = 28
+        c.setStrokeColor(colors.HexColor('#0066cc'))
+        c.setFillColor(colors.HexColor('#e6f2ff'))
+        c.roundRect(x, y - conversion_box_height, width, conversion_box_height, 3, fill=1, stroke=1)
+        c.setFillColor(colors.black)
+
+        conv_y = y - 10
+        c.setFont("Helvetica", font_label)
+        c.setFillColor(colors.HexColor('#0066cc'))
+        c.drawString(x + 8, conv_y, "CONVERSIÓN:")
+        c.setFont("Helvetica-Bold", font_normal)
+        c.drawString(x + 80, conv_y, f"{peso_neto_tn:.2f} tn ÷ {factor_conversion} = ")
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.HexColor('#004499'))
+        c.drawString(x + 200, conv_y, f"{cantidad_m3:.2f} m³")
+        c.setFillColor(colors.black)
+
+        y -= conversion_box_height + section_spacing
 
     # ==================== OPERARIO ====================
     draw_field("Operario", pesaje_data.get('operario', '-'), col1_x, y)

@@ -360,7 +360,39 @@ async def descargar_ticket_pdf(
     # Usar la fecha del pesaje (puede ser fecha manual/vieja), con hora de fecha_completado si existe
     fecha_pesaje = pesaje.fecha
 
-    # Preparar datos para el PDF (sin información de precios - es dato interno)
+    # Calcular peso en toneladas
+    peso_neto_kg = float(pesaje.peso_neto) if pesaje.peso_neto else 0
+    peso_neto_tn = peso_neto_kg / 1000
+
+    # Buscar factor de conversión a m³ en la lista de precios del cliente
+    factor_conversion = None
+    cantidad_m3 = None
+    unidad_facturacion = "tn"
+    precio_unitario = float(pesaje.precio_unitario) if pesaje.precio_unitario else None
+    importe_total = float(pesaje.importe_total) if pesaje.importe_total else None
+
+    # Obtener lista de precios del cliente o del pesaje
+    lista_precio = None
+    if pesaje.lista_precio_id:
+        from app.models.lista_precio import ListaPrecio
+        lista_precio = db.query(ListaPrecio).filter(ListaPrecio.id == pesaje.lista_precio_id).first()
+    elif pesaje.cliente_id:
+        # Buscar lista de precios asignada al cliente
+        from app.models.empresa import Empresa
+        cliente = db.query(Empresa).filter(Empresa.id == pesaje.cliente_id).first()
+        if cliente and cliente.lista_precio_id:
+            from app.models.lista_precio import ListaPrecio
+            lista_precio = db.query(ListaPrecio).filter(ListaPrecio.id == cliente.lista_precio_id).first()
+
+    # Si hay lista de precios, buscar el factor de conversión para el material
+    if lista_precio and pesaje.material:
+        item_precio = lista_precio.obtener_precio_material(pesaje.material)
+        if item_precio and item_precio.factor_conversion_m3:
+            factor_conversion = float(item_precio.factor_conversion_m3)
+            cantidad_m3 = peso_neto_tn / factor_conversion
+            unidad_facturacion = "m3"
+
+    # Preparar datos para el PDF
     pesaje_data = {
         "numero_pesaje": pesaje.numero_pesaje,
         "fecha": fecha_pesaje,
@@ -372,9 +404,16 @@ async def descargar_ticket_pdf(
         "chofer": pesaje.chofer,
         "peso_bruto": float(pesaje.peso_bruto) if pesaje.peso_bruto else 0,
         "peso_tara": float(pesaje.peso_tara) if pesaje.peso_tara else 0,
-        "peso_neto": float(pesaje.peso_neto) if pesaje.peso_neto else 0,
+        "peso_neto": peso_neto_kg,
+        "peso_neto_tn": peso_neto_tn,
         "operario": pesaje.operario,
         "observaciones": pesaje.observaciones,
+        # Datos de conversión y precio
+        "factor_conversion": factor_conversion,
+        "cantidad_m3": cantidad_m3,
+        "unidad_facturacion": unidad_facturacion,
+        "precio_unitario": precio_unitario,
+        "importe_total": importe_total,
     }
 
     # Generar PDF con las copias solicitadas
