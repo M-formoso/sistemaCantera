@@ -357,8 +357,8 @@ async def descargar_ticket_pdf(
     if pesaje.transportista_empresa:
         transportista_nombre = pesaje.transportista_empresa.nombre
 
-    # Usar fecha_completado si existe (tiene la hora real), sino usar fecha
-    fecha_pesaje = pesaje.fecha_completado or pesaje.fecha
+    # Usar la fecha del pesaje (puede ser fecha manual/vieja), con hora de fecha_completado si existe
+    fecha_pesaje = pesaje.fecha
 
     # Preparar datos para el PDF (sin información de precios - es dato interno)
     pesaje_data = {

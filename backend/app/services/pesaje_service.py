@@ -1104,8 +1104,8 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     db_pesaje.peso_bruto = pesaje_data.peso_bruto
     db_pesaje.peso_neto = peso_neto
     db_pesaje.estado = "completado"
-    # IMPORTANTE: La fecha del pesaje es cuando se COMPLETA, no cuando se hizo la tara
-    db_pesaje.fecha = ahora
+    # IMPORTANTE: La fecha del pesaje se mantiene como fue cargada (puede ser fecha vieja)
+    # Solo fecha_completado registra cuándo se completó físicamente
     db_pesaje.fecha_completado = ahora
 
     # Actualizar campos opcionales
