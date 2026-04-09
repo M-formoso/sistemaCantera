@@ -555,6 +555,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
                 detail=f"Solo se puede modificar precio, importe y observaciones en pesajes con remito. Campos no permitidos: {', '.join(campos_no_permitidos)}"
             )
 
+    # Campos de precio para detectar cambios
+    campos_precio = {'precio_unitario', 'flete', 'precio_fijo'}
+
     # Aplicar actualizaciones
     for field, value in update_data.items():
         setattr(db_pesaje, field, value)
@@ -572,7 +575,6 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
             )
 
     # Recalcular importe_total si se actualizaron campos de precio
-    campos_precio = {'precio_unitario', 'flete', 'precio_fijo'}
     if campos_precio.intersection(update_data.keys()) and db_pesaje.peso_neto:
         # Calcular según escenario:
         # 1. Si hay precio_fijo: importe = precio_fijo
@@ -594,6 +596,11 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         remito.producto = db_pesaje.material or remito.producto
         remito.observaciones = db_pesaje.observaciones
 
+        # Actualizar fecha si cambió
+        if 'fecha' in update_data:
+            fecha_pesaje = db_pesaje.fecha
+            remito.fecha = fecha_pesaje.date() if hasattr(fecha_pesaje, 'date') else fecha_pesaje
+
         # Actualizar cliente
         if db_pesaje.cliente:
             remito.cliente = db_pesaje.cliente.nombre
@@ -609,6 +616,10 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         # Actualizar chofer
         remito.chofer = db_pesaje.chofer
 
+        # Actualizar importe si cambió
+        if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):
+            remito.importe = db_pesaje.importe_total or Decimal("0")
+
     # ========== TRANSFERENCIA DE CUENTA CORRIENTE SI CAMBIA EL CLIENTE ==========
     cliente_id_nuevo = db_pesaje.cliente_id
     if 'cliente_id' in update_data and cliente_id_anterior and cliente_id_nuevo and cliente_id_anterior != cliente_id_nuevo:
@@ -619,6 +630,45 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
             cliente_id_nuevo=cliente_id_nuevo,
             usuario_id=usuario.id if usuario else None
         )
+
+    # ========== SINCRONIZAR FECHA Y MONTO EN CUENTA CORRIENTE ==========
+    if db_pesaje.cliente_id:
+        movimiento = db.query(MovimientoCuentaCorriente).filter(
+            MovimientoCuentaCorriente.pesaje_id == db_pesaje.id
+        ).first()
+
+        if movimiento:
+            # Actualizar fecha si cambió
+            if 'fecha' in update_data:
+                fecha_pesaje = db_pesaje.fecha
+                movimiento.fecha = fecha_pesaje.date() if hasattr(fecha_pesaje, 'date') else fecha_pesaje
+
+            # Actualizar monto si cambió el importe_total
+            if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):
+                nuevo_monto = db_pesaje.importe_total or Decimal("0")
+                diferencia = nuevo_monto - (movimiento.monto or Decimal("0"))
+
+                if diferencia != 0:
+                    # Actualizar el monto del movimiento
+                    movimiento.monto = nuevo_monto
+
+                    # Actualizar saldo del cliente
+                    cliente = db.query(Empresa).filter(Empresa.id == db_pesaje.cliente_id).first()
+                    if cliente:
+                        saldo_actual = cliente.saldo_cuenta_corriente or Decimal("0")
+                        cliente.saldo_cuenta_corriente = saldo_actual + diferencia
+
+                    # Actualizar saldo_posterior del movimiento
+                    movimiento.saldo_posterior = (movimiento.saldo_anterior or Decimal("0")) + nuevo_monto
+
+            # Actualizar descripción si cambió el material o peso
+            if 'material' in update_data or 'peso_neto' in update_data:
+                peso_tn = db_pesaje.peso_neto / Decimal("1000") if db_pesaje.peso_neto else Decimal("0")
+                descripcion = f"Pesaje #{db_pesaje.numero_pesaje}"
+                if db_pesaje.material:
+                    descripcion += f" - {db_pesaje.material}"
+                descripcion += f" ({peso_tn:.2f} tn)"
+                movimiento.descripcion = descripcion
 
     db.commit()
     db.refresh(db_pesaje)
