@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, DollarSign, Scale, Clock, Filter, X, FileDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, Scale, Clock, Filter, X, FileDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -318,7 +318,6 @@ export default function PesajesTab() {
 
   const totalToneladas = pesajes.reduce((sum, p) => sum + (p.peso_neto || 0) / 1000, 0)
   const promedioToneladas = pesajes.length > 0 ? totalToneladas / pesajes.length : 0
-  const totalIngresos = pesajes.reduce((sum, p) => sum + (Number(p.importe_total) || 0), 0)
 
   // Obtener el número de pesaje más alto como indicador del total real de pesajes
   const ultimoNumeroPesaje = pesajesRaw.reduce((max, p) => Math.max(max, p.numero_pesaje || 0), 0)
@@ -458,7 +457,7 @@ export default function PesajesTab() {
       )}
 
       {/* Estadísticas */}
-      <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${isAdmin ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Pesajes</div>
@@ -481,20 +480,6 @@ export default function PesajesTab() {
             </div>
           </CardContent>
         </Card>
-        {/* Solo visible para administradores */}
-        {isAdmin && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm text-muted-foreground flex items-center gap-1">
-                <DollarSign className="h-3 w-3" />
-                Ingresos por Pesajes
-              </div>
-              <div className="text-2xl font-bold text-blue-600">
-                ${formatNumber(totalIngresos, 2)}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Tabla */}
