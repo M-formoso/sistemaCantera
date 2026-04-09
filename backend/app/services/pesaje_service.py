@@ -338,6 +338,78 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     return movimiento
 
 
+def _transferir_cargo_cuenta_corriente(
+    db: Session,
+    pesaje: Pesaje,
+    cliente_id_anterior: UUID,
+    cliente_id_nuevo: UUID,
+    usuario_id: UUID = None
+) -> None:
+    """
+    Transfiere un cargo de cuenta corriente de un cliente a otro cuando se cambia
+    el cliente en un pesaje.
+
+    Este proceso:
+    1. Busca el movimiento de cuenta corriente del pesaje
+    2. Revierte el cargo del cliente anterior (ajuste negativo)
+    3. Crea un nuevo cargo para el cliente nuevo
+    4. Actualiza los saldos de ambos clientes
+    """
+    # Buscar el movimiento de cuenta corriente original
+    movimiento_original = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.pesaje_id == pesaje.id
+    ).first()
+
+    if not movimiento_original:
+        # Si no hay movimiento, no hay nada que transferir
+        return
+
+    # Obtener ambos clientes
+    cliente_anterior = db.query(Empresa).filter(Empresa.id == cliente_id_anterior).first()
+    cliente_nuevo = db.query(Empresa).filter(Empresa.id == cliente_id_nuevo).first()
+
+    if not cliente_anterior or not cliente_nuevo:
+        return
+
+    monto = movimiento_original.monto or Decimal("0")
+    ahora = get_argentina_now()
+
+    # ========== 1. REVERTIR CARGO EN CLIENTE ANTERIOR ==========
+    saldo_anterior_viejo = cliente_anterior.saldo_cuenta_corriente or Decimal("0")
+    saldo_posterior_viejo = saldo_anterior_viejo - monto
+
+    # Crear movimiento de reversión (ajuste negativo)
+    movimiento_reversion = MovimientoCuentaCorriente(
+        empresa_id=cliente_id_anterior,
+        tipo="ajuste",
+        concepto=f"Transferencia: Pesaje #{pesaje.numero_pesaje} reasignado a otro cliente",
+        monto=-monto,  # Negativo para revertir el cargo
+        saldo_anterior=saldo_anterior_viejo,
+        saldo_posterior=saldo_posterior_viejo,
+        fecha=ahora,
+        pesaje_id=None,  # No asociar al pesaje, ya fue transferido
+        created_by=usuario_id
+    )
+    db.add(movimiento_reversion)
+
+    # Actualizar saldo del cliente anterior
+    cliente_anterior.saldo_cuenta_corriente = saldo_posterior_viejo
+
+    # ========== 2. CREAR CARGO EN CLIENTE NUEVO ==========
+    saldo_anterior_nuevo = cliente_nuevo.saldo_cuenta_corriente or Decimal("0")
+    saldo_posterior_nuevo = saldo_anterior_nuevo + monto
+
+    # Actualizar el movimiento original para que apunte al nuevo cliente
+    movimiento_original.empresa_id = cliente_id_nuevo
+    movimiento_original.saldo_anterior = saldo_anterior_nuevo
+    movimiento_original.saldo_posterior = saldo_posterior_nuevo
+
+    # Actualizar saldo del cliente nuevo
+    cliente_nuevo.saldo_cuenta_corriente = saldo_posterior_nuevo
+
+    # El commit se hace en la función llamadora (actualizar)
+
+
 def sincronizar_pesaje_cuenta_corriente(db: Session, pesaje_id: UUID, usuario_id: UUID) -> dict:
     """
     Sincroniza un pesaje existente con la cuenta corriente del cliente.
@@ -450,6 +522,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
     Nota: Si ya tiene remito generado:
     - Administradores pueden editar todo
     - Otros usuarios solo pueden modificar precio_unitario, importe_total y observaciones
+
+    IMPORTANTE: Si se cambia el cliente_id, se transfiere el cargo de cuenta corriente
+    del cliente anterior al nuevo cliente.
     """
     from app.models.usuario import RolEnum
 
@@ -462,6 +537,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         )
 
     update_data = pesaje_data.model_dump(exclude_unset=True)
+
+    # Guardar cliente_id anterior para detectar cambio
+    cliente_id_anterior = db_pesaje.cliente_id
 
     # Verificar si el usuario es administrador
     es_admin = usuario and usuario.rol == RolEnum.ADMINISTRADOR
@@ -530,6 +608,17 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
 
         # Actualizar chofer
         remito.chofer = db_pesaje.chofer
+
+    # ========== TRANSFERENCIA DE CUENTA CORRIENTE SI CAMBIA EL CLIENTE ==========
+    cliente_id_nuevo = db_pesaje.cliente_id
+    if 'cliente_id' in update_data and cliente_id_anterior and cliente_id_nuevo and cliente_id_anterior != cliente_id_nuevo:
+        _transferir_cargo_cuenta_corriente(
+            db=db,
+            pesaje=db_pesaje,
+            cliente_id_anterior=cliente_id_anterior,
+            cliente_id_nuevo=cliente_id_nuevo,
+            usuario_id=usuario.id if usuario else None
+        )
 
     db.commit()
     db.refresh(db_pesaje)
