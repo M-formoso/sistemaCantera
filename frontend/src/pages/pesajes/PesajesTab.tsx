@@ -318,7 +318,10 @@ export default function PesajesTab() {
 
   const totalToneladas = pesajes.reduce((sum, p) => sum + (p.peso_neto || 0) / 1000, 0)
   const promedioToneladas = pesajes.length > 0 ? totalToneladas / pesajes.length : 0
-  const totalIngresos = pesajes.reduce((sum, p) => sum + (p.importe_total || 0), 0)
+  const totalIngresos = pesajes.reduce((sum, p) => sum + (Number(p.importe_total) || 0), 0)
+
+  // Obtener el número de pesaje más alto como indicador del total real de pesajes
+  const ultimoNumeroPesaje = pesajesRaw.reduce((max, p) => Math.max(max, p.numero_pesaje || 0), 0)
 
   return (
     <div className="space-y-6">
@@ -459,7 +462,7 @@ export default function PesajesTab() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">Total Pesajes</div>
-            <div className="text-2xl font-bold">{pesajes.length}</div>
+            <div className="text-2xl font-bold">{ultimoNumeroPesaje}</div>
           </CardContent>
         </Card>
         <Card>
