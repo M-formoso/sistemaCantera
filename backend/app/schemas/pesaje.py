@@ -397,3 +397,17 @@ class PesajeCanceladoSchema(ResponseBase):
     motivo_cancelacion: str
     cancelado_por: Optional[UUID] = None
     cancelado_por_nombre: Optional[str] = None
+
+
+# ============== SCHEMAS PARA HISTORIAL ==============
+
+class HistorialPesajeSchema(BaseModel):
+    """Schema de respuesta de historial de pesaje"""
+
+    id: UUID
+    fecha: datetime
+    usuario_nombre: str
+    accion: str
+
+    class Config:
+        from_attributes = True

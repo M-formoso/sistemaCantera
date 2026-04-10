@@ -14,7 +14,8 @@ from app.schemas.pesaje import (
     PesajeSchema, PesajeCreate, PesajeUpdate,
     PesajeIniciarCreate, PesajeCompletarCreate,
     PesajePendienteSchema, BusquedaPatenteResult,
-    PesajeCancelarCreate, PesajeCanceladoSchema
+    PesajeCancelarCreate, PesajeCanceladoSchema,
+    HistorialPesajeSchema
 )
 from app.services import pesaje_service
 
@@ -430,3 +431,18 @@ async def descargar_ticket_pdf(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+@router.get("/{pesaje_id}/historial", response_model=List[HistorialPesajeSchema])
+async def obtener_historial_pesaje(
+    pesaje_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Obtiene el historial de modificaciones de un pesaje.
+
+    Retorna lista de acciones: CREACION, MODIFICACION, ELIMINACION
+    Con fecha, hora y nombre del usuario que realizó la acción.
+    """
+    return pesaje_service.obtener_historial(db, pesaje_id)

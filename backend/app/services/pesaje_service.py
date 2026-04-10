@@ -11,7 +11,7 @@ from fastapi import HTTPException, status
 
 from app.models.base import get_argentina_now
 
-from app.models.pesaje import Pesaje
+from app.models.pesaje import Pesaje, HistorialPesaje
 from app.models.remito import Remito
 from app.models.empresa import Empresa
 from app.models.camion import Camion
@@ -85,6 +85,35 @@ def _enriquecer_pesaje(db: Session, pesaje: Pesaje) -> None:
 def obtener_por_id(db: Session, pesaje_id: UUID) -> Optional[Pesaje]:
     """Obtiene un pesaje por ID"""
     return db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
+
+
+def _registrar_historial(db: Session, pesaje_id: UUID, usuario_id: UUID, accion: str) -> None:
+    """Registra una entrada en el historial de un pesaje"""
+    historial = HistorialPesaje(
+        pesaje_id=pesaje_id,
+        usuario_id=usuario_id,
+        accion=accion
+    )
+    db.add(historial)
+
+
+def obtener_historial(db: Session, pesaje_id: UUID) -> List[dict]:
+    """Obtiene el historial de modificaciones de un pesaje"""
+    historial = db.query(HistorialPesaje).filter(
+        HistorialPesaje.pesaje_id == pesaje_id
+    ).order_by(desc(HistorialPesaje.created_at)).all()
+
+    resultado = []
+    for h in historial:
+        usuario = db.query(Usuario).filter(Usuario.id == h.usuario_id).first()
+        resultado.append({
+            "id": h.id,
+            "fecha": h.created_at,
+            "usuario_nombre": usuario.nombre if usuario else "Usuario desconocido",
+            "accion": h.accion
+        })
+
+    return resultado
 
 
 def obtener_por_camion(db: Session, camion_id: UUID) -> List[Pesaje]:
@@ -224,6 +253,10 @@ def crear(db: Session, pesaje_data: PesajeCreate, usuario_id: UUID) -> Pesaje:
     db.add(db_pesaje)
     db.commit()
     db.refresh(db_pesaje)
+
+    # Registrar en historial
+    _registrar_historial(db, db_pesaje.id, usuario_id, "CREACION")
+    db.commit()
 
     # Generar remito automáticamente
     _generar_remito_automatico(db, db_pesaje, usuario_id)
@@ -670,6 +703,10 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
                 descripcion += f" ({peso_tn:.2f} tn)"
                 movimiento.descripcion = descripcion
 
+    # Registrar en historial si hubo cambios
+    if update_data and usuario:
+        _registrar_historial(db, db_pesaje.id, usuario.id, "MODIFICACION")
+
     db.commit()
     db.refresh(db_pesaje)
 
@@ -765,6 +802,9 @@ def cancelar_pesaje(
     db_pesaje.motivo_cancelacion = datos_cancelacion.motivo
     db_pesaje.fecha_cancelacion = ahora
     db_pesaje.cancelado_por = usuario_id
+
+    # Registrar en historial
+    _registrar_historial(db, db_pesaje.id, usuario_id, "ELIMINACION")
 
     db.commit()
     db.refresh(db_pesaje)
@@ -1135,6 +1175,10 @@ def iniciar_pesaje(db: Session, pesaje_data: PesajeIniciarCreate, usuario_id: UU
     db.add(db_pesaje)
     db.commit()
     db.refresh(db_pesaje)
+
+    # Registrar en historial
+    _registrar_historial(db, db_pesaje.id, usuario_id, "CREACION")
+    db.commit()
 
     # Agregar info para respuesta
     if camion:

@@ -5,6 +5,22 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
 
+class HistorialPesaje(BaseModel):
+    """Historial de modificaciones de pesajes"""
+
+    __tablename__ = "historial_pesajes"
+
+    pesaje_id = Column(UUID(as_uuid=True), ForeignKey("pesajes.id", ondelete="CASCADE"), nullable=False, index=True)
+    usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    accion = Column(String(50), nullable=False)  # CREACION, MODIFICACION, ELIMINACION
+
+    # Relaciones
+    usuario = relationship("Usuario")
+
+    def __repr__(self):
+        return f"<HistorialPesaje {self.accion} - {self.created_at}>"
+
+
 class Pesaje(BaseModel):
     """Modelo de Pesaje"""
 
@@ -82,6 +98,7 @@ class Pesaje(BaseModel):
     remito = relationship("Remito", back_populates="pesaje", uselist=False)
     orden_entrega = relationship("OrdenEntrega", back_populates="pesajes")
     lista_precio = relationship("ListaPrecio")
+    historial = relationship("HistorialPesaje", backref="pesaje", cascade="all, delete-orphan", order_by="desc(HistorialPesaje.created_at)")
 
     def __repr__(self):
         return f"<Pesaje #{self.numero_pesaje} - {self.material}>"

@@ -241,4 +241,22 @@ export const pesajesService = {
     }>(`/pesajes/${pesajeId}/sincronizar-cuenta-corriente`)
     return response.data
   },
+
+  /**
+   * Obtiene el historial de modificaciones de un pesaje
+   */
+  async getHistorial(pesajeId: string): Promise<{
+    id: string
+    fecha: string
+    usuario_nombre: string
+    accion: string
+  }[]> {
+    const response = await api.get<{
+      id: string
+      fecha: string
+      usuario_nombre: string
+      accion: string
+    }[]>(`/pesajes/${pesajeId}/historial`)
+    return response.data
+  },
 }

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, Scale, Clock, Filter, X, FileDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, Scale, Clock, Filter, X, FileDown, MoreVertical, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,14 @@ const MATERIALES_DISPONIBLES = [
   'retiro',
 ]
 
+// Tipo para historial
+interface HistorialItem {
+  id: string
+  fecha: string
+  usuario_nombre: string
+  accion: string
+}
+
 export default function PesajesTab() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -41,6 +49,12 @@ export default function PesajesTab() {
   const [filtroCliente, setFiltroCliente] = useState<string>('')
   const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false)
   const [descargandoPDF, setDescargandoPDF] = useState<boolean>(false)
+
+  // Estados para historial
+  const [showHistorialModal, setShowHistorialModal] = useState(false)
+  const [historialPesaje, setHistorialPesaje] = useState<{ id: string; numero: number } | null>(null)
+  const [historial, setHistorial] = useState<HistorialItem[]>([])
+  const [cargandoHistorial, setCargandoHistorial] = useState(false)
 
   // Query para pesajes
   const { data: pesajesRaw = [], isLoading } = useQuery({
@@ -157,6 +171,21 @@ export default function PesajesTab() {
     }
   }
 
+  const handleVerHistorial = async (id: string, numero: number) => {
+    setHistorialPesaje({ id, numero })
+    setCargandoHistorial(true)
+    setShowHistorialModal(true)
+    try {
+      const data = await pesajesService.getHistorial(id)
+      setHistorial(data)
+    } catch (error) {
+      console.error('Error al cargar historial:', error)
+      setHistorial([])
+    } finally {
+      setCargandoHistorial(false)
+    }
+  }
+
   // Columnas para pesajes
   const columns: ColumnDef<Pesaje>[] = [
     {
@@ -254,6 +283,7 @@ export default function PesajesTab() {
       cell: ({ row }) => {
         const pesaje = row.original
         const esPendiente = pesaje.estado === 'pendiente'
+        const [menuAbierto, setMenuAbierto] = useState(false)
 
         return (
           <div className="flex items-center gap-1">
@@ -302,6 +332,38 @@ export default function PesajesTab() {
                 <Trash2 className="h-4 w-4 text-red-600" />
               </Button>
             )}
+
+            {/* Menú de tres puntitos */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMenuAbierto(!menuAbierto)}
+                title="Más opciones"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+              {menuAbierto && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setMenuAbierto(false)}
+                  />
+                  <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-20">
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-gray-100"
+                      onClick={() => {
+                        setMenuAbierto(false)
+                        handleVerHistorial(pesaje.id, pesaje.numero_pesaje)
+                      }}
+                    >
+                      <History className="h-4 w-4 text-blue-600" />
+                      Historial
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )
       },
@@ -496,6 +558,76 @@ export default function PesajesTab() {
           />
         </CardContent>
       </Card>
+
+      {/* Modal de Historial */}
+      {showHistorialModal && historialPesaje && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-blue-600" />
+                  Historial Pesaje #{historialPesaje.numero}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowHistorialModal(false)
+                    setHistorialPesaje(null)
+                    setHistorial([])
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {cargandoHistorial ? (
+                <div className="py-8 text-center text-gray-500">
+                  Cargando historial...
+                </div>
+              ) : historial.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">
+                  No hay registros de historial
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {historial.map((item) => {
+                    const fecha = new Date(item.fecha)
+                    const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+                    const horaStr = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600">
+                            {fechaStr} - {horaStr}
+                          </span>
+                          <span className="font-medium text-sm">
+                            {item.usuario_nombre.toUpperCase()}
+                          </span>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                          item.accion === 'CREACION' ? 'bg-green-100 text-green-700' :
+                          item.accion === 'MODIFICACION' ? 'bg-blue-100 text-blue-700' :
+                          item.accion === 'ELIMINACION' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {item.accion}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
