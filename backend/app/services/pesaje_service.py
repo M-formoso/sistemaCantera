@@ -415,7 +415,7 @@ def _transferir_cargo_cuenta_corriente(
     movimiento_reversion = MovimientoCuentaCorriente(
         empresa_id=cliente_id_anterior,
         tipo="ajuste",
-        concepto=f"Transferencia: Pesaje #{pesaje.numero_pesaje} reasignado a otro cliente",
+        descripcion=f"Transferencia: Pesaje #{pesaje.numero_pesaje} reasignado a otro cliente",
         monto=-monto,  # Negativo para revertir el cargo
         saldo_anterior=saldo_anterior_viejo,
         saldo_posterior=saldo_posterior_viejo,
