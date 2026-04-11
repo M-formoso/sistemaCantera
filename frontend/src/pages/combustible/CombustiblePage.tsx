@@ -6,7 +6,7 @@ import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, P
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { combustibleService } from '@/services/combustibleService'
+import { combustibleService, MovimientoCisterna } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
@@ -191,6 +191,77 @@ export default function CombustiblePage() {
             >
               <Trash2 className="h-4 w-4 text-red-600" />
             </Button>
+          </div>
+        )
+      },
+    },
+  ]
+
+  // Columnas para tabla de movimientos
+  const movimientosColumns: ColumnDef<MovimientoCisterna>[] = [
+    {
+      accessorKey: 'fecha',
+      header: 'Fecha',
+      cell: ({ row }) => {
+        const fecha = new Date(row.getValue('fecha'))
+        const fechaStr = fecha.toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })
+        const horaStr = fecha.toLocaleTimeString('es-AR', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+        return (
+          <div className="text-center">
+            <p className="text-sm font-medium">{fechaStr}</p>
+            <p className="text-xs text-gray-500">{horaStr}</p>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'tipo',
+      header: 'Tipo',
+      cell: ({ row }) => {
+        const tipo = row.getValue('tipo') as string
+        const tipoConfig: Record<string, { color: string; icon: string; label: string }> = {
+          CARGA: { color: 'bg-green-100 text-green-700', icon: '↑', label: 'Carga' },
+          SUMINISTRO: { color: 'bg-orange-100 text-orange-700', icon: '↓', label: 'Suministro' },
+          TRANSFERENCIA_SALIDA: { color: 'bg-red-100 text-red-700', icon: '→', label: 'Transf. Salida' },
+          TRANSFERENCIA_ENTRADA: { color: 'bg-blue-100 text-blue-700', icon: '←', label: 'Transf. Entrada' },
+        }
+        const config = tipoConfig[tipo] || { color: 'bg-gray-100', icon: '•', label: tipo }
+        return (
+          <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ${config.color}`}>
+            {config.icon} {config.label}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'descripcion',
+      header: 'Descripcion',
+      cell: ({ row }) => (
+        <div className="text-sm font-medium">{row.getValue('descripcion')}</div>
+      ),
+    },
+    {
+      accessorKey: 'usuario_nombre',
+      header: 'Usuario',
+      cell: ({ row }) => (
+        <div className="text-sm text-gray-600">{row.getValue('usuario_nombre')}</div>
+      ),
+    },
+    {
+      accessorKey: 'litros',
+      header: 'Litros',
+      cell: ({ row }) => {
+        const mov = row.original
+        return (
+          <div className={`text-lg font-bold text-right ${mov.signo === '+' ? 'text-green-600' : 'text-orange-600'}`}>
+            {mov.signo}{formatNumber(mov.litros, 0)} L
           </div>
         )
       },
@@ -475,71 +546,29 @@ export default function CombustiblePage() {
             </CardContent>
           </Card>
 
-          {/* Lista de movimientos */}
+          {/* Tabla de movimientos */}
           {selectedCisternaId && (
             <Card>
               <CardHeader>
                 <CardTitle>
                   Movimientos de {cisternas.find(c => c.id === selectedCisternaId)?.nombre}
                 </CardTitle>
+                <CardDescription>
+                  {movimientos.length} movimientos registrados
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingMovimientos ? (
                   <div className="py-8 text-center text-gray-500">
                     Cargando movimientos...
                   </div>
-                ) : movimientos.length === 0 ? (
-                  <div className="py-8 text-center text-gray-500">
-                    No hay movimientos registrados
-                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    {movimientos.map((mov) => {
-                      const fecha = new Date(mov.fecha)
-                      const fechaStr = fecha.toLocaleDateString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      })
-                      const horaStr = fecha.toLocaleTimeString('es-AR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-
-                      const tipoConfig: Record<string, { color: string; icon: string; label: string }> = {
-                        CARGA: { color: 'bg-green-100 text-green-700', icon: '↑', label: 'Carga' },
-                        SUMINISTRO: { color: 'bg-orange-100 text-orange-700', icon: '↓', label: 'Suministro' },
-                        TRANSFERENCIA_SALIDA: { color: 'bg-red-100 text-red-700', icon: '→', label: 'Transf. Salida' },
-                        TRANSFERENCIA_ENTRADA: { color: 'bg-blue-100 text-blue-700', icon: '←', label: 'Transf. Entrada' },
-                      }
-
-                      const config = tipoConfig[mov.tipo] || { color: 'bg-gray-100', icon: '•', label: mov.tipo }
-
-                      return (
-                        <div
-                          key={mov.id}
-                          className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-gray-100"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="text-center min-w-[80px]">
-                              <p className="text-sm font-medium">{fechaStr}</p>
-                              <p className="text-xs text-gray-500">{horaStr}</p>
-                            </div>
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${config.color}`}>
-                              {config.icon} {config.label}
-                            </span>
-                            <div>
-                              <p className="text-sm font-medium">{mov.descripcion}</p>
-                              <p className="text-xs text-gray-500">{mov.usuario_nombre}</p>
-                            </div>
-                          </div>
-                          <div className={`text-lg font-bold ${mov.signo === '+' ? 'text-green-600' : 'text-orange-600'}`}>
-                            {mov.signo}{formatNumber(mov.litros, 0)} L
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <DataTable
+                    columns={movimientosColumns}
+                    data={movimientos}
+                    searchPlaceholder="Buscar por descripcion, usuario..."
+                    defaultPageSize={10}
+                  />
                 )}
               </CardContent>
             </Card>
