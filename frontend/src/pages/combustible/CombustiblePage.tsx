@@ -6,7 +6,7 @@ import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, P
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { combustibleService, MovimientoCisterna } from '@/services/combustibleService'
+import { combustibleService } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
