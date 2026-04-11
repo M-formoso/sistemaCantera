@@ -333,6 +333,29 @@ async def eliminar_transferencia(
     return combustible_service.eliminar_transferencia(db, transferencia_id)
 
 
+# ==================== MOVIMIENTOS / HISTORIAL ====================
+
+@router.get("/cisternas/{cisterna_id}/movimientos")
+async def obtener_movimientos_cisterna(
+    cisterna_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Obtiene el historial de todos los movimientos de una cisterna.
+
+    Incluye:
+    - Cargas (entrada de combustible)
+    - Suministros (salida a camiones)
+    - Transferencias (entrada/salida entre cisternas)
+
+    Ordenados por fecha descendente (más recientes primero).
+    """
+    return combustible_service.obtener_movimientos_cisterna(db, cisterna_id, skip, limit)
+
+
 # ==================== ESTADÍSTICAS ====================
 
 @router.get("/consumo-por-camion/{camion_id}")

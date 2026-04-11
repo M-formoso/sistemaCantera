@@ -191,4 +191,27 @@ export const combustibleService = {
   async deleteTransferencia(id: string): Promise<void> {
     await api.delete(`/combustible/transferencias/${id}`)
   },
+
+  // ========== MOVIMIENTOS / HISTORIAL ==========
+  /**
+   * Obtiene todos los movimientos de una cisterna
+   */
+  async getMovimientosCisterna(cisternaId: string, skip: number = 0, limit: number = 100): Promise<MovimientoCisterna[]> {
+    const response = await api.get<MovimientoCisterna[]>(`/combustible/cisternas/${cisternaId}/movimientos`, {
+      params: { skip, limit },
+    })
+    return response.data
+  },
+}
+
+// Tipo para movimientos
+export interface MovimientoCisterna {
+  id: string
+  tipo: 'CARGA' | 'SUMINISTRO' | 'TRANSFERENCIA_SALIDA' | 'TRANSFERENCIA_ENTRADA'
+  fecha: string
+  litros: number
+  signo: '+' | '-'
+  descripcion: string
+  usuario_nombre: string
+  detalle: Record<string, unknown>
 }

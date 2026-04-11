@@ -778,3 +778,138 @@ def obtener_consumo_por_camion(
         "cantidad_suministros": cantidad,
         "promedio_por_suministro": round(promedio, 2)
     }
+
+
+# ==================== MOVIMIENTOS / HISTORIAL ====================
+
+def obtener_movimientos_cisterna(
+    db: Session,
+    cisterna_id: UUID,
+    skip: int = 0,
+    limit: int = 100
+) -> List[dict]:
+    """
+    Obtiene el historial de todos los movimientos de una cisterna.
+
+    Incluye:
+    - Cargas (entrada de combustible)
+    - Suministros (salida a camiones)
+    - Transferencias (entrada/salida entre cisternas)
+
+    Ordenados por fecha descendente (más recientes primero).
+    """
+    from app.models.usuario import Usuario
+    from app.models.camion import Camion
+
+    movimientos = []
+
+    # Obtener la cisterna
+    cisterna = obtener_cisterna_por_id(db, cisterna_id)
+    if not cisterna:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cisterna no encontrada"
+        )
+
+    # 1. Cargas (entrada)
+    cargas = db.query(CargaCisterna).filter(
+        CargaCisterna.cisterna_id == cisterna_id
+    ).all()
+
+    for c in cargas:
+        usuario = db.query(Usuario).filter(Usuario.id == c.created_by).first()
+        movimientos.append({
+            "id": str(c.id),
+            "tipo": "CARGA",
+            "fecha": c.fecha.isoformat() if c.fecha else None,
+            "litros": float(c.litros),
+            "signo": "+",
+            "descripcion": f"Carga de {c.proveedor}" + (f" - Factura: {c.numero_factura}" if c.numero_factura else ""),
+            "usuario_nombre": usuario.nombre if usuario else "Desconocido",
+            "detalle": {
+                "proveedor": c.proveedor,
+                "numero_factura": c.numero_factura,
+                "costo_total": float(c.costo_total) if c.costo_total else None,
+                "costo_por_litro": float(c.costo_por_litro) if c.costo_por_litro else None
+            }
+        })
+
+    # 2. Suministros (salida)
+    suministros = db.query(SuministroCombustible).filter(
+        SuministroCombustible.cisterna_id == cisterna_id
+    ).all()
+
+    for s in suministros:
+        usuario = db.query(Usuario).filter(Usuario.id == s.created_by).first()
+        camion = db.query(Camion).filter(Camion.id == s.camion_id).first()
+        movimientos.append({
+            "id": str(s.id),
+            "tipo": "SUMINISTRO",
+            "fecha": s.fecha.isoformat() if s.fecha else None,
+            "litros": float(s.litros),
+            "signo": "-",
+            "descripcion": f"Suministro a {camion.patente if camion else 'Camión'}" + (f" - {s.chofer}" if s.chofer else ""),
+            "usuario_nombre": usuario.nombre if usuario else "Desconocido",
+            "detalle": {
+                "camion_patente": camion.patente if camion else None,
+                "camion_id": str(s.camion_id),
+                "chofer": s.chofer,
+                "kilometraje": s.kilometraje
+            }
+        })
+
+    # 3. Transferencias de salida (esta cisterna es origen)
+    transferencias_salida = db.query(TransferenciaCisterna).filter(
+        TransferenciaCisterna.cisterna_origen_id == cisterna_id
+    ).all()
+
+    for t in transferencias_salida:
+        usuario = db.query(Usuario).filter(Usuario.id == t.created_by).first()
+        cisterna_destino = db.query(CisternaCombustible).filter(
+            CisternaCombustible.id == t.cisterna_destino_id
+        ).first()
+        movimientos.append({
+            "id": str(t.id),
+            "tipo": "TRANSFERENCIA_SALIDA",
+            "fecha": t.fecha.isoformat() if t.fecha else None,
+            "litros": float(t.litros),
+            "signo": "-",
+            "descripcion": f"Transferencia a {cisterna_destino.nombre if cisterna_destino else 'Otra cisterna'}",
+            "usuario_nombre": usuario.nombre if usuario else "Desconocido",
+            "detalle": {
+                "cisterna_destino_id": str(t.cisterna_destino_id),
+                "cisterna_destino_nombre": cisterna_destino.nombre if cisterna_destino else None,
+                "observaciones": t.observaciones
+            }
+        })
+
+    # 4. Transferencias de entrada (esta cisterna es destino)
+    transferencias_entrada = db.query(TransferenciaCisterna).filter(
+        TransferenciaCisterna.cisterna_destino_id == cisterna_id
+    ).all()
+
+    for t in transferencias_entrada:
+        usuario = db.query(Usuario).filter(Usuario.id == t.created_by).first()
+        cisterna_origen = db.query(CisternaCombustible).filter(
+            CisternaCombustible.id == t.cisterna_origen_id
+        ).first()
+        movimientos.append({
+            "id": str(t.id),
+            "tipo": "TRANSFERENCIA_ENTRADA",
+            "fecha": t.fecha.isoformat() if t.fecha else None,
+            "litros": float(t.litros),
+            "signo": "+",
+            "descripcion": f"Transferencia desde {cisterna_origen.nombre if cisterna_origen else 'Otra cisterna'}",
+            "usuario_nombre": usuario.nombre if usuario else "Desconocido",
+            "detalle": {
+                "cisterna_origen_id": str(t.cisterna_origen_id),
+                "cisterna_origen_nombre": cisterna_origen.nombre if cisterna_origen else None,
+                "observaciones": t.observaciones
+            }
+        })
+
+    # Ordenar por fecha descendente
+    movimientos.sort(key=lambda x: x["fecha"] or "", reverse=True)
+
+    # Aplicar paginación
+    return movimientos[skip:skip + limit]

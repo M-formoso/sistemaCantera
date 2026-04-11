@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, Plus, ArrowRightLeft } from 'lucide-react'
+import { Fuel, TrendingUp, TrendingDown, Truck, AlertTriangle, Pencil, Trash2, Plus, ArrowRightLeft, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
-import { combustibleService } from '@/services/combustibleService'
+import { combustibleService, MovimientoCisterna } from '@/services/combustibleService'
 import { CargaCisterna, SuministroCombustible } from '@/types'
 import { formatNumber, formatDate, formatCurrency } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
@@ -15,7 +15,8 @@ export default function CombustiblePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isAdmin = useIsAdmin()
-  const [selectedTab, setSelectedTab] = useState<'cisternas' | 'cargas' | 'suministros'>('cisternas')
+  const [selectedTab, setSelectedTab] = useState<'cisternas' | 'cargas' | 'suministros' | 'movimientos'>('cisternas')
+  const [selectedCisternaId, setSelectedCisternaId] = useState<string | null>(null)
 
   // Mutation para eliminar suministro
   const deleteSuministroMutation = useMutation({
@@ -52,6 +53,13 @@ export default function CombustiblePage() {
   const { data: suministros = [], isLoading: isLoadingSuministros } = useQuery({
     queryKey: ['suministros'],
     queryFn: () => combustibleService.getSuministros(0, 100),
+  })
+
+  // Query para movimientos de cisterna seleccionada
+  const { data: movimientos = [], isLoading: isLoadingMovimientos } = useQuery({
+    queryKey: ['movimientos-cisterna', selectedCisternaId],
+    queryFn: () => combustibleService.getMovimientosCisterna(selectedCisternaId!, 0, 200),
+    enabled: !!selectedCisternaId && selectedTab === 'movimientos',
   })
 
   const isLoading = isLoadingCisternas || isLoadingCargas || isLoadingSuministros
@@ -278,6 +286,17 @@ export default function CombustiblePage() {
           >
             Suministros ({suministros.length})
           </button>
+          <button
+            onClick={() => setSelectedTab('movimientos')}
+            className={`pb-3 px-1 border-b-2 transition-colors flex items-center gap-1 ${
+              selectedTab === 'movimientos'
+                ? 'border-blue-600 text-blue-600 font-medium'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <History className="h-4 w-4" />
+            Movimientos
+          </button>
         </div>
       </div>
 
@@ -419,6 +438,113 @@ export default function CombustiblePage() {
             />
           </CardContent>
         </Card>
+      )}
+
+      {selectedTab === 'movimientos' && (
+        <div className="space-y-4">
+          {/* Selector de cisterna */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Historial de Movimientos
+              </CardTitle>
+              <CardDescription>
+                Seleccione una cisterna para ver todos sus movimientos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {cisternas.map((cisterna) => (
+                  <button
+                    key={cisterna.id}
+                    onClick={() => setSelectedCisternaId(cisterna.id)}
+                    className={`p-3 rounded-lg text-left transition-all ${
+                      selectedCisternaId === cisterna.id
+                        ? 'bg-blue-100 border-2 border-blue-500 shadow-md'
+                        : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-medium text-sm">{cisterna.nombre}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatNumber(cisterna.nivel_actual, 0)} L
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de movimientos */}
+          {selectedCisternaId && (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Movimientos de {cisternas.find(c => c.id === selectedCisternaId)?.nombre}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingMovimientos ? (
+                  <div className="py-8 text-center text-gray-500">
+                    Cargando movimientos...
+                  </div>
+                ) : movimientos.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500">
+                    No hay movimientos registrados
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {movimientos.map((mov) => {
+                      const fecha = new Date(mov.fecha)
+                      const fechaStr = fecha.toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })
+                      const horaStr = fecha.toLocaleTimeString('es-AR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+
+                      const tipoConfig: Record<string, { color: string; icon: string; label: string }> = {
+                        CARGA: { color: 'bg-green-100 text-green-700', icon: '↑', label: 'Carga' },
+                        SUMINISTRO: { color: 'bg-orange-100 text-orange-700', icon: '↓', label: 'Suministro' },
+                        TRANSFERENCIA_SALIDA: { color: 'bg-red-100 text-red-700', icon: '→', label: 'Transf. Salida' },
+                        TRANSFERENCIA_ENTRADA: { color: 'bg-blue-100 text-blue-700', icon: '←', label: 'Transf. Entrada' },
+                      }
+
+                      const config = tipoConfig[mov.tipo] || { color: 'bg-gray-100', icon: '•', label: mov.tipo }
+
+                      return (
+                        <div
+                          key={mov.id}
+                          className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-gray-100"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="text-center min-w-[80px]">
+                              <p className="text-sm font-medium">{fechaStr}</p>
+                              <p className="text-xs text-gray-500">{horaStr}</p>
+                            </div>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${config.color}`}>
+                              {config.icon} {config.label}
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium">{mov.descripcion}</p>
+                              <p className="text-xs text-gray-500">{mov.usuario_nombre}</p>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold ${mov.signo === '+' ? 'text-green-600' : 'text-orange-600'}`}>
+                            {mov.signo}{formatNumber(mov.litros, 0)} L
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
     </div>
