@@ -202,9 +202,12 @@ async def delete_usuario(
     current_user: Usuario = Depends(get_current_active_user)
 ):
     """
-    Eliminar un usuario (solo administradores)
+    Desactivar un usuario (solo administradores)
 
-    No permite eliminar al propio usuario
+    En lugar de eliminar físicamente, se marca como inactivo para preservar
+    la integridad referencial con otros registros del sistema.
+
+    No permite desactivar al propio usuario.
     """
     check_admin_permission(current_user)
 
@@ -217,15 +220,15 @@ async def delete_usuario(
             detail="Usuario no encontrado"
         )
 
-    # No permitir que el usuario se elimine a sí mismo
+    # No permitir que el usuario se desactive a sí mismo
     if usuario.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No puede eliminar su propia cuenta"
+            detail="No puede desactivar su propia cuenta"
         )
 
-    # Eliminar usuario
-    db.delete(usuario)
+    # Desactivar usuario en lugar de eliminarlo
+    usuario.activo = False
     db.commit()
 
     return None

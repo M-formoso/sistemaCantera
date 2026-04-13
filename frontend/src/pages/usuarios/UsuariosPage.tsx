@@ -11,7 +11,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from '@tanstack/react-table'
-import { Users, Plus, Pencil, Trash2, Key, Shield, Eye, EyeOff, Edit } from 'lucide-react'
+import { Users, Plus, Pencil, Key, Shield, Eye, EyeOff, Edit, UserX } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,10 +30,11 @@ export default function UsuariosPage() {
   const [showResetPassword, setShowResetPassword] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [showPasswordVisible, setShowPasswordVisible] = useState(false)
+  const [showInactivos, setShowInactivos] = useState(false)
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['usuarios'],
-    queryFn: () => usuariosService.getAll({ limit: 100 }),
+    queryKey: ['usuarios', showInactivos],
+    queryFn: () => usuariosService.getAll({ limit: 100, activo: showInactivos ? undefined : true }),
   })
 
   const deleteMutation = useMutation({
@@ -54,11 +55,11 @@ export default function UsuariosPage() {
   })
 
   const handleDelete = async (id: string, nombre: string) => {
-    if (window.confirm(`¿Está seguro de eliminar al usuario ${nombre}?`)) {
+    if (window.confirm(`¿Está seguro de desactivar al usuario ${nombre}? El usuario no podrá acceder más al sistema.`)) {
       try {
         await deleteMutation.mutateAsync(id)
       } catch (error: any) {
-        alert(error.response?.data?.detail || 'Error al eliminar el usuario')
+        alert(error.response?.data?.detail || 'Error al desactivar el usuario')
       }
     }
   }
@@ -195,15 +196,15 @@ export default function UsuariosPage() {
               <Key className="h-4 w-4" />
             </Button>
 
-            {!isCurrentUser && (
+            {!isCurrentUser && usuario.activo && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDelete(usuario.id, usuario.nombre)}
                 className="text-red-600 hover:text-red-700"
-                title="Eliminar usuario"
+                title="Desactivar usuario"
               >
-                <Trash2 className="h-4 w-4" />
+                <UserX className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -256,7 +257,7 @@ export default function UsuariosPage() {
         <CardHeader className="px-3 sm:px-6">
           <CardTitle className="text-lg sm:text-xl">Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="px-3 sm:px-6">
+        <CardContent className="px-3 sm:px-6 space-y-4">
           <Input
             placeholder="Buscar por nombre o email..."
             value={(table.getColumn('nombre')?.getFilterValue() as string) ?? ''}
@@ -264,6 +265,17 @@ export default function UsuariosPage() {
               table.getColumn('nombre')?.setFilterValue(event.target.value)
             }
           />
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showInactivos}
+              onChange={(e) => setShowInactivos(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span className="text-sm text-gray-600">
+              Mostrar usuarios inactivos
+            </span>
+          </label>
         </CardContent>
       </Card>
 
