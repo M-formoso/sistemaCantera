@@ -56,10 +56,10 @@ export default function PesajesTab() {
   const [historial, setHistorial] = useState<HistorialItem[]>([])
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
 
-  // Query para pesajes
+  // Query para pesajes - incluir cancelados si el filtro está activo
   const { data: pesajesRaw = [], isLoading } = useQuery({
-    queryKey: ['pesajes'],
-    queryFn: () => pesajesService.getAll(0, 500),
+    queryKey: ['pesajes', filtroEstado],
+    queryFn: () => pesajesService.getAll(0, 500, filtroEstado === 'cancelado'),
   })
 
   // Filtrar pesajes según los filtros activos
@@ -200,15 +200,22 @@ export default function PesajesTab() {
       header: 'Estado',
       cell: ({ row }) => {
         const estado = row.original.estado
-        const esPendiente = estado === 'pendiente'
+        const estilos = {
+          pendiente: 'bg-yellow-100 text-yellow-700',
+          completado: 'bg-green-100 text-green-700',
+          cancelado: 'bg-red-100 text-red-700',
+        }
+        const etiquetas = {
+          pendiente: 'Pendiente',
+          completado: 'Completado',
+          cancelado: 'Cancelado',
+        }
         return (
           <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded ${
-            esPendiente
-              ? 'bg-yellow-100 text-yellow-700'
-              : 'bg-green-100 text-green-700'
+            estilos[estado as keyof typeof estilos] || 'bg-gray-100 text-gray-700'
           }`}>
-            {esPendiente ? <Clock className="h-3 w-3" /> : null}
-            {esPendiente ? 'Pendiente' : 'Completado'}
+            {estado === 'pendiente' ? <Clock className="h-3 w-3" /> : null}
+            {etiquetas[estado as keyof typeof etiquetas] || estado}
           </span>
         )
       },
@@ -445,6 +452,7 @@ export default function PesajesTab() {
                     <option value="">Todos</option>
                     <option value="completado">Completado</option>
                     <option value="pendiente">Pendiente</option>
+                    <option value="cancelado">Cancelado</option>
                   </select>
                 </div>
 
@@ -613,7 +621,9 @@ export default function PesajesTab() {
                         </div>
                         <span className={`text-xs font-semibold px-2 py-1 rounded ${
                           item.accion === 'CREACION' ? 'bg-green-100 text-green-700' :
-                          item.accion === 'MODIFICACION' ? 'bg-blue-100 text-blue-700' :
+                          item.accion === 'COMPLETADO' ? 'bg-blue-100 text-blue-700' :
+                          item.accion === 'MODIFICACION' ? 'bg-yellow-100 text-yellow-700' :
+                          item.accion === 'CANCELACION' ? 'bg-red-100 text-red-700' :
                           item.accion === 'ELIMINACION' ? 'bg-red-100 text-red-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>

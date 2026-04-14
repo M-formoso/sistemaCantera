@@ -98,7 +98,12 @@ def _registrar_historial(db: Session, pesaje_id: UUID, usuario_id: UUID, accion:
 
 
 def obtener_historial(db: Session, pesaje_id: UUID) -> List[dict]:
-    """Obtiene el historial de modificaciones de un pesaje"""
+    """
+    Obtiene el historial de modificaciones de un pesaje.
+
+    Si el pesaje no tiene historial registrado (pesajes anteriores a la implementación
+    del sistema de historial), genera un historial básico usando los datos del pesaje.
+    """
     historial = db.query(HistorialPesaje).filter(
         HistorialPesaje.pesaje_id == pesaje_id
     ).order_by(desc(HistorialPesaje.created_at)).all()
@@ -112,6 +117,45 @@ def obtener_historial(db: Session, pesaje_id: UUID) -> List[dict]:
             "usuario_nombre": usuario.nombre if usuario else "Usuario desconocido",
             "accion": h.accion
         })
+
+    # Si no hay historial, generar uno básico desde los datos del pesaje
+    if not resultado:
+        pesaje = db.query(Pesaje).filter(Pesaje.id == pesaje_id).first()
+        if pesaje:
+            # Obtener usuario creador
+            creador = db.query(Usuario).filter(Usuario.id == pesaje.created_by).first()
+
+            # Agregar registro de creación
+            resultado.append({
+                "id": None,
+                "fecha": pesaje.created_at,
+                "usuario_nombre": creador.nombre if creador else "Usuario desconocido",
+                "accion": "CREACION"
+            })
+
+            # Si fue completado, agregar registro de completado
+            if pesaje.estado == "completado" and pesaje.fecha_completado:
+                resultado.append({
+                    "id": None,
+                    "fecha": pesaje.fecha_completado,
+                    "usuario_nombre": creador.nombre if creador else "Usuario desconocido",
+                    "accion": "COMPLETADO"
+                })
+
+            # Si fue cancelado, agregar registro de cancelación
+            if pesaje.estado == "cancelado" and pesaje.fecha_cancelacion:
+                cancelador = None
+                if pesaje.cancelado_por:
+                    cancelador = db.query(Usuario).filter(Usuario.id == pesaje.cancelado_por).first()
+                resultado.append({
+                    "id": None,
+                    "fecha": pesaje.fecha_cancelacion,
+                    "usuario_nombre": cancelador.nombre if cancelador else "Usuario desconocido",
+                    "accion": "CANCELACION"
+                })
+
+            # Ordenar por fecha descendente
+            resultado.sort(key=lambda x: x["fecha"] if x["fecha"] else pesaje.created_at, reverse=True)
 
     return resultado
 
