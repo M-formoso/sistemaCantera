@@ -10,6 +10,7 @@ from datetime import date, datetime
 from fastapi import HTTPException, status
 
 from app.models.combustible import CisternaCombustible, CargaCisterna, SuministroCombustible, TransferenciaCisterna
+from app.models.base import get_argentina_now
 from app.schemas.combustible import (
     CisternaConfig, CisternaUpdate, CisternaCreate,
     CargaCisternaCreate, CargaCisternaUpdate, SuministroCombustibleCreate,
@@ -214,14 +215,10 @@ def crear_carga_cisterna(
     if carga_data.costo_total:
         costo_por_litro = carga_data.costo_total / carga_data.litros
 
-    # Preparar datos y convertir fecha si es string
+    # Preparar datos y usar fecha/hora actual de Argentina
     carga_dict = carga_data.model_dump()
-    if isinstance(carga_dict.get('fecha'), str):
-        from datetime import datetime as dt
-        try:
-            carga_dict['fecha'] = dt.fromisoformat(carga_dict['fecha'])
-        except ValueError:
-            carga_dict['fecha'] = dt.strptime(carga_dict['fecha'], '%Y-%m-%d')
+    # Usar la hora actual de Argentina (no solo la fecha)
+    carga_dict['fecha'] = get_argentina_now()
 
     # Crear carga
     db_carga = CargaCisterna(
@@ -433,18 +430,13 @@ def crear_suministro(
             detail=f"No hay combustible suficiente en la cisterna. Nivel actual: {cisterna.nivel_actual}L, requerido: {suministro_data.litros}L"
         )
 
-    # Crear suministro - mapear kilometraje_actual a kilometraje y convertir fecha
+    # Crear suministro - mapear kilometraje_actual a kilometraje y usar fecha/hora actual
     suministro_dict = suministro_data.model_dump()
     if 'kilometraje_actual' in suministro_dict:
         suministro_dict['kilometraje'] = suministro_dict.pop('kilometraje_actual')
 
-    # Convertir fecha string a datetime
-    if isinstance(suministro_dict.get('fecha'), str):
-        from datetime import datetime as dt
-        try:
-            suministro_dict['fecha'] = dt.fromisoformat(suministro_dict['fecha'])
-        except ValueError:
-            suministro_dict['fecha'] = dt.strptime(suministro_dict['fecha'], '%Y-%m-%d')
+    # Usar la hora actual de Argentina (no solo la fecha)
+    suministro_dict['fecha'] = get_argentina_now()
 
     db_suministro = SuministroCombustible(
         **suministro_dict,
@@ -663,14 +655,8 @@ def crear_transferencia(
             detail=f"La transferencia excede la capacidad de la cisterna destino. Capacidad: {cisterna_destino.capacidad_total}L, nivel actual: {cisterna_destino.nivel_actual}L, transferencia: {transferencia_data.litros}L"
         )
 
-    # Convertir fecha string a datetime
-    fecha = transferencia_data.fecha
-    if isinstance(fecha, str):
-        from datetime import datetime as dt
-        try:
-            fecha = dt.fromisoformat(fecha)
-        except ValueError:
-            fecha = dt.strptime(fecha, '%Y-%m-%d')
+    # Usar la hora actual de Argentina (no solo la fecha)
+    fecha = get_argentina_now()
 
     # Crear transferencia
     db_transferencia = TransferenciaCisterna(

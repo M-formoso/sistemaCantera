@@ -577,6 +577,11 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
     # Verificar si el usuario es administrador
     es_admin = usuario and usuario.rol == RolEnum.ADMINISTRADOR
 
+    # IMPORTANTE: La fecha del ticket NUNCA se puede modificar después de completado
+    # La fecha es cuando se pesó el BRUTO y es la fecha real del ticket
+    if 'fecha' in update_data:
+        del update_data['fecha']
+
     # Si ya tiene remito generado y NO es admin, restringir campos
     if db_pesaje.remito_generado and not es_admin:
         campos_permitidos = {'precio_unitario', 'flete', 'precio_fijo', 'importe_total', 'observaciones'}
@@ -629,10 +634,7 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         remito.producto = db_pesaje.material or remito.producto
         remito.observaciones = db_pesaje.observaciones
 
-        # Actualizar fecha si cambió
-        if 'fecha' in update_data:
-            fecha_pesaje = db_pesaje.fecha
-            remito.fecha = fecha_pesaje.date() if hasattr(fecha_pesaje, 'date') else fecha_pesaje
+        # NOTA: La fecha del remito NO se actualiza porque la fecha del ticket es inmutable
 
         # Actualizar cliente
         if db_pesaje.cliente:
@@ -671,10 +673,7 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         ).first()
 
         if movimiento:
-            # Actualizar fecha si cambió
-            if 'fecha' in update_data:
-                fecha_pesaje = db_pesaje.fecha
-                movimiento.fecha = fecha_pesaje.date() if hasattr(fecha_pesaje, 'date') else fecha_pesaje
+            # NOTA: La fecha del movimiento NO se actualiza porque la fecha del ticket es inmutable
 
             # Actualizar monto si cambió el importe_total
             if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):
@@ -1287,8 +1286,9 @@ def completar_pesaje(db: Session, pesaje_id: UUID, pesaje_data: PesajeCompletarC
     db_pesaje.peso_bruto = pesaje_data.peso_bruto
     db_pesaje.peso_neto = peso_neto
     db_pesaje.estado = "completado"
-    # IMPORTANTE: La fecha del pesaje se mantiene como fue cargada (puede ser fecha vieja)
-    # Solo fecha_completado registra cuándo se completó físicamente
+    # IMPORTANTE: La fecha del ticket es cuando se pesa el BRUTO (se completa el pesaje)
+    # Esto asegura que el ticket aparezca en los movimientos del día correcto
+    db_pesaje.fecha = ahora
     db_pesaje.fecha_completado = ahora
 
     # Actualizar campos opcionales
