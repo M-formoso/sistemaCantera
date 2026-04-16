@@ -47,6 +47,7 @@ export default function PesajesTab() {
   const [filtroPatente, setFiltroPatente] = useState<string>('')
   const [filtroMaterial, setFiltroMaterial] = useState<string>('')
   const [filtroCliente, setFiltroCliente] = useState<string>('')
+  const [filtroNumeroTicket, setFiltroNumeroTicket] = useState<string>('')
   const [mostrarFiltros, setMostrarFiltros] = useState<boolean>(false)
   const [descargandoPDF, setDescargandoPDF] = useState<boolean>(false)
 
@@ -65,26 +66,38 @@ export default function PesajesTab() {
   // Filtrar pesajes según los filtros activos
   const pesajes = useMemo(() => {
     return pesajesRaw.filter((pesaje) => {
+      // Filtro por número de ticket (prioridad alta - si se busca por número, ignorar otros filtros de fecha)
+      if (filtroNumeroTicket) {
+        const numeroStr = pesaje.numero_pesaje?.toString() || ''
+        if (!numeroStr.includes(filtroNumeroTicket)) {
+          return false
+        }
+        // Si hay filtro de número de ticket, no aplicar filtros de fecha
+        // para poder encontrar tickets viejos
+      } else {
+        // Solo aplicar filtros de fecha si NO hay búsqueda por número de ticket
+
+        // Filtro por fecha desde
+        if (filtroFechaDesde) {
+          // Extraer solo la parte de fecha del pesaje (YYYY-MM-DD)
+          const fechaPesajeStr = pesaje.fecha.split('T')[0]
+          if (fechaPesajeStr < filtroFechaDesde) {
+            return false
+          }
+        }
+
+        // Filtro por fecha hasta
+        if (filtroFechaHasta) {
+          const fechaPesajeStr = pesaje.fecha.split('T')[0]
+          if (fechaPesajeStr > filtroFechaHasta) {
+            return false
+          }
+        }
+      }
+
       // Filtro por estado
       if (filtroEstado && pesaje.estado !== filtroEstado) {
         return false
-      }
-
-      // Filtro por fecha desde
-      if (filtroFechaDesde) {
-        // Extraer solo la parte de fecha del pesaje (YYYY-MM-DD)
-        const fechaPesajeStr = pesaje.fecha.split('T')[0]
-        if (fechaPesajeStr < filtroFechaDesde) {
-          return false
-        }
-      }
-
-      // Filtro por fecha hasta
-      if (filtroFechaHasta) {
-        const fechaPesajeStr = pesaje.fecha.split('T')[0]
-        if (fechaPesajeStr > filtroFechaHasta) {
-          return false
-        }
       }
 
       // Filtro por patente
@@ -110,10 +123,10 @@ export default function PesajesTab() {
 
       return true
     })
-  }, [pesajesRaw, filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente])
+  }, [pesajesRaw, filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente, filtroNumeroTicket])
 
   // Verificar si hay filtros activos
-  const hayFiltrosActivos = filtroEstado || filtroFechaDesde || filtroFechaHasta || filtroPatente || filtroMaterial || filtroCliente
+  const hayFiltrosActivos = filtroEstado || filtroFechaDesde || filtroFechaHasta || filtroPatente || filtroMaterial || filtroCliente || filtroNumeroTicket
 
   // Limpiar todos los filtros
   const limpiarFiltros = () => {
@@ -123,6 +136,7 @@ export default function PesajesTab() {
     setFiltroPatente('')
     setFiltroMaterial('')
     setFiltroCliente('')
+    setFiltroNumeroTicket('')
   }
 
   // Descargar PDF de pesajes
@@ -405,7 +419,7 @@ export default function PesajesTab() {
             Filtros
             {hayFiltrosActivos && (
               <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                {[filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente].filter(Boolean).length}
+                {[filtroNumeroTicket, filtroEstado, filtroFechaDesde, filtroFechaHasta, filtroPatente, filtroMaterial, filtroCliente].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -440,7 +454,19 @@ export default function PesajesTab() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3">
+                {/* Filtro Número de Ticket */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">N° Ticket</label>
+                  <Input
+                    type="text"
+                    placeholder="Ej: 481"
+                    value={filtroNumeroTicket}
+                    onChange={(e) => setFiltroNumeroTicket(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
                 {/* Filtro Estado */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-600">Estado</label>
