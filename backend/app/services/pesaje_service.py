@@ -1427,19 +1427,22 @@ def cancelar_pesaje_pendiente(db: Session, pesaje_id: UUID) -> dict:
     return {"message": "Pesaje pendiente cancelado correctamente"}
 
 
-def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 1) -> dict:
+def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 7) -> dict:
     """
-    Elimina pesajes pendientes que tienen más de X días sin completarse.
+    Marca como 'expirado' los pesajes pendientes que tienen más de X días sin completarse.
 
     Los pesajes pendientes son aquellos donde solo se registró la tara
     pero nunca se completó con el peso bruto.
 
+    NOTA: Ya no se eliminan, se marcan como 'expirado' para mantener registro
+    y poder verlos en la sección "No Concretados".
+
     Args:
         db: Sesión de base de datos
-        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 1)
+        dias_limite: Cantidad de días máximos que puede estar pendiente (default: 7)
 
     Returns:
-        dict con cantidad de pesajes eliminados y sus números
+        dict con cantidad de pesajes expirados y sus números
     """
     ahora = get_argentina_now()
     fecha_limite = ahora - timedelta(days=dias_limite)
@@ -1452,25 +1455,51 @@ def limpiar_pesajes_pendientes_viejos(db: Session, dias_limite: int = 1) -> dict
 
     if not pesajes_viejos:
         return {
-            "eliminados": 0,
+            "expirados": 0,
             "numeros_pesaje": [],
-            "message": "No hay pesajes pendientes viejos para eliminar"
+            "message": "No hay pesajes pendientes viejos para marcar como expirados"
         }
 
-    # Guardar los números antes de eliminar
+    # Guardar los números antes de marcar
     numeros = [p.numero_pesaje for p in pesajes_viejos]
 
-    # Eliminar los pesajes
+    # Marcar como expirados (soft-delete)
     for pesaje in pesajes_viejos:
-        db.delete(pesaje)
+        pesaje.estado = "expirado"
+        pesaje.motivo_cancelacion = f"Pesaje no completado en {dias_limite} días - expirado automáticamente"
+        pesaje.fecha_cancelacion = ahora
 
     db.commit()
 
     return {
-        "eliminados": len(numeros),
+        "expirados": len(numeros),
         "numeros_pesaje": numeros,
-        "message": f"Se eliminaron {len(numeros)} pesajes pendientes con más de {dias_limite} días"
+        "message": f"Se marcaron {len(numeros)} pesajes como expirados (más de {dias_limite} días sin completar)"
     }
+
+
+def obtener_no_concretados(db: Session, skip: int = 0, limit: int = 100) -> List[Pesaje]:
+    """
+    Obtiene pesajes no concretados: cancelados y expirados.
+    Útil para auditoría y seguimiento de pesajes que no se completaron.
+
+    Args:
+        db: Sesión de base de datos
+        skip: Offset para paginación
+        limit: Límite de resultados
+
+    Returns:
+        Lista de pesajes cancelados y expirados
+    """
+    pesajes = db.query(Pesaje).filter(
+        Pesaje.estado.in_(["cancelado", "expirado"])
+    ).order_by(desc(Pesaje.fecha_cancelacion)).offset(skip).limit(limit).all()
+
+    # Enriquecer con datos
+    for p in pesajes:
+        _enriquecer_pesaje(db, p)
+
+    return pesajes
 
 
 def obtener_pesajes_pendientes_viejos(db: Session, dias_limite: int = 1) -> List[Pesaje]:

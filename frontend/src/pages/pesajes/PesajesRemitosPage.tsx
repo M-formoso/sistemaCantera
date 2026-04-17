@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Scale, ClipboardList } from 'lucide-react'
+import { Scale, ClipboardList, AlertTriangle } from 'lucide-react'
 import PesajesTab from './PesajesTab'
 import OrdenesEntregaTab from './OrdenesEntregaTab'
+import NoConcretadosTab from './NoConcretadosTab'
 
-type TabType = 'pesajes' | 'ordenes'
+type TabType = 'pesajes' | 'ordenes' | 'no-concretados'
 
 export default function PesajesRemitosPage() {
   const [activeTab, setActiveTab] = useState<TabType>('pesajes')
@@ -11,6 +12,7 @@ export default function PesajesRemitosPage() {
   const tabs = [
     { id: 'pesajes' as TabType, label: 'Pesajes', icon: Scale },
     { id: 'ordenes' as TabType, label: 'Órdenes de Entrega', icon: ClipboardList },
+    { id: 'no-concretados' as TabType, label: 'No Concretados', icon: AlertTriangle },
   ]
 
   return (
@@ -56,6 +58,7 @@ export default function PesajesRemitosPage() {
       <div>
         {activeTab === 'pesajes' && <PesajesTab />}
         {activeTab === 'ordenes' && <OrdenesEntregaTab />}
+        {activeTab === 'no-concretados' && <NoConcretadosTab />}
       </div>
     </div>
   )

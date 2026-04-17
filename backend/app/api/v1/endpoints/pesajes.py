@@ -50,12 +50,32 @@ async def listar_pesajes_pendientes(
     """
     Lista pesajes pendientes (solo tara registrada, esperando peso bruto).
 
-    NOTA: Automáticamente elimina pesajes pendientes con más de 1 día de antigüedad.
+    NOTA: Automáticamente marca como 'expirado' los pesajes pendientes con más de 7 días.
+    Los pesajes expirados se pueden ver en la sección "No Concretados".
     """
-    # Limpiar pesajes pendientes viejos automáticamente (más de 1 día)
-    pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias_limite=1)
+    # Marcar como expirados los pesajes pendientes viejos (más de 7 días)
+    pesaje_service.limpiar_pesajes_pendientes_viejos(db, dias_limite=7)
 
     return pesaje_service.obtener_pendientes(db)
+
+
+@router.get("/no-concretados", response_model=List[PesajeSchema])
+async def listar_pesajes_no_concretados(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Lista pesajes no concretados (cancelados y expirados).
+
+    Incluye:
+    - Pesajes cancelados manualmente
+    - Pesajes expirados (pendientes que no se completaron en 7 días)
+
+    Desde esta vista se pueden eliminar definitivamente si es necesario.
+    """
+    return pesaje_service.obtener_no_concretados(db, skip, limit)
 
 
 @router.get("/buscar-patente/{patente}", response_model=BusquedaPatenteResult)

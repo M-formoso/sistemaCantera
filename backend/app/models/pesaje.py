@@ -82,8 +82,9 @@ class Pesaje(BaseModel):
     # Lista de precios utilizada (para trazabilidad)
     lista_precio_id = Column(UUID(as_uuid=True), ForeignKey("listas_precios.id"), nullable=True, index=True)
 
-    # Campos para cancelación (soft-delete con auditoría)
-    # Estado puede ser: 'pendiente', 'completado', 'cancelado'
+    # Campos para cancelación/expiración (soft-delete con auditoría)
+    # Estado puede ser: 'pendiente', 'completado', 'cancelado', 'expirado'
+    # 'expirado' = pesaje pendiente que no se completó a tiempo (más de 7 días)
     motivo_cancelacion = Column(Text, nullable=True)  # Obligatorio si estado = 'cancelado'
     fecha_cancelacion = Column(DateTime, nullable=True)
     cancelado_por = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)

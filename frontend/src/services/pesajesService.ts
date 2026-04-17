@@ -227,6 +227,17 @@ export const pesajesService = {
   },
 
   /**
+   * Obtiene pesajes no concretados (cancelados + expirados)
+   * Para la sección "No Concretados" donde se pueden ver y eliminar definitivamente
+   */
+  async getNoConcretados(skip: number = 0, limit: number = 100): Promise<Pesaje[]> {
+    const response = await api.get<Pesaje[]>('/pesajes/no-concretados', {
+      params: { skip, limit },
+    })
+    return response.data
+  },
+
+  /**
    * Sincroniza un pesaje con la cuenta corriente del cliente
    * Útil para pesajes históricos que no tienen movimiento registrado
    */

@@ -312,7 +312,7 @@ export interface EmpresaCreate {
 
 export type TipoEntrega = 'propio' | 'transportista'
 
-export type EstadoPesaje = 'pendiente' | 'completado' | 'cancelado'
+export type EstadoPesaje = 'pendiente' | 'completado' | 'cancelado' | 'expirado'
 
 export interface Pesaje {
   id: string
