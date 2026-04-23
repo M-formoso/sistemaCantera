@@ -916,16 +916,21 @@ def obtener_movimientos_cisterna(
     for s in suministros:
         usuario = db.query(Usuario).filter(Usuario.id == s.created_by).first()
         camion = db.query(Camion).filter(Camion.id == s.camion_id).first()
+        # Obtener identificador del camión/máquina (patente, nombre o código)
+        camion_identificador = "Equipo"
+        if camion:
+            camion_identificador = camion.patente or camion.nombre or camion.codigo_interno or "Equipo"
         movimientos.append({
             "id": str(s.id),
             "tipo": "SUMINISTRO",
             "fecha": s.fecha.isoformat() if s.fecha else None,
             "litros": float(s.litros),
             "signo": "-",
-            "descripcion": f"Suministro a {camion.patente if camion else 'Camión'}" + (f" - {s.chofer}" if s.chofer else ""),
+            "descripcion": f"Suministro a {camion_identificador}" + (f" - {s.chofer}" if s.chofer else ""),
             "usuario_nombre": usuario.nombre if usuario else "Desconocido",
             "detalle": {
                 "camion_patente": camion.patente if camion else None,
+                "camion_nombre": camion.nombre if camion else None,
                 "camion_id": str(s.camion_id),
                 "chofer": s.chofer,
                 "kilometraje": s.kilometraje
