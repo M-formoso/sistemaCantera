@@ -160,6 +160,21 @@ export const combustibleService = {
     return response.data
   },
 
+  /**
+   * Obtiene consumo detallado por camión/máquina
+   * Incluye litros/km, km/litro, litros/hora según el tipo
+   */
+  async getConsumoPorCamion(
+    camionId: string,
+    fechaDesde?: string,
+    fechaHasta?: string
+  ): Promise<ConsumoCamion> {
+    const response = await api.get<ConsumoCamion>(`/combustible/consumo-por-camion/${camionId}`, {
+      params: { fecha_desde: fechaDesde, fecha_hasta: fechaHasta },
+    })
+    return response.data
+  },
+
   // ========== TRANSFERENCIAS ENTRE CISTERNAS ==========
   /**
    * Obtiene todas las transferencias
@@ -214,4 +229,24 @@ export interface MovimientoCisterna {
   descripcion: string
   usuario_nombre: string
   detalle: Record<string, unknown>
+}
+
+// Tipo para consumo por camión/máquina
+export interface ConsumoCamion {
+  camion_id: string
+  patente: string | null
+  nombre: string | null
+  categoria: 'CAMION' | 'MAQUINA'
+  kilometraje_actual: number | null
+  horometro_actual: number | null
+  total_litros: number
+  cantidad_suministros: number
+  promedio_por_suministro: number
+  // Métricas para camiones
+  consumo_litros_por_km: number | null
+  consumo_km_por_litro: number | null
+  total_km_recorridos: number | null
+  // Métricas para máquinas
+  consumo_litros_por_hora: number | null
+  total_horas_trabajadas: number | null
 }

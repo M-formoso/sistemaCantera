@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle, Cog, Hammer, Plus, Package } from 'lucide-react'
+import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle, Cog, Hammer, Plus, Package, Fuel, Gauge, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { camionesService } from '@/services/camionesService'
 import { serviciosService } from '@/services/serviciosService'
 import { trabajosService } from '@/services/trabajosService'
 import { repuestosService } from '@/services/repuestosService'
+import { combustibleService, ConsumoCamion } from '@/services/combustibleService'
 import { formatDate, formatCurrency, getTodayLocalDate } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 import { Trabajo, Repuesto } from '@/types'
@@ -51,6 +52,13 @@ export default function CamionDetailPage() {
     queryKey: ['repuestos-equipo', id],
     queryFn: () => repuestosService.getByEquipo(id!, true).catch(() => []),
     enabled: showTrabajoForm,
+    retry: false,
+  })
+
+  // Obtener consumo de combustible
+  const { data: consumo } = useQuery({
+    queryKey: ['consumo-camion', id],
+    queryFn: () => combustibleService.getConsumoPorCamion(id!),
     retry: false,
   })
 
@@ -310,6 +318,96 @@ export default function CamionDetailPage() {
             <div className="mt-6 pt-6 border-t">
               <p className="text-sm text-muted-foreground mb-2">Observaciones</p>
               <p className="text-sm">{camion.observaciones}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Consumo de Combustible */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Fuel className="h-5 w-5" />
+            Consumo de Combustible
+          </CardTitle>
+          <CardDescription>
+            Estadísticas basadas en los suministros registrados
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {consumo ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {/* Kilometraje/Horómetro actual */}
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {esMaquina ? <Clock className="h-5 w-5 text-blue-600" /> : <Gauge className="h-5 w-5 text-blue-600" />}
+                </div>
+                <p className="text-2xl font-bold text-blue-700">
+                  {esMaquina
+                    ? (consumo.horometro_actual ? `${consumo.horometro_actual.toLocaleString('es-AR')}` : '-')
+                    : (consumo.kilometraje_actual ? consumo.kilometraje_actual.toLocaleString('es-AR') : '-')
+                  }
+                </p>
+                <p className="text-sm text-blue-600">{esMaquina ? 'Horas actuales' : 'Km actuales'}</p>
+              </div>
+
+              {/* Total litros */}
+              <div className="bg-amber-50 rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Fuel className="h-5 w-5 text-amber-600" />
+                </div>
+                <p className="text-2xl font-bold text-amber-700">
+                  {consumo.total_litros.toLocaleString('es-AR')} L
+                </p>
+                <p className="text-sm text-amber-600">Total consumido</p>
+              </div>
+
+              {/* Consumo (litros/km o litros/hora) */}
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Gauge className="h-5 w-5 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-green-700">
+                  {esMaquina
+                    ? (consumo.consumo_litros_por_hora ? `${consumo.consumo_litros_por_hora.toLocaleString('es-AR')}` : '-')
+                    : (consumo.consumo_litros_por_km ? `${consumo.consumo_litros_por_km.toLocaleString('es-AR')}` : '-')
+                  }
+                </p>
+                <p className="text-sm text-green-600">
+                  {esMaquina ? 'Litros/hora' : 'Litros/km'}
+                </p>
+              </div>
+
+              {/* Rendimiento inverso o km/horas recorridos */}
+              <div className="bg-purple-50 rounded-lg p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  {esMaquina ? <Clock className="h-5 w-5 text-purple-600" /> : <Truck className="h-5 w-5 text-purple-600" />}
+                </div>
+                <p className="text-2xl font-bold text-purple-700">
+                  {esMaquina
+                    ? (consumo.total_horas_trabajadas ? `${consumo.total_horas_trabajadas.toLocaleString('es-AR')}` : '-')
+                    : (consumo.consumo_km_por_litro ? `${consumo.consumo_km_por_litro.toLocaleString('es-AR')}` : '-')
+                  }
+                </p>
+                <p className="text-sm text-purple-600">
+                  {esMaquina ? 'Horas trabajadas' : 'Km/litro'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay datos de consumo disponibles. Registre suministros de combustible para ver las estadísticas.
+            </div>
+          )}
+
+          {consumo && consumo.cantidad_suministros > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Basado en <span className="font-semibold">{consumo.cantidad_suministros} suministros</span> registrados
+                {!esMaquina && consumo.total_km_recorridos && (
+                  <> • <span className="font-semibold">{consumo.total_km_recorridos.toLocaleString('es-AR')} km</span> recorridos</>
+                )}
+              </p>
             </div>
           )}
         </CardContent>

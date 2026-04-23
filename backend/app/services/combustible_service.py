@@ -445,6 +445,19 @@ def crear_suministro(
 
     db.add(db_suministro)
 
+    # ==========================================
+    # ACTUALIZAR KM/HORAS DEL CAMIÓN
+    # ==========================================
+    # Si se registró kilometraje, actualizar el kilometraje_actual del camión
+    if suministro_data.kilometraje_actual and suministro_data.kilometraje_actual > 0:
+        if camion.kilometraje_actual is None or suministro_data.kilometraje_actual > camion.kilometraje_actual:
+            camion.kilometraje_actual = suministro_data.kilometraje_actual
+
+    # Si se registró horómetro, actualizar el horometro_actual del camión/máquina
+    if suministro_data.horometro and suministro_data.horometro > 0:
+        if camion.horometro_actual is None or suministro_data.horometro > camion.horometro_actual:
+            camion.horometro_actual = suministro_data.horometro
+
     # Descontar de cisterna
     cisterna.nivel_actual -= suministro_data.litros
 
@@ -730,11 +743,25 @@ def obtener_consumo_por_camion(
     fecha_hasta: Optional[date] = None
 ) -> dict:
     """
-    Obtiene estadísticas de consumo de combustible por camión
+    Obtiene estadísticas de consumo de combustible por camión/máquina
+
+    Calcula:
+    - Total de litros consumidos
+    - Consumo promedio por km (para camiones)
+    - Consumo promedio por hora (para máquinas)
+    - Kilómetros/horas recorridos entre cargas
 
     Returns:
-        Diccionario con estadísticas
+        Diccionario con estadísticas completas
     """
+    # Obtener el camión para saber si es máquina o camión
+    camion = camion_service.obtener_por_id(db, camion_id)
+    if not camion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Camión/máquina no encontrado"
+        )
+
     query = db.query(SuministroCombustible).filter(
         SuministroCombustible.camion_id == camion_id
     )
@@ -744,25 +771,86 @@ def obtener_consumo_por_camion(
     if fecha_hasta:
         query = query.filter(func.date(SuministroCombustible.fecha) <= fecha_hasta)
 
-    suministros = query.all()
+    # Ordenar por fecha para calcular diferencias
+    suministros = query.order_by(SuministroCombustible.fecha.asc()).all()
 
     if not suministros:
         return {
             "camion_id": str(camion_id),
+            "patente": camion.patente,
+            "nombre": camion.nombre,
+            "categoria": camion.categoria,
+            "kilometraje_actual": camion.kilometraje_actual,
+            "horometro_actual": float(camion.horometro_actual) if camion.horometro_actual else None,
             "total_litros": Decimal("0"),
             "cantidad_suministros": 0,
-            "promedio_por_suministro": Decimal("0")
+            "promedio_por_suministro": Decimal("0"),
+            "consumo_litros_por_km": None,
+            "consumo_km_por_litro": None,
+            "consumo_litros_por_hora": None,
+            "total_km_recorridos": None,
+            "total_horas_trabajadas": None
         }
 
     total_litros = sum(s.litros for s in suministros)
     cantidad = len(suministros)
     promedio = total_litros / cantidad if cantidad > 0 else Decimal("0")
 
+    # Calcular consumo basado en diferencias entre suministros consecutivos
+    total_km_recorridos = None
+    total_horas_trabajadas = None
+    consumo_litros_por_km = None
+    consumo_km_por_litro = None
+    consumo_litros_por_hora = None
+
+    # Para camiones: calcular km recorridos
+    if camion.categoria == "CAMION":
+        suministros_con_km = [s for s in suministros if s.kilometraje and s.kilometraje > 0]
+        if len(suministros_con_km) >= 2:
+            # Calcular km totales entre primer y último suministro
+            km_inicial = suministros_con_km[0].kilometraje
+            km_final = suministros_con_km[-1].kilometraje
+            total_km_recorridos = km_final - km_inicial
+
+            # Litros consumidos entre esos suministros (excluyendo el primero)
+            litros_periodo = sum(s.litros for s in suministros_con_km[1:])
+
+            if total_km_recorridos > 0 and litros_periodo > 0:
+                consumo_litros_por_km = round(float(litros_periodo) / total_km_recorridos, 3)
+                consumo_km_por_litro = round(total_km_recorridos / float(litros_periodo), 2)
+
+    # Para máquinas: calcular horas trabajadas
+    if camion.categoria == "MAQUINA":
+        suministros_con_horas = [s for s in suministros if s.horometro and s.horometro > 0]
+        if len(suministros_con_horas) >= 2:
+            # Calcular horas totales entre primer y último suministro
+            horas_inicial = float(suministros_con_horas[0].horometro)
+            horas_final = float(suministros_con_horas[-1].horometro)
+            total_horas_trabajadas = round(horas_final - horas_inicial, 1)
+
+            # Litros consumidos entre esos suministros (excluyendo el primero)
+            litros_periodo = sum(s.litros for s in suministros_con_horas[1:])
+
+            if total_horas_trabajadas > 0 and litros_periodo > 0:
+                consumo_litros_por_hora = round(float(litros_periodo) / total_horas_trabajadas, 2)
+
     return {
         "camion_id": str(camion_id),
-        "total_litros": round(total_litros, 2),
+        "patente": camion.patente,
+        "nombre": camion.nombre,
+        "categoria": camion.categoria,
+        "kilometraje_actual": camion.kilometraje_actual,
+        "horometro_actual": float(camion.horometro_actual) if camion.horometro_actual else None,
+        "total_litros": round(float(total_litros), 2),
         "cantidad_suministros": cantidad,
-        "promedio_por_suministro": round(promedio, 2)
+        "promedio_por_suministro": round(float(promedio), 2),
+        # Métricas de consumo para camiones
+        "consumo_litros_por_km": consumo_litros_por_km,
+        "consumo_km_por_litro": consumo_km_por_litro,
+        "total_km_recorridos": total_km_recorridos,
+        # Métricas de consumo para máquinas
+        "consumo_litros_por_hora": consumo_litros_por_hora,
+        "total_horas_trabajadas": total_horas_trabajadas
     }
 
 
