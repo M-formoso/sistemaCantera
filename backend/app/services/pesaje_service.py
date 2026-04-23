@@ -621,10 +621,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
     # Verificar si el usuario es administrador
     es_admin = usuario and usuario.rol == RolEnum.ADMINISTRADOR
 
-    # IMPORTANTE: La fecha del ticket NUNCA se puede modificar después de completado
-    # La fecha es cuando se pesó el BRUTO y es la fecha real del ticket
-    if 'fecha' in update_data:
-        del update_data['fecha']
+    # Permitir edición de fecha para corregir tickets de días anteriores
+    # La fecha se puede modificar y se sincronizará con el remito y cuenta corriente
+    fecha_actualizada = 'fecha' in update_data and update_data['fecha'] is not None
 
     # Si ya tiene remito generado y NO es admin, restringir campos
     if db_pesaje.remito_generado and not es_admin:
@@ -678,7 +677,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         remito.producto = db_pesaje.material or remito.producto
         remito.observaciones = db_pesaje.observaciones
 
-        # NOTA: La fecha del remito NO se actualiza porque la fecha del ticket es inmutable
+        # Actualizar fecha del remito si se modificó la fecha del pesaje
+        if fecha_actualizada:
+            remito.fecha = db_pesaje.fecha.date() if hasattr(db_pesaje.fecha, 'date') else db_pesaje.fecha
 
         # Actualizar cliente
         if db_pesaje.cliente:
@@ -717,7 +718,9 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         ).first()
 
         if movimiento:
-            # NOTA: La fecha del movimiento NO se actualiza porque la fecha del ticket es inmutable
+            # Actualizar fecha del movimiento si se modificó la fecha del pesaje
+            if fecha_actualizada:
+                movimiento.fecha = db_pesaje.fecha.date() if hasattr(db_pesaje.fecha, 'date') else db_pesaje.fecha
 
             # Actualizar monto si cambió el importe_total
             if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):

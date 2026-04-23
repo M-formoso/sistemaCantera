@@ -113,6 +113,9 @@ class PesajeCreate(PesajeBase):
 class PesajeUpdate(BaseModel):
     """Schema para actualizar Pesaje"""
 
+    # Fecha del ticket (editable para corregir fecha de carga)
+    fecha: Optional[Union[datetime, date, str]] = None
+
     tipo_entrega: Optional[Literal["propio", "transportista"]] = None
     camion_id: Optional[UUID] = None
     transportista_id: Optional[UUID] = None
@@ -130,6 +133,22 @@ class PesajeUpdate(BaseModel):
     precio_fijo: Optional[Decimal] = Field(None, ge=0)
     importe_total: Optional[Decimal] = Field(None, ge=0)
     orden_entrega_id: Optional[UUID] = None
+
+    @field_validator('fecha', mode='before')
+    @classmethod
+    def parse_fecha(cls, v):
+        """Convertir string a datetime si es necesario"""
+        if v is None:
+            return v
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    return datetime.strptime(v, '%Y-%m-%d')
+                except ValueError:
+                    raise ValueError('Formato de fecha inválido')
+        return v
 
 
 class PesajeSchema(ResponseBase):
