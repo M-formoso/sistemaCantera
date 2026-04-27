@@ -81,12 +81,12 @@ export default function NuevoCobroModal({
 
   // Calcular totales
   const totalHaber = useMemo(() =>
-    itemsHaber.reduce((sum, item) => sum + (item.monto || 0), 0),
+    itemsHaber.reduce((sum, item) => sum + (Number(item.monto) || 0), 0),
     [itemsHaber]
   )
 
   const totalDebe = useMemo(() =>
-    itemsDebe.reduce((sum, item) => sum + (item.monto || 0), 0),
+    itemsDebe.reduce((sum, item) => sum + (Number(item.monto) || 0), 0),
     [itemsDebe]
   )
 
@@ -124,7 +124,7 @@ export default function NuevoCobroModal({
     const nuevoItem: ItemCobro = {
       tipo_item: 'factura',
       concepto: 'debe',
-      monto: factura.saldo_pendiente,
+      monto: Number(factura.saldo_pendiente) || 0,
       descripcion: `Factura ${factura.numero_factura}`,
       factura_id: factura.id,
     }
@@ -135,7 +135,7 @@ export default function NuevoCobroModal({
     const nuevoItem: ItemCobro = {
       tipo_item: 'ticket',
       concepto: 'debe',
-      monto: ticket.saldo_pendiente,
+      monto: Number(ticket.saldo_pendiente) || 0,
       descripcion: `${ticket.tipo === 'remito' ? 'Remito' : 'Pesaje'} #${ticket.numero}`,
       // Si es remito usar remito_id, si es pesaje usar pesaje_id
       remito_id: ticket.tipo === 'remito' ? ticket.id : undefined,
