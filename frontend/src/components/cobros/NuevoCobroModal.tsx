@@ -249,7 +249,7 @@ export default function NuevoCobroModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <Card className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <CardHeader className="flex-shrink-0 border-b">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -530,77 +530,105 @@ export default function NuevoCobroModal({
               </div>
 
               {/* Documentos pendientes */}
-              {documentosPendientes && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Facturas */}
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Facturas Pendientes
-                    </h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {documentosPendientes.facturas.map((factura) => {
-                        const yaAgregada = itemsDebe.some(i => i.factura_id === factura.id)
-                        return (
-                          <div
-                            key={factura.id}
-                            className={`border rounded p-2 text-sm flex justify-between items-center ${
-                              yaAgregada ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50 cursor-pointer'
-                            }`}
-                            onClick={() => !yaAgregada && agregarItemDebeFactura(factura)}
-                          >
-                            <div>
-                              <p className="font-medium">{factura.numero_factura}</p>
-                              <p className="text-xs text-gray-500">{factura.fecha_emision}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium">${formatNumber(factura.saldo_pendiente, 2)}</p>
-                              {yaAgregada && <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {documentosPendientes.facturas.length === 0 && (
-                        <p className="text-gray-500 text-sm">No hay facturas pendientes</p>
-                      )}
-                    </div>
-                  </div>
+              {documentosPendientes && (() => {
+                const hayFacturas = documentosPendientes.facturas.length > 0
+                const hayTickets = documentosPendientes.tickets.length > 0
+                const usarDosColumnas = hayFacturas && hayTickets
 
-                  {/* Tickets */}
-                  <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <Receipt className="h-4 w-4" />
-                      Tickets/Remitos Pendientes
-                    </h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {documentosPendientes.tickets.map((ticket) => {
-                        const yaAgregado = itemsDebe.some(i => i.remito_id === ticket.id)
-                        return (
-                          <div
-                            key={ticket.id}
-                            className={`border rounded p-2 text-sm flex justify-between items-center ${
-                              yaAgregado ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50 cursor-pointer'
-                            }`}
-                            onClick={() => !yaAgregado && agregarItemDebeTicket(ticket)}
-                          >
-                            <div>
-                              <p className="font-medium">#{ticket.numero}</p>
-                              <p className="text-xs text-gray-500">{ticket.material}</p>
+                return (
+                  <div className={`grid gap-4 ${usarDosColumnas ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                    {/* Facturas */}
+                    {hayFacturas && (
+                      <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Facturas Pendientes
+                          <span className="text-xs text-gray-500 font-normal">
+                            ({documentosPendientes.facturas.length})
+                          </span>
+                        </h4>
+                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                          {documentosPendientes.facturas.map((factura) => {
+                            const yaAgregada = itemsDebe.some(i => i.factura_id === factura.id)
+                            return (
+                              <div
+                                key={factura.id}
+                                className={`border rounded-lg p-3 flex justify-between items-center transition-colors ${
+                                  yaAgregada ? 'bg-green-50 border-green-300' : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+                                }`}
+                                onClick={() => !yaAgregada && agregarItemDebeFactura(factura)}
+                              >
+                                <div>
+                                  <p className="font-semibold text-base">{factura.numero_factura}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5">{factura.fecha_emision}</p>
+                                </div>
+                                <div className="text-right flex items-center gap-2">
+                                  <p className="font-semibold text-base">${formatNumber(factura.saldo_pendiente, 2)}</p>
+                                  {yaAgregada && <CheckCircle className="h-5 w-5 text-green-600" />}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tickets */}
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Receipt className="h-4 w-4" />
+                        Tickets/Remitos Pendientes
+                        <span className="text-xs text-gray-500 font-normal">
+                          ({documentosPendientes.tickets.length})
+                        </span>
+                      </h4>
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                        {documentosPendientes.tickets.map((ticket) => {
+                          const yaAgregado = itemsDebe.some(
+                            i => i.remito_id === ticket.id || i.pesaje_id === ticket.id
+                          )
+                          const pesoTn = ticket.peso_neto
+                            ? (Number(ticket.peso_neto) / 1000).toFixed(2)
+                            : null
+                          return (
+                            <div
+                              key={ticket.id}
+                              className={`border rounded-lg p-3 flex justify-between items-center transition-colors ${
+                                yaAgregado ? 'bg-green-50 border-green-300' : 'hover:bg-blue-50 hover:border-blue-300 cursor-pointer'
+                              }`}
+                              onClick={() => !yaAgregado && agregarItemDebeTicket(ticket)}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-base">
+                                  Pesaje #{ticket.numero}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                                  {ticket.fecha}
+                                  {ticket.material && ` · ${ticket.material}`}
+                                  {pesoTn && ` · ${pesoTn} tn`}
+                                </p>
+                              </div>
+                              <div className="text-right flex items-center gap-2 flex-shrink-0 ml-3">
+                                <p className="font-semibold text-base">${formatNumber(ticket.saldo_pendiente, 2)}</p>
+                                {yaAgregado && <CheckCircle className="h-5 w-5 text-green-600" />}
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-medium">${formatNumber(ticket.saldo_pendiente, 2)}</p>
-                              {yaAgregado && <CheckCircle className="h-4 w-4 text-green-600 ml-auto" />}
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {documentosPendientes.tickets.length === 0 && (
-                        <p className="text-gray-500 text-sm">No hay tickets pendientes</p>
-                      )}
+                          )
+                        })}
+                        {!hayTickets && (
+                          <p className="text-gray-500 text-sm">No hay tickets pendientes</p>
+                        )}
+                      </div>
                     </div>
+
+                    {!hayFacturas && !hayTickets && (
+                      <p className="text-gray-500 text-sm col-span-full text-center py-4">
+                        No hay documentos pendientes para este cliente
+                      </p>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Items seleccionados */}
               <div>

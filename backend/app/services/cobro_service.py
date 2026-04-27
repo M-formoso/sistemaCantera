@@ -785,10 +785,12 @@ def obtener_documentos_pendientes(
         Remito.facturado == False
     ).order_by(Remito.fecha).all()
 
+    # Mostrar el numero_pesaje (no el numero_remito) para que coincida
+    # con la descripción de los cargos en la cuenta corriente
     tickets = [
         TicketPendienteSchema(
             id=r.id,
-            numero=r.numero_remito,
+            numero=r.pesaje.numero_pesaje if r.pesaje else r.numero_remito,
             tipo="remito",
             fecha=r.fecha,
             material=r.producto,
@@ -825,7 +827,7 @@ def obtener_documentos_pendientes(
 
                 tickets.append(TicketPendienteSchema(
                     id=remito_existente.id,
-                    numero=remito_existente.numero_remito,
+                    numero=p.numero_pesaje,
                     tipo="remito",
                     fecha=remito_existente.fecha,
                     material=remito_existente.producto,
