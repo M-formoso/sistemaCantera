@@ -9,10 +9,81 @@ from decimal import Decimal
 from datetime import date
 from fastapi import HTTPException, status
 
-from app.models.cuenta_corriente import MovimientoCuentaCorriente
+from app.models.cuenta_corriente import MovimientoCuentaCorriente, HistorialMovimientoCC
 from app.models.empresa import Empresa
 from app.models.pesaje import Pesaje
+from app.models.usuario import Usuario
 from app.models.finanzas import MovimientoFinanciero, CategoriaFinanzas
+
+
+def _registrar_historial(
+    db: Session,
+    movimiento_id: UUID,
+    usuario_id: UUID,
+    accion: str,
+    detalle: Optional[str] = None,
+) -> None:
+    """Registra una entrada en el historial de un movimiento de cuenta corriente"""
+    historial = HistorialMovimientoCC(
+        movimiento_id=movimiento_id,
+        usuario_id=usuario_id,
+        accion=accion,
+        detalle=detalle,
+    )
+    db.add(historial)
+
+
+def obtener_historial_movimiento(db: Session, movimiento_id: UUID) -> List[dict]:
+    """Obtiene el historial de un movimiento de cuenta corriente.
+
+    Si el movimiento no tiene entradas registradas (movimientos previos a la
+    implementación del historial), genera al menos un registro de creación
+    a partir de los datos del propio movimiento.
+    """
+    movimiento = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.id == movimiento_id
+    ).first()
+
+    if not movimiento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movimiento no encontrado",
+        )
+
+    entradas = db.query(HistorialMovimientoCC).filter(
+        HistorialMovimientoCC.movimiento_id == movimiento_id
+    ).order_by(desc(HistorialMovimientoCC.created_at)).all()
+
+    resultado = []
+    for h in entradas:
+        usuario = db.query(Usuario).filter(Usuario.id == h.usuario_id).first()
+        resultado.append({
+            "id": h.id,
+            "fecha": h.created_at,
+            "usuario_nombre": usuario.nombre if usuario else "Usuario desconocido",
+            "accion": h.accion,
+            "detalle": h.detalle,
+        })
+
+    if not resultado:
+        creador = db.query(Usuario).filter(Usuario.id == movimiento.created_by).first()
+        resultado.append({
+            "id": None,
+            "fecha": movimiento.created_at,
+            "usuario_nombre": creador.nombre if creador else "Usuario desconocido",
+            "accion": "CREACION",
+            "detalle": None,
+        })
+        if movimiento.anulado:
+            resultado.insert(0, {
+                "id": None,
+                "fecha": movimiento.updated_at,
+                "usuario_nombre": creador.nombre if creador else "Usuario desconocido",
+                "accion": "ANULACION",
+                "detalle": movimiento.motivo_anulacion,
+            })
+
+    return resultado
 
 
 def obtener_saldo_cliente(db: Session, empresa_id: UUID) -> Decimal:
@@ -141,6 +212,14 @@ def registrar_cargo_pesaje(
     empresa.saldo_cuenta_corriente = saldo_posterior
 
     db.add(movimiento)
+    db.flush()
+    _registrar_historial(
+        db,
+        movimiento.id,
+        usuario_id,
+        "CREACION",
+        f"Cargo automático por pesaje #{pesaje.numero_pesaje}",
+    )
     db.commit()
     db.refresh(movimiento)
 
@@ -240,6 +319,13 @@ def registrar_pago(
         # Vincular movimiento CC con ingreso
         movimiento.movimiento_financiero_id = ingreso.id
 
+    _registrar_historial(
+        db,
+        movimiento.id,
+        usuario_id,
+        "CREACION",
+        f"Pago registrado{f' ({metodo_pago})' if metodo_pago else ''}",
+    )
     db.commit()
     db.refresh(movimiento)
 
@@ -293,6 +379,14 @@ def registrar_ajuste(
     empresa.saldo_cuenta_corriente = saldo_posterior
 
     db.add(movimiento)
+    db.flush()
+    _registrar_historial(
+        db,
+        movimiento.id,
+        usuario_id,
+        "CREACION",
+        f"{tipo_ajuste}",
+    )
     db.commit()
     db.refresh(movimiento)
 
@@ -365,6 +459,12 @@ def actualizar_monto_cargo(
             if precio_unitario:
                 pesaje.precio_unitario = precio_unitario
 
+    if usuario_id:
+        detalle_hist = f"Monto: ${monto_anterior:,.2f} → ${nuevo_monto:,.2f}"
+        if precio_unitario:
+            detalle_hist += f" (precio/tn: ${precio_unitario:,.2f})"
+        _registrar_historial(db, movimiento.id, usuario_id, "MODIFICACION", detalle_hist)
+
     db.commit()
     db.refresh(movimiento)
 
@@ -414,6 +514,8 @@ def anular_movimiento(
         ).first()
         if ingreso:
             ingreso.estado = "anulado"
+
+    _registrar_historial(db, movimiento.id, usuario_id, "ANULACION", motivo)
 
     db.commit()
     db.refresh(movimiento)

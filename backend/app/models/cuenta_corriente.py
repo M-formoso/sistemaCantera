@@ -9,6 +9,27 @@ import enum
 from app.models.base import BaseModel
 
 
+class HistorialMovimientoCC(BaseModel):
+    """Historial de acciones sobre movimientos de cuenta corriente"""
+
+    __tablename__ = "historial_movimientos_cc"
+
+    movimiento_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("movimientos_cuenta_corriente.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    accion = Column(String(50), nullable=False)  # CREACION, MODIFICACION, ANULACION
+    detalle = Column(Text)
+
+    usuario = relationship("Usuario")
+
+    def __repr__(self):
+        return f"<HistorialMovimientoCC {self.accion} - {self.created_at}>"
+
+
 class TipoMovimientoCCEnum(str, enum.Enum):
     """Tipo de movimiento en cuenta corriente"""
     CARGO = "cargo"  # Deuda (pesaje, servicio, etc.)
@@ -75,6 +96,12 @@ class MovimientoCuentaCorriente(BaseModel):
     pesaje = relationship("Pesaje")
     movimiento_financiero = relationship("MovimientoFinanciero")
     creador = relationship("Usuario")
+    historial = relationship(
+        "HistorialMovimientoCC",
+        backref="movimiento",
+        cascade="all, delete-orphan",
+        order_by="desc(HistorialMovimientoCC.created_at)",
+    )
 
     def __repr__(self):
         return f"<MovimientoCC {self.tipo} ${self.monto} - {self.empresa_id}>"

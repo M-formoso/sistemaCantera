@@ -101,3 +101,15 @@ class ActualizarMontoRequest(BaseModel):
     """Request para actualizar el monto de un cargo"""
     monto: Decimal = Field(..., ge=0)
     precio_unitario: Optional[Decimal] = Field(None, ge=0)  # Precio por tonelada
+
+
+class HistorialMovimientoCCSchema(BaseModel):
+    """Schema de respuesta del historial de un movimiento"""
+    id: Optional[UUID] = None
+    fecha: datetime
+    usuario_nombre: str
+    accion: str
+    detalle: Optional[str] = None
+
+    class Config:
+        from_attributes = True

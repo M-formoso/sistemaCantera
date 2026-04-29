@@ -124,6 +124,38 @@ export const actualizarMontoCargo = async (
   return data
 }
 
+export interface HistorialMovimientoItem {
+  id: string | null
+  fecha: string
+  usuario_nombre: string
+  accion: string
+  detalle?: string | null
+}
+
+// Obtener historial de un movimiento
+export const getHistorialMovimiento = async (movimientoId: string): Promise<HistorialMovimientoItem[]> => {
+  const { data } = await api.get<HistorialMovimientoItem[]>(
+    `/cuenta-corriente/movimientos/${movimientoId}/historial`
+  )
+  return data
+}
+
+// Descargar comprobante PDF de un movimiento
+export const descargarComprobantePDF = async (movimientoId: string, filename?: string): Promise<void> => {
+  const response = await api.get<Blob>(`/cuenta-corriente/movimientos/${movimientoId}/comprobante-pdf`, {
+    responseType: 'blob',
+  })
+  const blob = new Blob([response.data], { type: 'application/pdf' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || `comprobante_${movimientoId}.pdf`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
 export const cuentaCorrienteService = {
   getClientesConDeuda,
   getResumenCliente,
@@ -133,6 +165,8 @@ export const cuentaCorrienteService = {
   registrarAjuste,
   anularMovimiento,
   actualizarMontoCargo,
+  getHistorialMovimiento,
+  descargarComprobantePDF,
 }
 
 export default cuentaCorrienteService

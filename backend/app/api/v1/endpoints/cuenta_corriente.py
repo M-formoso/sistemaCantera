@@ -1,7 +1,8 @@
 """
 Endpoints API para Cuenta Corriente
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -9,6 +10,8 @@ from datetime import date
 
 from app.core.deps import get_db, get_current_active_user, require_admin_or_operador
 from app.models.usuario import Usuario
+from app.models.cuenta_corriente import MovimientoCuentaCorriente
+from app.models.empresa import Empresa
 from app.schemas.cuenta_corriente import (
     MovimientoCCSchema,
     PagoCreate,
@@ -16,7 +19,8 @@ from app.schemas.cuenta_corriente import (
     ResumenCuentaCorriente,
     ClienteConDeuda,
     AnularMovimientoRequest,
-    ActualizarMontoRequest
+    ActualizarMontoRequest,
+    HistorialMovimientoCCSchema,
 )
 from app.services import cuenta_corriente_service
 
@@ -187,3 +191,64 @@ async def actualizar_monto_cargo(
     if movimiento.empresa:
         result.empresa_nombre = movimiento.empresa.nombre
     return result
+
+
+@router.get("/movimientos/{movimiento_id}/historial", response_model=List[HistorialMovimientoCCSchema])
+async def obtener_historial_movimiento(
+    movimiento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user),
+):
+    """Obtiene el historial de un movimiento de cuenta corriente."""
+    return cuenta_corriente_service.obtener_historial_movimiento(db, movimiento_id)
+
+
+@router.get("/movimientos/{movimiento_id}/comprobante-pdf")
+async def descargar_comprobante_pdf(
+    movimiento_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user),
+):
+    """Genera y descarga un PDF tipo comprobante para un movimiento."""
+    movimiento = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.id == movimiento_id
+    ).first()
+
+    if not movimiento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movimiento no encontrado",
+        )
+
+    empresa = db.query(Empresa).filter(Empresa.id == movimiento.empresa_id).first()
+
+    data = {
+        "tipo": movimiento.tipo,
+        "fecha": movimiento.fecha,
+        "descripcion": movimiento.descripcion,
+        "detalle": movimiento.detalle,
+        "monto": float(movimiento.monto) if movimiento.monto is not None else 0,
+        "saldo_anterior": float(movimiento.saldo_anterior) if movimiento.saldo_anterior is not None else 0,
+        "saldo_posterior": float(movimiento.saldo_posterior) if movimiento.saldo_posterior is not None else 0,
+        "metodo_pago": movimiento.metodo_pago,
+        "numero_comprobante": movimiento.numero_comprobante,
+        "banco": movimiento.banco,
+        "referencia_pago": movimiento.referencia_pago,
+        "anulado": movimiento.anulado,
+        "motivo_anulacion": movimiento.motivo_anulacion,
+        "notas": movimiento.notas,
+        "cliente_nombre": empresa.nombre if empresa else None,
+        "cliente_cuit": empresa.cuit if empresa else None,
+    }
+
+    from app.tasks.reportes import generar_comprobante_movimiento_cc_pdf
+    pdf_buffer = generar_comprobante_movimiento_cc_pdf(data)
+
+    fecha_str = movimiento.fecha.strftime("%Y%m%d") if movimiento.fecha else "sin_fecha"
+    filename = f"comprobante_{movimiento.tipo}_{fecha_str}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

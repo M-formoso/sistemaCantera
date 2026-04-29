@@ -3,26 +3,36 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown,
-  X, Search, Pencil, DollarSign
+  X, Search, Pencil, DollarSign, Trash2, MoreVertical, History
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
-import { cuentaCorrienteService } from '@/services/cuentaCorrienteService'
+import { cuentaCorrienteService, type HistorialMovimientoItem } from '@/services/cuentaCorrienteService'
 import { empresasService } from '@/services/empresasService'
 import { facturacionService } from '@/services/facturacionService'
 import { formatDate, formatNumber, getTodayLocalDate } from '@/lib/utils'
+import { useIsAdmin } from '@/hooks/useIsAdmin'
 import NuevoCobroModal from '@/components/cobros/NuevoCobroModal'
 
 export default function CuentaCorrienteTab() {
   const queryClient = useQueryClient()
+  const isAdmin = useIsAdmin()
   const [selectedCliente, setSelectedCliente] = useState<string | null>(null)
   const [showPagoModal, setShowPagoModal] = useState(false)
   const [showAjusteModal, setShowAjusteModal] = useState(false)
   const [showEditarMontoModal, setShowEditarMontoModal] = useState(false)
   const [showNuevoCobroModal, setShowNuevoCobroModal] = useState(false)
+  const [showAnularModal, setShowAnularModal] = useState(false)
+  const [showHistorialModal, setShowHistorialModal] = useState(false)
   const [movimientoAEditar, setMovimientoAEditar] = useState<any>(null)
+  const [movimientoAAnular, setMovimientoAAnular] = useState<any>(null)
+  const [historialMovimiento, setHistorialMovimiento] = useState<any>(null)
+  const [historial, setHistorial] = useState<HistorialMovimientoItem[]>([])
+  const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [menuAbiertoId, setMenuAbiertoId] = useState<string | null>(null)
+  const [descargandoComprobante, setDescargandoComprobante] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
 
   // Paginación de clientes
@@ -107,6 +117,37 @@ export default function CuentaCorrienteTab() {
     } catch (error) {
       console.error('Error al descargar PDF:', error)
       alert('Error al descargar el PDF')
+    }
+  }
+
+  // Descargar comprobante de un movimiento
+  const handleDescargarComprobante = async (mov: any) => {
+    setDescargandoComprobante(mov.id)
+    try {
+      const fechaStr = mov.fecha?.replace(/-/g, '') || 'sin_fecha'
+      const filename = `comprobante_${mov.tipo}_${fechaStr}.pdf`
+      await cuentaCorrienteService.descargarComprobantePDF(mov.id, filename)
+    } catch (error) {
+      console.error('Error al descargar comprobante:', error)
+      alert('Error al descargar el comprobante')
+    } finally {
+      setDescargandoComprobante(null)
+    }
+  }
+
+  // Ver historial de un movimiento
+  const handleVerHistorial = async (mov: any) => {
+    setHistorialMovimiento(mov)
+    setShowHistorialModal(true)
+    setCargandoHistorial(true)
+    try {
+      const data = await cuentaCorrienteService.getHistorialMovimiento(mov.id)
+      setHistorial(data)
+    } catch (error) {
+      console.error('Error al cargar historial:', error)
+      setHistorial([])
+    } finally {
+      setCargandoHistorial(false)
     }
   }
 
@@ -316,20 +357,81 @@ export default function CuentaCorrienteTab() {
                             <td className="px-4 py-3 text-sm text-right font-bold">
                               ${formatNumber(mov.saldo_posterior, 2)}
                             </td>
-                            <td className="px-4 py-3 text-center">
-                              {mov.tipo === 'cargo' && !mov.anulado && (
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-1">
+                                {/* Descargar comprobante */}
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    setMovimientoAEditar(mov)
-                                    setShowEditarMontoModal(true)
-                                  }}
-                                  title="Editar monto"
+                                  onClick={() => handleDescargarComprobante(mov)}
+                                  disabled={descargandoComprobante === mov.id}
+                                  title="Descargar comprobante"
                                 >
-                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                  <Download className="h-4 w-4 text-green-600" />
                                 </Button>
-                              )}
+
+                                {/* Editar monto (solo para cargos) */}
+                                {mov.tipo === 'cargo' && !mov.anulado && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setMovimientoAEditar(mov)
+                                      setShowEditarMontoModal(true)
+                                    }}
+                                    title="Editar monto"
+                                  >
+                                    <Pencil className="h-4 w-4 text-blue-600" />
+                                  </Button>
+                                )}
+
+                                {/* Anular movimiento */}
+                                {isAdmin && !mov.anulado && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setMovimientoAAnular(mov)
+                                      setShowAnularModal(true)
+                                    }}
+                                    title="Anular movimiento"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                )}
+
+                                {/* Menú 3 puntos: Historial */}
+                                <div className="relative">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setMenuAbiertoId(menuAbiertoId === mov.id ? null : mov.id)}
+                                    title="Más opciones"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                  {menuAbiertoId === mov.id && (
+                                    <>
+                                      <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setMenuAbiertoId(null)}
+                                      />
+                                      <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-20">
+                                        <button
+                                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-gray-100"
+                                          onClick={() => {
+                                            setMenuAbiertoId(null)
+                                            handleVerHistorial(mov)
+                                          }}
+                                        >
+                                          <History className="h-4 w-4 text-blue-600" />
+                                          Historial
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -427,6 +529,166 @@ export default function CuentaCorrienteTab() {
           queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
         }}
       />
+
+      {/* Modal Anular Movimiento */}
+      {showAnularModal && movimientoAAnular && (
+        <AnularMovimientoModal
+          movimiento={movimientoAAnular}
+          onClose={() => {
+            setShowAnularModal(false)
+            setMovimientoAAnular(null)
+          }}
+          onSuccess={() => {
+            setShowAnularModal(false)
+            setMovimientoAAnular(null)
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+            queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+          }}
+        />
+      )}
+
+      {/* Modal Historial */}
+      {showHistorialModal && historialMovimiento && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-blue-600" />
+                  Historial del Movimiento
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowHistorialModal(false)
+                    setHistorialMovimiento(null)
+                    setHistorial([])
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-gray-500 mt-1 truncate">{historialMovimiento.descripcion}</p>
+            </CardHeader>
+            <CardContent>
+              {cargandoHistorial ? (
+                <div className="py-8 text-center text-gray-500">Cargando historial...</div>
+              ) : historial.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">No hay registros de historial</div>
+              ) : (
+                <div className="space-y-2">
+                  {historial.map((item, idx) => {
+                    const fecha = new Date(item.fecha)
+                    const fechaStr = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                    const horaStr = fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div
+                        key={item.id || `idx-${idx}`}
+                        className="py-2 px-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-600">{fechaStr} - {horaStr}</span>
+                            <span className="font-medium text-sm">
+                              {item.usuario_nombre.toUpperCase()}
+                            </span>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                            item.accion === 'CREACION' ? 'bg-green-100 text-green-700' :
+                            item.accion === 'MODIFICACION' ? 'bg-yellow-100 text-yellow-700' :
+                            item.accion === 'ANULACION' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {item.accion}
+                          </span>
+                        </div>
+                        {item.detalle && (
+                          <p className="text-xs text-gray-500 mt-1 italic">{item.detalle}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Modal para anular un movimiento
+function AnularMovimientoModal({
+  movimiento,
+  onClose,
+  onSuccess,
+}: {
+  movimiento: any
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [motivo, setMotivo] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => cuentaCorrienteService.anularMovimiento(movimiento.id, motivo),
+    onSuccess,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (motivo.trim().length < 5) {
+      alert('El motivo debe tener al menos 5 caracteres')
+      return
+    }
+    mutation.mutate()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Anular Movimiento
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">{movimiento.descripcion}</p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-sm text-red-700">
+              Esta acción revertirá el saldo del cliente. El movimiento quedará marcado como anulado y no se eliminará.
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo de anulación *</label>
+              <Input
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                placeholder="Indique el motivo (mínimo 5 caracteres)"
+              />
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button
+                type="submit"
+                disabled={mutation.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                {mutation.isPending ? 'Anulando...' : 'Anular Movimiento'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -641,3 +641,202 @@ def generar_pdf_remito(remito_id: str):
 
     finally:
         db.close()
+
+
+def generar_comprobante_movimiento_cc_pdf(data: dict) -> BytesIO:
+    """Genera un PDF tipo comprobante para un movimiento de cuenta corriente.
+
+    Soporta los tres tipos: cargo, pago y ajuste. Incluye datos del cliente,
+    descripción, monto y saldos anterior/posterior.
+    """
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    normal_style = ParagraphStyle(
+        'NormalCmp', parent=styles['Normal'], fontSize=11, leading=14
+    )
+    tipo_style = ParagraphStyle(
+        'TipoCmp', parent=styles['Normal'], fontSize=12,
+        fontName='Helvetica-Bold', alignment=TA_RIGHT,
+        textColor=colors.HexColor('#666666'),
+    )
+    title_style = ParagraphStyle(
+        'TitleCmp', parent=styles['Heading2'], fontSize=18,
+        fontName='Helvetica-Bold', alignment=TA_CENTER,
+        spaceBefore=4 * mm, spaceAfter=6 * mm,
+    )
+
+    elements = []
+
+    # Encabezado: logo + empresa + tipo de comprobante
+    logo_cell = ""
+    if os.path.exists(LOGO_PATH):
+        try:
+            logo_cell = Image(LOGO_PATH, width=45 * mm, height=35 * mm, kind='proportional')
+        except Exception as e:
+            print(f"Error al cargar logo: {e}")
+
+    empresa_info = Paragraph(
+        "<b>Canteras La Rufina – TBF SRL</b><br/>"
+        "<font size='10'>Ruta C45 – Km 11 – Falda del Carmen</font><br/>"
+        "<font size='10'>Tel: 351 537-2741</font>",
+        ParagraphStyle('EmpresaInfoCmp', parent=styles['Normal'], fontSize=14, leading=18),
+    )
+
+    tipo_movimiento = (data.get("tipo") or "").upper()
+    tipo_label = {
+        "CARGO": "COMPROBANTE DE CARGO",
+        "PAGO": "RECIBO DE PAGO",
+        "AJUSTE": "COMPROBANTE DE AJUSTE",
+    }.get(tipo_movimiento, "COMPROBANTE DE MOVIMIENTO")
+
+    tipo_cell = Paragraph(f"<b>{tipo_label}</b>", tipo_style)
+
+    header_table = Table(
+        [[logo_cell, empresa_info, tipo_cell]],
+        colWidths=[50 * mm, 80 * mm, 40 * mm],
+    )
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+    ]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 4 * mm))
+
+    elements.append(Paragraph(tipo_label, title_style))
+
+    # Datos del cliente y movimiento
+    fecha = data.get("fecha")
+    if isinstance(fecha, datetime):
+        fecha_str = fecha.strftime("%d/%m/%Y")
+    elif fecha:
+        try:
+            fecha_str = datetime.fromisoformat(str(fecha)).strftime("%d/%m/%Y")
+        except Exception:
+            fecha_str = str(fecha)
+    else:
+        fecha_str = "-"
+
+    monto = data.get("monto") or 0
+    saldo_anterior = data.get("saldo_anterior") or 0
+    saldo_posterior = data.get("saldo_posterior") or 0
+
+    def fmt_money(v):
+        try:
+            return f"$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            return f"$ {v}"
+
+    info_rows = [
+        [Paragraph("<b>Fecha:</b>", normal_style), Paragraph(fecha_str, normal_style)],
+        [Paragraph("<b>Cliente:</b>", normal_style), Paragraph(data.get("cliente_nombre") or "-", normal_style)],
+        [Paragraph("<b>CUIT:</b>", normal_style), Paragraph(data.get("cliente_cuit") or "-", normal_style)],
+        [Paragraph("<b>Tipo:</b>", normal_style), Paragraph(tipo_movimiento or "-", normal_style)],
+    ]
+    if data.get("metodo_pago"):
+        info_rows.append([
+            Paragraph("<b>Método de pago:</b>", normal_style),
+            Paragraph(str(data["metodo_pago"]).capitalize(), normal_style),
+        ])
+    if data.get("numero_comprobante"):
+        info_rows.append([
+            Paragraph("<b>N° comprobante:</b>", normal_style),
+            Paragraph(str(data["numero_comprobante"]), normal_style),
+        ])
+    if data.get("banco"):
+        info_rows.append([
+            Paragraph("<b>Banco:</b>", normal_style),
+            Paragraph(str(data["banco"]), normal_style),
+        ])
+    if data.get("referencia_pago"):
+        info_rows.append([
+            Paragraph("<b>Referencia:</b>", normal_style),
+            Paragraph(str(data["referencia_pago"]), normal_style),
+        ])
+
+    info_table = Table(info_rows, colWidths=[45 * mm, 120 * mm])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 4 * mm))
+
+    # Descripción
+    elements.append(Paragraph("<b>Descripción</b>", normal_style))
+    elements.append(Paragraph(data.get("descripcion") or "-", normal_style))
+    if data.get("detalle"):
+        elements.append(Paragraph(f"<i>{data['detalle']}</i>", normal_style))
+    elements.append(Spacer(1, 4 * mm))
+
+    # Tabla de montos
+    monto_label = "Importe"
+    monto_color_hex = "#1a1a1a"
+    if tipo_movimiento == "CARGO":
+        monto_color_hex = "#b91c1c"
+    elif tipo_movimiento == "PAGO":
+        monto_color_hex = "#15803d"
+
+    montos_data = [
+        [Paragraph(f"<b>{monto_label}</b>", normal_style),
+         Paragraph(f"<font color='{monto_color_hex}'><b>{fmt_money(monto)}</b></font>", normal_style)],
+        [Paragraph("Saldo anterior", normal_style), Paragraph(fmt_money(saldo_anterior), normal_style)],
+        [Paragraph("<b>Saldo posterior</b>", normal_style),
+         Paragraph(f"<b>{fmt_money(saldo_posterior)}</b>", normal_style)],
+    ]
+    montos_table = Table(montos_data, colWidths=[100 * mm, 65 * mm])
+    montos_table.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#f3f4f6')),
+    ]))
+    elements.append(montos_table)
+    elements.append(Spacer(1, 6 * mm))
+
+    if data.get("anulado"):
+        elements.append(Paragraph(
+            "<font color='#b91c1c'><b>** MOVIMIENTO ANULADO **</b></font>",
+            ParagraphStyle('AnuladoCmp', parent=normal_style, alignment=TA_CENTER),
+        ))
+        if data.get("motivo_anulacion"):
+            elements.append(Paragraph(
+                f"<i>Motivo: {data['motivo_anulacion']}</i>",
+                ParagraphStyle('MotivoCmp', parent=normal_style, alignment=TA_CENTER),
+            ))
+        elements.append(Spacer(1, 4 * mm))
+
+    if data.get("notas"):
+        elements.append(Paragraph("<b>Notas</b>", normal_style))
+        elements.append(Paragraph(data["notas"], normal_style))
+        elements.append(Spacer(1, 4 * mm))
+
+    # Pie con espacio para firma
+    elements.append(Spacer(1, 12 * mm))
+    firma_table = Table(
+        [["", ""], [Paragraph("________________________", normal_style),
+                    Paragraph("________________________", normal_style)],
+         [Paragraph("Firma cliente", normal_style),
+          Paragraph("Firma autorizada", normal_style)]],
+        colWidths=[80 * mm, 80 * mm],
+    )
+    firma_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    elements.append(firma_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
