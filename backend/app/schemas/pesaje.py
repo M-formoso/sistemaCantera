@@ -381,6 +381,12 @@ class BusquedaPatenteResult(BaseModel):
     pesaje_pendiente_fecha: Optional[str] = None
 
 
+class CambiarClientePesajeRequest(BaseModel):
+    """Request para cambiar el cliente asignado a un pesaje"""
+
+    cliente_id: UUID = Field(..., description="ID del nuevo cliente (empresa tipo='cliente')")
+
+
 class PesajeCancelarCreate(BaseModel):
     """Schema para cancelar un pesaje pendiente (soft-delete con auditoría)"""
 

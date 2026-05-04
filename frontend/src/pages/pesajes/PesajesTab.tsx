@@ -2,14 +2,15 @@ import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Trash2, Download, Scale, Clock, Filter, X, FileDown, MoreVertical, History } from 'lucide-react'
+import { Plus, Pencil, Trash2, Download, Scale, Clock, Filter, X, FileDown, MoreVertical, History, UserCog } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/ui/data-table'
 import { pesajesService } from '@/services/pesajesService'
+import { empresasService } from '@/services/empresasService'
 import { reportesService } from '@/services/reportesService'
-import { Pesaje } from '@/types'
+import { Pesaje, Empresa } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/useIsAdmin'
 
@@ -56,6 +57,10 @@ export default function PesajesTab() {
   const [historialPesaje, setHistorialPesaje] = useState<{ id: string; numero: number } | null>(null)
   const [historial, setHistorial] = useState<HistorialItem[]>([])
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
+
+  // Estado para cambiar cliente
+  const [showCambiarClienteModal, setShowCambiarClienteModal] = useState(false)
+  const [pesajeACambiar, setPesajeACambiar] = useState<Pesaje | null>(null)
 
   // Query para pesajes - incluir cancelados si el filtro está activo
   const { data: pesajesRaw = [], isLoading } = useQuery({
@@ -370,7 +375,7 @@ export default function PesajesTab() {
                     className="fixed inset-0 z-10"
                     onClick={() => setMenuAbierto(false)}
                   />
-                  <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-20">
+                  <div className="absolute right-0 mt-1 w-44 bg-white border rounded-md shadow-lg z-20">
                     <button
                       className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-gray-100"
                       onClick={() => {
@@ -380,6 +385,17 @@ export default function PesajesTab() {
                     >
                       <History className="h-4 w-4 text-blue-600" />
                       Historial
+                    </button>
+                    <button
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-gray-100"
+                      onClick={() => {
+                        setMenuAbierto(false)
+                        setPesajeACambiar(pesaje)
+                        setShowCambiarClienteModal(true)
+                      }}
+                    >
+                      <UserCog className="h-4 w-4 text-purple-600" />
+                      Cambiar cliente
                     </button>
                   </div>
                 </>
@@ -664,6 +680,164 @@ export default function PesajesTab() {
           </Card>
         </div>
       )}
+
+      {/* Modal Cambiar Cliente */}
+      {showCambiarClienteModal && pesajeACambiar && (
+        <CambiarClienteModal
+          pesaje={pesajeACambiar}
+          onClose={() => {
+            setShowCambiarClienteModal(false)
+            setPesajeACambiar(null)
+          }}
+          onSuccess={() => {
+            setShowCambiarClienteModal(false)
+            setPesajeACambiar(null)
+            queryClient.invalidateQueries({ queryKey: ['pesajes'] })
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+            queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+            queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Modal para cambiar el cliente de un pesaje
+function CambiarClienteModal({
+  pesaje,
+  onClose,
+  onSuccess,
+}: {
+  pesaje: Pesaje
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [busqueda, setBusqueda] = useState('')
+  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>(pesaje.cliente_id || '')
+
+  const { data: clientes = [], isLoading } = useQuery<Empresa[]>({
+    queryKey: ['empresas-clientes'],
+    queryFn: () => empresasService.getClientes(),
+  })
+
+  const clientesFiltrados = useMemo(() => {
+    const q = busqueda.toLowerCase().trim()
+    if (!q) return clientes
+    return clientes.filter(c =>
+      c.nombre.toLowerCase().includes(q) ||
+      (c.cuit && c.cuit.includes(q))
+    )
+  }, [clientes, busqueda])
+
+  const mutation = useMutation({
+    mutationFn: () => pesajesService.cambiarCliente(pesaje.id, clienteIdSeleccionado),
+    onSuccess,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!clienteIdSeleccionado) {
+      alert('Seleccione un cliente')
+      return
+    }
+    if (clienteIdSeleccionado === pesaje.cliente_id) {
+      alert('El cliente seleccionado es el mismo que el actual')
+      return
+    }
+    mutation.mutate()
+  }
+
+  const importeTotal = pesaje.importe_total ?? 0
+  const tieneImporte = importeTotal > 0
+  const teniaCliente = !!pesaje.cliente_id
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-purple-600" />
+              Cambiar Cliente — Pesaje #{pesaje.numero_pesaje}
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Cliente actual: <strong>{pesaje.cliente_nombre || 'Sin cliente'}</strong>
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs text-blue-800 space-y-1">
+              <p>
+                {teniaCliente
+                  ? '🔁 El cargo en cuenta corriente del cliente actual se transferirá al cliente nuevo.'
+                  : '➕ Como el pesaje no tiene cliente asignado, se creará un nuevo movimiento en la cuenta corriente del cliente seleccionado.'}
+              </p>
+              {!tieneImporte && (
+                <p>
+                  Como el pesaje no tiene importe, se creará un cargo de <strong>$0</strong>. Después podés editarlo desde Cuenta Corriente.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Buscar cliente</label>
+              <Input
+                placeholder="Nombre o CUIT..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Seleccionar cliente *</label>
+              <div className="border rounded-md max-h-60 overflow-y-auto">
+                {isLoading ? (
+                  <div className="p-3 text-sm text-gray-500">Cargando...</div>
+                ) : clientesFiltrados.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">Sin resultados</div>
+                ) : (
+                  clientesFiltrados.map((cliente) => (
+                    <button
+                      key={cliente.id}
+                      type="button"
+                      onClick={() => setClienteIdSeleccionado(cliente.id)}
+                      className={`w-full px-3 py-2 text-left text-sm border-b last:border-b-0 transition ${
+                        clienteIdSeleccionado === cliente.id
+                          ? 'bg-purple-100 border-purple-300'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium">{cliente.nombre}</div>
+                      <div className="text-xs text-gray-500">
+                        {cliente.cuit ? `CUIT: ${cliente.cuit}` : 'Sin CUIT'}
+                        {cliente.id === pesaje.cliente_id && ' · (cliente actual)'}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="submit"
+                disabled={mutation.isPending || !clienteIdSeleccionado || clienteIdSeleccionado === pesaje.cliente_id}
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+              >
+                {mutation.isPending ? 'Aplicando...' : 'Aplicar cambio'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

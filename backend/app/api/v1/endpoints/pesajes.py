@@ -15,7 +15,7 @@ from app.schemas.pesaje import (
     PesajeIniciarCreate, PesajeCompletarCreate,
     PesajePendienteSchema, BusquedaPatenteResult,
     PesajeCancelarCreate, PesajeCanceladoSchema,
-    HistorialPesajeSchema
+    HistorialPesajeSchema, CambiarClientePesajeRequest,
 )
 from app.services import pesaje_service
 
@@ -235,6 +235,28 @@ async def actualizar_pesaje(
     - Otros usuarios solo pueden editar precio, importe y observaciones
     """
     return pesaje_service.actualizar(db, pesaje_id, pesaje_data, current_user)
+
+
+@router.patch("/{pesaje_id}/cliente", response_model=PesajeSchema)
+async def cambiar_cliente_pesaje(
+    pesaje_id: UUID,
+    request: CambiarClientePesajeRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador),
+):
+    """Cambia el cliente asignado a un pesaje y reconcilia cuenta corriente.
+
+    - Si el pesaje no tenía cliente, crea un movimiento nuevo (con $0 si no hay importe).
+    - Si tenía otro cliente, transfiere el cargo al cliente nuevo.
+    - Si el cliente coincide, no hace nada.
+    - Actualiza el remito asociado y registra el cambio en el historial.
+    """
+    return pesaje_service.cambiar_cliente_pesaje(
+        db=db,
+        pesaje_id=pesaje_id,
+        cliente_id_nuevo=request.cliente_id,
+        usuario_id=current_user.id,
+    )
 
 
 @router.delete("/{pesaje_id}")

@@ -123,6 +123,9 @@ const api = {
   put<T>(endpoint: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
     return request<T>('PUT', endpoint, data, config)
   },
+  patch<T>(endpoint: string, data?: any, config?: RequestConfig): Promise<{ data: T }> {
+    return request<T>('PATCH', endpoint, data, config)
+  },
   delete<T>(endpoint: string, config?: RequestConfig): Promise<{ data: T }> {
     return request<T>('DELETE', endpoint, undefined, config)
   },

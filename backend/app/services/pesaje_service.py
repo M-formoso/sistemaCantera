@@ -487,6 +487,128 @@ def _transferir_cargo_cuenta_corriente(
     # El commit se hace en la función llamadora (actualizar)
 
 
+def _aplicar_cambio_cliente_cc(
+    db: Session,
+    pesaje: Pesaje,
+    cliente_id_anterior: Optional[UUID],
+    cliente_id_nuevo: Optional[UUID],
+    usuario_id: UUID = None,
+) -> str:
+    """Reconcilia la cuenta corriente cuando cambia el cliente de un pesaje.
+
+    Casos:
+    - sin cambio → no hace nada
+    - sin cliente anterior y nuevo seteado → crea movimiento nuevo
+    - ambos seteados y diferentes → transfiere (puede crear si no había movimiento)
+    - cliente anterior seteado y nuevo None → no toca movimientos (caso defensivo)
+
+    El commit lo hace la función llamadora.
+    Retorna un código describiendo qué se hizo: 'sin_cambio', 'creado', 'transferido',
+    'transferido_creado', 'sin_accion'.
+    """
+    if cliente_id_anterior == cliente_id_nuevo:
+        return "sin_cambio"
+
+    movimiento_existente = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.pesaje_id == pesaje.id
+    ).first()
+
+    # Cliente nuevo None → no creamos movimiento, dejamos saldo como está
+    if not cliente_id_nuevo:
+        return "sin_accion"
+
+    # Sin cliente anterior y nuevo seteado → creamos movimiento nuevo
+    if not cliente_id_anterior:
+        _registrar_en_cuenta_corriente(db, pesaje, usuario_id)
+        return "creado"
+
+    # Ambos seteados y diferentes
+    if movimiento_existente:
+        _transferir_cargo_cuenta_corriente(
+            db=db,
+            pesaje=pesaje,
+            cliente_id_anterior=cliente_id_anterior,
+            cliente_id_nuevo=cliente_id_nuevo,
+            usuario_id=usuario_id,
+        )
+        return "transferido"
+
+    # Cambió cliente pero no había movimiento previo (caso roto histórico)
+    # Creamos uno para el cliente nuevo
+    _registrar_en_cuenta_corriente(db, pesaje, usuario_id)
+    return "transferido_creado"
+
+
+def cambiar_cliente_pesaje(
+    db: Session,
+    pesaje_id: UUID,
+    cliente_id_nuevo: UUID,
+    usuario_id: UUID,
+) -> Pesaje:
+    """Cambia el cliente asignado a un pesaje y reconcilia cuenta corriente.
+
+    - Valida que el cliente nuevo exista y sea de tipo 'cliente'.
+    - Actualiza cliente_id y cliente_nombre del pesaje.
+    - Sincroniza el remito asociado si existe.
+    - Reconcilia cuenta corriente: crea movimiento si no había, transfiere si había.
+    - Registra entrada en historial.
+    """
+    pesaje = obtener_por_id(db, pesaje_id)
+    if not pesaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pesaje no encontrado",
+        )
+
+    if pesaje.estado == "cancelado":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se puede cambiar el cliente de un pesaje cancelado",
+        )
+
+    cliente_nuevo = db.query(Empresa).filter(Empresa.id == cliente_id_nuevo).first()
+    if not cliente_nuevo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado",
+        )
+    if cliente_nuevo.tipo != "cliente":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La empresa seleccionada no está marcada como cliente",
+        )
+
+    cliente_id_anterior = pesaje.cliente_id
+
+    if cliente_id_anterior == cliente_id_nuevo:
+        return pesaje
+
+    # Actualizar pesaje
+    pesaje.cliente_id = cliente_id_nuevo
+    pesaje.cliente_nombre = cliente_nuevo.nombre
+
+    # Actualizar remito asociado
+    if pesaje.remito:
+        pesaje.remito.cliente = cliente_nuevo.nombre
+
+    # Reconciliar cuenta corriente
+    accion = _aplicar_cambio_cliente_cc(
+        db=db,
+        pesaje=pesaje,
+        cliente_id_anterior=cliente_id_anterior,
+        cliente_id_nuevo=cliente_id_nuevo,
+        usuario_id=usuario_id,
+    )
+
+    # Registrar en historial
+    _registrar_historial(db, pesaje.id, usuario_id, "MODIFICACION")
+
+    db.commit()
+    db.refresh(pesaje)
+
+    return pesaje
+
+
 def sincronizar_pesaje_cuenta_corriente(db: Session, pesaje_id: UUID, usuario_id: UUID) -> dict:
     """
     Sincroniza un pesaje existente con la cuenta corriente del cliente.
@@ -700,15 +822,16 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
         if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):
             remito.importe = db_pesaje.importe_total or Decimal("0")
 
-    # ========== TRANSFERENCIA DE CUENTA CORRIENTE SI CAMBIA EL CLIENTE ==========
+    # ========== RECONCILIACIÓN DE CUENTA CORRIENTE SI CAMBIA EL CLIENTE ==========
+    # Maneja todos los casos: crear si no había, transferir si había, no-op si no cambió.
     cliente_id_nuevo = db_pesaje.cliente_id
-    if 'cliente_id' in update_data and cliente_id_anterior and cliente_id_nuevo and cliente_id_anterior != cliente_id_nuevo:
-        _transferir_cargo_cuenta_corriente(
+    if 'cliente_id' in update_data and cliente_id_anterior != cliente_id_nuevo:
+        _aplicar_cambio_cliente_cc(
             db=db,
             pesaje=db_pesaje,
             cliente_id_anterior=cliente_id_anterior,
             cliente_id_nuevo=cliente_id_nuevo,
-            usuario_id=usuario.id if usuario else None
+            usuario_id=usuario.id if usuario else None,
         )
 
     # ========== SINCRONIZAR FECHA Y MONTO EN CUENTA CORRIENTE ==========

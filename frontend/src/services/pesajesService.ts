@@ -120,6 +120,17 @@ export const pesajesService = {
   },
 
   /**
+   * Cambia el cliente asignado a un pesaje. Reconcilia cuenta corriente
+   * automáticamente (crea movimiento si no había, transfiere si había).
+   */
+  async cambiarCliente(id: string, clienteId: string): Promise<Pesaje> {
+    const response = await api.patch<Pesaje>(`/pesajes/${id}/cliente`, {
+      cliente_id: clienteId,
+    })
+    return response.data
+  },
+
+  /**
    * Elimina un pesaje (soft delete)
    */
   async delete(id: string): Promise<void> {
