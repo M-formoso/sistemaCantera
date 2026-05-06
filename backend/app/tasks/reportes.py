@@ -806,6 +806,42 @@ def generar_comprobante_movimiento_cc_pdf(data: dict) -> BytesIO:
     elements.append(montos_table)
     elements.append(Spacer(1, 6 * mm))
 
+    # Detalle de aplicaciones (cuando el pago proviene de un cobro multi-aplicación)
+    aplicaciones = data.get("aplicaciones") or []
+    if aplicaciones:
+        elements.append(Paragraph("<b>Aplicaciones</b>", normal_style))
+        elements.append(Spacer(1, 2 * mm))
+
+        aplic_rows = [[
+            Paragraph("<b>Documento</b>", normal_style),
+            Paragraph("<b>Monto</b>", normal_style),
+        ]]
+        total_aplic = 0
+        for a in aplicaciones:
+            monto_a = a.get("monto") or 0
+            total_aplic += monto_a
+            aplic_rows.append([
+                Paragraph(a.get("descripcion") or "-", normal_style),
+                Paragraph(fmt_money(monto_a), normal_style),
+            ])
+        aplic_rows.append([
+            Paragraph("<b>Total aplicado</b>", normal_style),
+            Paragraph(f"<b>{fmt_money(total_aplic)}</b>", normal_style),
+        ])
+
+        aplic_table = Table(aplic_rows, colWidths=[100 * mm, 65 * mm])
+        aplic_table.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e5e7eb')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f3f4f6')),
+        ]))
+        elements.append(aplic_table)
+        elements.append(Spacer(1, 6 * mm))
+
     if data.get("anulado"):
         elements.append(Paragraph(
             "<font color='#b91c1c'><b>** MOVIMIENTO ANULADO **</b></font>",

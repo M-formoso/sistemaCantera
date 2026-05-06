@@ -211,6 +211,10 @@ def registrar_cargo_pesaje(
     # Actualizar saldo de empresa
     empresa.saldo_cuenta_corriente = saldo_posterior
 
+    # Inicializar saldo_pendiente del pesaje (para que aparezca correctamente
+    # en la lista de "documentos pendientes" al hacer un cobro).
+    pesaje.saldo_pendiente = pesaje.importe_total
+
     db.add(movimiento)
     db.flush()
     _registrar_historial(
@@ -459,6 +463,20 @@ def actualizar_monto_cargo(
             if precio_unitario:
                 pesaje.precio_unitario = precio_unitario
 
+            # Ajustar saldo_pendiente del pesaje por la diferencia, sin bajar de 0.
+            saldo_actual = pesaje.saldo_pendiente or Decimal("0")
+            nuevo_saldo = saldo_actual + diferencia
+            pesaje.saldo_pendiente = nuevo_saldo if nuevo_saldo > 0 else Decimal("0")
+
+            # Si tiene remito vinculado, sincronizar su importe y saldo_pendiente.
+            from app.models.remito import Remito
+            remito = db.query(Remito).filter(Remito.pesaje_id == pesaje.id).first()
+            if remito:
+                remito.importe = nuevo_monto
+                saldo_remito = remito.saldo_pendiente or Decimal("0")
+                nuevo_saldo_remito = saldo_remito + diferencia
+                remito.saldo_pendiente = nuevo_saldo_remito if nuevo_saldo_remito > 0 else Decimal("0")
+
     if usuario_id:
         detalle_hist = f"Monto: ${monto_anterior:,.2f} → ${nuevo_monto:,.2f}"
         if precio_unitario:
@@ -469,6 +487,59 @@ def actualizar_monto_cargo(
     db.refresh(movimiento)
 
     return movimiento
+
+
+def recalcular_saldos_movimientos(db: Session, empresa_id: UUID) -> dict:
+    """Recalcula saldo_anterior/saldo_posterior de todos los movimientos no anulados
+    de un cliente en orden cronológico, y sincroniza empresa.saldo_cuenta_corriente.
+
+    Útil después de anular movimientos viejos para que el running balance de cada
+    fila vuelva a ser coherente.
+    """
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado",
+        )
+
+    movimientos = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.empresa_id == empresa_id,
+        MovimientoCuentaCorriente.anulado == False,
+    ).order_by(
+        MovimientoCuentaCorriente.fecha.asc(),
+        MovimientoCuentaCorriente.created_at.asc(),
+    ).all()
+
+    saldo = Decimal("0")
+    actualizados = 0
+    for mov in movimientos:
+        nuevo_anterior = saldo
+        if mov.tipo == "cargo":
+            nuevo_posterior = saldo + mov.monto
+        elif mov.tipo == "pago":
+            nuevo_posterior = saldo - mov.monto
+        else:  # ajuste: monto ya viene firmado (negativo si es crédito)
+            nuevo_posterior = saldo + mov.monto
+
+        if mov.saldo_anterior != nuevo_anterior or mov.saldo_posterior != nuevo_posterior:
+            mov.saldo_anterior = nuevo_anterior
+            mov.saldo_posterior = nuevo_posterior
+            actualizados += 1
+
+        saldo = nuevo_posterior
+
+    saldo_previo = empresa.saldo_cuenta_corriente or Decimal("0")
+    empresa.saldo_cuenta_corriente = saldo
+    db.commit()
+
+    return {
+        "empresa_id": str(empresa_id),
+        "movimientos_procesados": len(movimientos),
+        "movimientos_actualizados": actualizados,
+        "saldo_anterior_empresa": float(saldo_previo),
+        "saldo_recalculado": float(saldo),
+    }
 
 
 def anular_movimiento(
@@ -494,14 +565,7 @@ def anular_movimiento(
             detail="El movimiento ya está anulado"
         )
 
-    # Revertir el saldo
-    empresa = db.query(Empresa).filter(Empresa.id == movimiento.empresa_id).first()
-    if movimiento.tipo == "cargo":
-        empresa.saldo_cuenta_corriente -= movimiento.monto
-    elif movimiento.tipo == "pago":
-        empresa.saldo_cuenta_corriente += movimiento.monto
-    elif movimiento.tipo == "ajuste":
-        empresa.saldo_cuenta_corriente -= movimiento.monto  # Revertir ajuste
+    empresa_id = movimiento.empresa_id
 
     # Marcar como anulado
     movimiento.anulado = True
@@ -516,10 +580,12 @@ def anular_movimiento(
             ingreso.estado = "anulado"
 
     _registrar_historial(db, movimiento.id, usuario_id, "ANULACION", motivo)
+    db.flush()
 
-    db.commit()
+    # Recalcular saldos de todos los movimientos posteriores y el saldo de la empresa
+    recalcular_saldos_movimientos(db, empresa_id)
+
     db.refresh(movimiento)
-
     return movimiento
 
 

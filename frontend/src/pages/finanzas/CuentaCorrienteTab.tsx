@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, Plus, CreditCard, FileText, Download,
   TrendingUp, TrendingDown,
-  X, Search, Pencil, DollarSign, Trash2, MoreVertical, History
+  X, Search, Pencil, DollarSign, Trash2, MoreVertical, History, RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,7 @@ export default function CuentaCorrienteTab() {
   const [menuAbiertoId, setMenuAbiertoId] = useState<string | null>(null)
   const [descargandoComprobante, setDescargandoComprobante] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [recalculando, setRecalculando] = useState(false)
 
   // Paginación de clientes
   const [clientesPage, setClientesPage] = useState(1)
@@ -132,6 +133,33 @@ export default function CuentaCorrienteTab() {
       alert('Error al descargar el comprobante')
     } finally {
       setDescargandoComprobante(null)
+    }
+  }
+
+  // Recalcular saldos acumulados del cliente
+  const handleRecalcularSaldos = async () => {
+    if (!selectedCliente) return
+    const ok = window.confirm(
+      'Esto recorre todos los movimientos no anulados en orden cronológico y reescribe la columna SALDO. ¿Continuar?'
+    )
+    if (!ok) return
+    setRecalculando(true)
+    try {
+      const res = await cuentaCorrienteService.recalcularSaldosCliente(selectedCliente)
+      queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+      queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+      queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+      alert(
+        `Saldos recalculados.\n` +
+        `Movimientos procesados: ${res.movimientos_procesados}\n` +
+        `Filas actualizadas: ${res.movimientos_actualizados}\n` +
+        `Saldo: $${formatNumber(res.saldo_recalculado, 2)}`
+      )
+    } catch (error) {
+      console.error('Error al recalcular saldos:', error)
+      alert('Error al recalcular saldos')
+    } finally {
+      setRecalculando(false)
     }
   }
 
@@ -268,6 +296,18 @@ export default function CuentaCorrienteTab() {
                   <FileText className="h-4 w-4 mr-1" />
                   Ajuste
                 </Button>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRecalcularSaldos}
+                    disabled={recalculando}
+                    title="Reconcilia la columna Saldo recorriendo los movimientos en orden cronológico"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${recalculando ? 'animate-spin' : ''}`} />
+                    {recalculando ? 'Recalculando...' : 'Recalcular saldos'}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={handleDescargarPDF}>
                   <Download className="h-4 w-4 mr-1" />
                   PDF

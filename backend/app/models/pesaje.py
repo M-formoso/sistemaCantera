@@ -74,6 +74,10 @@ class Pesaje(BaseModel):
     flete = Column(Numeric(12, 2))  # Monto fijo de flete (se suma al total)
     precio_fijo = Column(Numeric(12, 2))  # Precio fijo por viaje (ignora precio_unitario)
     importe_total = Column(Numeric(12, 2))  # Importe total del pesaje
+    # Saldo aún no cobrado del pesaje (para pesajes sin remito formal).
+    # Se inicializa con importe_total al crear el cargo en CC y se decrementa
+    # al aplicar items de cobro que apunten a este pesaje.
+    saldo_pendiente = Column(Numeric(12, 2), nullable=True)
     movimiento_financiero_id = Column(UUID(as_uuid=True), ForeignKey("movimientos_financieros.id"), nullable=True)
 
     # Vinculación con orden de entrega

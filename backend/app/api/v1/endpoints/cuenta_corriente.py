@@ -166,6 +166,20 @@ async def obtener_saldo_cliente(
     return {"saldo": float(saldo)}
 
 
+@router.post("/cliente/{empresa_id}/recalcular")
+async def recalcular_saldos_cliente(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador),
+):
+    """Reconcilia los saldos acumulados de un cliente.
+
+    Recorre todos los movimientos no anulados en orden cronológico y reescribe
+    saldo_anterior/saldo_posterior. También sincroniza el saldo total de la empresa.
+    """
+    return cuenta_corriente_service.recalcular_saldos_movimientos(db, empresa_id)
+
+
 @router.put("/{movimiento_id}/monto", response_model=MovimientoCCSchema)
 async def actualizar_monto_cargo(
     movimiento_id: UUID,
@@ -222,6 +236,41 @@ async def descargar_comprobante_pdf(
 
     empresa = db.query(Empresa).filter(Empresa.id == movimiento.empresa_id).first()
 
+    # Si el movimiento proviene de un cobro multi-aplicación, recolectar
+    # los items DEBE para mostrarlos en el recibo.
+    aplicaciones = []
+    if movimiento.tipo == "pago":
+        from app.models.cuenta_corriente import ItemCobroCliente
+        from app.models.factura import Factura
+        from app.models.remito import Remito
+        from app.models.pesaje import Pesaje as PesajeModel
+
+        items_debe = db.query(ItemCobroCliente).filter(
+            ItemCobroCliente.movimiento_cc_id == movimiento.id,
+            ItemCobroCliente.concepto == "debe",
+        ).all()
+
+        for it in items_debe:
+            label = it.descripcion or ""
+            if it.factura_id:
+                f = db.query(Factura).filter(Factura.id == it.factura_id).first()
+                if f:
+                    label = f"Factura #{f.numero_factura}"
+            elif it.remito_id:
+                r = db.query(Remito).filter(Remito.id == it.remito_id).first()
+                if r:
+                    numero = r.pesaje.numero_pesaje if r.pesaje else r.numero_remito
+                    label = f"Remito/Pesaje #{numero}"
+            elif it.pesaje_id:
+                p = db.query(PesajeModel).filter(PesajeModel.id == it.pesaje_id).first()
+                if p:
+                    label = f"Pesaje #{p.numero_pesaje}"
+
+            aplicaciones.append({
+                "descripcion": label or "Aplicación",
+                "monto": float(it.monto) if it.monto is not None else 0,
+            })
+
     data = {
         "tipo": movimiento.tipo,
         "fecha": movimiento.fecha,
@@ -239,6 +288,7 @@ async def descargar_comprobante_pdf(
         "notas": movimiento.notas,
         "cliente_nombre": empresa.nombre if empresa else None,
         "cliente_cuit": empresa.cuit if empresa else None,
+        "aplicaciones": aplicaciones,
     }
 
     from app.tasks.reportes import generar_comprobante_movimiento_cc_pdf

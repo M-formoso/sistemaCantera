@@ -140,6 +140,22 @@ export const getHistorialMovimiento = async (movimientoId: string): Promise<Hist
   return data
 }
 
+export interface RecalcularResultado {
+  empresa_id: string
+  movimientos_procesados: number
+  movimientos_actualizados: number
+  saldo_anterior_empresa: number
+  saldo_recalculado: number
+}
+
+// Recalcular saldos acumulados de un cliente
+export const recalcularSaldosCliente = async (empresaId: string): Promise<RecalcularResultado> => {
+  const { data } = await api.post<RecalcularResultado>(
+    `/cuenta-corriente/cliente/${empresaId}/recalcular`
+  )
+  return data
+}
+
 // Descargar comprobante PDF de un movimiento
 export const descargarComprobantePDF = async (movimientoId: string, filename?: string): Promise<void> => {
   const response = await api.get<Blob>(`/cuenta-corriente/movimientos/${movimientoId}/comprobante-pdf`, {
@@ -167,6 +183,7 @@ export const cuentaCorrienteService = {
   actualizarMontoCargo,
   getHistorialMovimiento,
   descargarComprobantePDF,
+  recalcularSaldosCliente,
 }
 
 export default cuentaCorrienteService

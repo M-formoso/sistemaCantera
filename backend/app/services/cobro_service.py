@@ -565,6 +565,7 @@ def aplicar_cobro(
     ).all()
 
     for item in items_factura:
+        item.movimiento_cc_id = mov_cc.id
         factura = db.query(Factura).filter(Factura.id == item.factura_id).first()
         if factura:
             # Crear pago de factura
@@ -594,12 +595,18 @@ def aplicar_cobro(
     ).all()
 
     for item in items_remito:
+        item.movimiento_cc_id = mov_cc.id
         remito = db.query(Remito).filter(Remito.id == item.remito_id).first()
         if remito:
             # Actualizar saldo pendiente del remito
             remito.saldo_pendiente = (remito.saldo_pendiente or Decimal("0")) - item.monto
             if remito.saldo_pendiente < 0:
                 remito.saldo_pendiente = Decimal("0")
+            # Si el remito tiene pesaje vinculado, sincronizar también su saldo_pendiente.
+            if remito.pesaje:
+                saldo_p = remito.pesaje.saldo_pendiente or remito.pesaje.importe_total or Decimal("0")
+                nuevo_saldo_p = saldo_p - item.monto
+                remito.pesaje.saldo_pendiente = nuevo_saldo_p if nuevo_saldo_p > 0 else Decimal("0")
 
     # Aplicar a pesajes directos (sin remito)
     items_pesaje = db.query(ItemCobroCliente).filter(
@@ -610,12 +617,21 @@ def aplicar_cobro(
     ).all()
 
     for item in items_pesaje:
+        item.movimiento_cc_id = mov_cc.id
         pesaje = db.query(Pesaje).filter(Pesaje.id == item.pesaje_id).first()
-        if pesaje and pesaje.remito:
-            # Si el pesaje tiene remito, actualizar el remito
-            pesaje.remito.saldo_pendiente = (pesaje.remito.saldo_pendiente or Decimal("0")) - item.monto
-            if pesaje.remito.saldo_pendiente < 0:
-                pesaje.remito.saldo_pendiente = Decimal("0")
+        if not pesaje:
+            continue
+
+        # Decrementar saldo_pendiente del pesaje (sin bajar de 0).
+        saldo_actual = pesaje.saldo_pendiente or pesaje.importe_total or Decimal("0")
+        nuevo_saldo = saldo_actual - item.monto
+        pesaje.saldo_pendiente = nuevo_saldo if nuevo_saldo > 0 else Decimal("0")
+
+        # Si el pesaje tiene remito vinculado, sincronizar también su saldo_pendiente.
+        if pesaje.remito:
+            saldo_remito = pesaje.remito.saldo_pendiente or Decimal("0")
+            nuevo_saldo_remito = saldo_remito - item.monto
+            pesaje.remito.saldo_pendiente = nuevo_saldo_remito if nuevo_saldo_remito > 0 else Decimal("0")
 
     # Calcular diferencia
     diferencia = total_haber - total_debe
@@ -801,8 +817,8 @@ def obtener_documentos_pendientes(
         for r in remitos_db
     ]
 
-    # También buscar pesajes con importe que no tienen remito o cuyo remito no tiene saldo
-    # Esto es para pesajes históricos que no se migraron correctamente
+    # También buscar pesajes con saldo pendiente que no están ya en remitos_db.
+    # saldo_pendiente NULL se interpreta como importe_total (datos previos a la migración).
     pesajes_ids_con_remito = [r.pesaje_id for r in remitos_db if r.pesaje_id]
 
     pesajes_pendientes = db.query(Pesaje).filter(
@@ -812,17 +828,18 @@ def obtener_documentos_pendientes(
         ~Pesaje.id.in_(pesajes_ids_con_remito) if pesajes_ids_con_remito else True
     ).order_by(Pesaje.fecha).all()
 
-    # Agregar pesajes que no están en remitos con saldo
     for p in pesajes_pendientes:
-        # Verificar si tiene remito pero sin saldo (datos históricos)
+        saldo_p = p.saldo_pendiente if p.saldo_pendiente is not None else p.importe_total
+        if saldo_p is None or saldo_p <= 0:
+            continue  # ya cobrado, no aparece en la lista
+
         remito_existente = db.query(Remito).filter(Remito.pesaje_id == p.id).first()
 
         if remito_existente:
-            # Si tiene remito pero saldo_pendiente es 0 o NULL, usar el importe del pesaje
+            # Si tiene remito pero saldo_pendiente del remito es 0/NULL, usar el del pesaje
             if not remito_existente.saldo_pendiente or remito_existente.saldo_pendiente <= 0:
-                # Actualizar el remito con el saldo correcto
                 remito_existente.importe = p.importe_total
-                remito_existente.saldo_pendiente = p.importe_total
+                remito_existente.saldo_pendiente = saldo_p
                 db.commit()
 
                 tickets.append(TicketPendienteSchema(
@@ -833,20 +850,18 @@ def obtener_documentos_pendientes(
                     material=remito_existente.producto,
                     peso_neto=remito_existente.peso_neto,
                     importe=p.importe_total,
-                    saldo_pendiente=p.importe_total
+                    saldo_pendiente=saldo_p,
                 ))
         else:
-            # Pesaje sin remito - mostrar como ticket directo
-            patente = p.camion.patente if p.camion else p.patente_externa
             tickets.append(TicketPendienteSchema(
-                id=p.id,  # Usamos el ID del pesaje
+                id=p.id,
                 numero=p.numero_pesaje,
                 tipo="pesaje",
                 fecha=p.fecha.date() if hasattr(p.fecha, 'date') else p.fecha,
                 material=p.material,
                 peso_neto=p.peso_neto,
                 importe=p.importe_total,
-                saldo_pendiente=p.importe_total  # Todo el importe está pendiente
+                saldo_pendiente=saldo_p,
             ))
 
     total_facturas = sum(f.saldo_pendiente for f in facturas)
