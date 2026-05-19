@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ColumnDef,
@@ -54,6 +54,15 @@ export default function EmpresasPage() {
   const [showPreciosModal, setShowPreciosModal] = useState(false)
   const [listaSeleccionada, setListaSeleccionada] = useState<string | null>(null)
   const [guardandoPrecios, setGuardandoPrecios] = useState(false)
+
+  useEffect(() => {
+    if (!showPreciosModal) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closePreciosModal()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [showPreciosModal])
 
   const { data: empresas, isLoading } = useQuery({
     queryKey: ['empresas', filtroTipo, mostrarInactivos],
@@ -1016,50 +1025,51 @@ export default function EmpresasPage() {
 
       {/* Modal de precios del cliente (seleccionar lista de precios) */}
       {showPreciosModal && selectedCliente && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-lg">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ListOrdered className="h-5 w-5" />
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={closePreciosModal}
+        >
+          <Card
+            className="w-full max-w-md flex flex-col max-h-[75vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader className="flex flex-row items-center justify-between flex-shrink-0 border-b p-4 space-y-0">
+              <div className="min-w-0">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ListOrdered className="h-4 w-4" />
                   Lista de Precios
                 </CardTitle>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-0.5 truncate">
                   {selectedCliente.nombre}
+                  {selectedCliente.lista_precio_nombre && (
+                    <span className="ml-1">· Actual: <span className="font-medium text-gray-700">{selectedCliente.lista_precio_nombre}</span></span>
+                  )}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={closePreciosModal}>
+              <Button variant="ghost" size="sm" onClick={closePreciosModal} className="flex-shrink-0">
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent>
-              {/* Info */}
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-sm text-blue-700">
-                <p>
-                  Seleccione una lista de precios para asignar a este cliente.
-                  Los precios se aplicarán automáticamente en los pesajes.
-                </p>
-              </div>
-
+            <CardContent className="flex-1 overflow-y-auto p-4">
               {/* Selector de lista */}
               {listasPrecios.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {/* Opción: Sin lista */}
                   <button
                     type="button"
                     onClick={() => setListaSeleccionada(null)}
-                    className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition-colors ${
+                    className={`w-full px-3 py-2 rounded-md border text-left flex items-center justify-between transition-colors ${
                       listaSeleccionada === null
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <div>
-                      <p className="font-medium text-gray-700">Sin lista de precios</p>
-                      <p className="text-sm text-gray-500">Ingresar precios manualmente en cada pesaje</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-700">Sin lista de precios</p>
+                      <p className="text-xs text-gray-500 truncate">Ingresar precios manualmente</p>
                     </div>
                     {listaSeleccionada === null && (
-                      <Check className="h-5 w-5 text-blue-600" />
+                      <Check className="h-4 w-4 text-blue-600 flex-shrink-0 ml-2" />
                     )}
                   </button>
 
@@ -1069,29 +1079,29 @@ export default function EmpresasPage() {
                       key={lista.id}
                       type="button"
                       onClick={() => setListaSeleccionada(lista.id)}
-                      className={`w-full p-3 rounded-lg border text-left flex items-center justify-between transition-colors ${
+                      className={`w-full px-3 py-2 rounded-md border text-left flex items-center justify-between transition-colors ${
                         listaSeleccionada === lista.id
                           ? 'border-green-500 bg-green-50'
                           : 'border-gray-200 hover:bg-gray-50'
                       }`}
                     >
-                      <div>
-                        <p className="font-medium">{lista.nombre}</p>
-                        <p className="text-sm text-gray-500">
-                          {lista.cantidad_items} materiales configurados
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{lista.nombre}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {lista.cantidad_items} materiales
                           {lista.descripcion && ` • ${lista.descripcion}`}
                         </p>
                       </div>
                       {listaSeleccionada === lista.id && (
-                        <Check className="h-5 w-5 text-green-600" />
+                        <Check className="h-4 w-4 text-green-600 flex-shrink-0 ml-2" />
                       )}
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500 border rounded-lg">
-                  <ListOrdered className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                  <p>No hay listas de precios creadas</p>
+                <div className="text-center py-6 text-gray-500 border rounded-lg">
+                  <ListOrdered className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No hay listas de precios creadas</p>
                   <a
                     href="/listas-precios"
                     className="text-blue-600 underline text-sm mt-2 inline-block"
@@ -1100,25 +1110,17 @@ export default function EmpresasPage() {
                   </a>
                 </div>
               )}
-
-              {/* Lista actual */}
-              {selectedCliente.lista_precio_nombre && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-md text-sm">
-                  <span className="text-gray-500">Lista actual:</span>{' '}
-                  <span className="font-medium">{selectedCliente.lista_precio_nombre}</span>
-                </div>
-              )}
-
-              {/* Botones */}
-              <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
-                <Button variant="outline" onClick={closePreciosModal}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleGuardarListaPrecio} disabled={guardandoPrecios}>
-                  {guardandoPrecios ? 'Guardando...' : 'Guardar'}
-                </Button>
-              </div>
             </CardContent>
+
+            {/* Botones (footer fijo, siempre visible) */}
+            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white rounded-b-lg flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={closePreciosModal}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleGuardarListaPrecio} disabled={guardandoPrecios}>
+                {guardandoPrecios ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
           </Card>
         </div>
       )}
