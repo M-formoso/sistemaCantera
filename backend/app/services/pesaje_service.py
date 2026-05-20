@@ -358,8 +358,12 @@ def _actualizar_orden_entrega(db: Session, orden_id: UUID, peso_neto: Decimal) -
 
 def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID) -> MovimientoCuentaCorriente:
     """
-    Registra un cargo en la cuenta corriente del cliente al crear un pesaje.
-    Si no tiene importe, registra con $0 (pendiente de precio).
+    Registra (o sincroniza si ya existe) el cargo en cuenta corriente del cliente.
+
+    Idempotente: si ya hay un cargo activo para este pesaje, sincroniza monto/fecha/
+    descripción del movimiento existente en lugar de crear un duplicado. Esto evita
+    el bug donde crear_pesaje + completar_pesaje generaban dos movimientos para el
+    mismo pesaje.
     """
     # Obtener empresa y saldo actual
     empresa = db.query(Empresa).filter(Empresa.id == pesaje.cliente_id).first()
@@ -369,11 +373,8 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     # Usar importe_total o 0 si no tiene
     importe = pesaje.importe_total or Decimal("0")
 
-    saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
-    saldo_posterior = saldo_anterior + importe
-
     # Crear descripción
-    peso_tn = pesaje.peso_neto / Decimal("1000")
+    peso_tn = pesaje.peso_neto / Decimal("1000") if pesaje.peso_neto else Decimal("0")
     descripcion = f"Pesaje #{pesaje.numero_pesaje}"
     if pesaje.material:
         descripcion += f" - {pesaje.material}"
@@ -391,7 +392,35 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     else:
         detalle = None
 
-    # Crear movimiento de cuenta corriente
+    # Idempotencia: si ya hay un cargo activo para este pesaje, no duplicar.
+    movimiento_existente = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.pesaje_id == pesaje.id,
+        MovimientoCuentaCorriente.anulado == False,
+        MovimientoCuentaCorriente.tipo == "cargo",
+    ).first()
+
+    if movimiento_existente:
+        # Solo sincronizar si el movimiento pertenece al cliente correcto. Si está
+        # en otro cliente, no tocamos nada: el cambio de cliente debe pasar por
+        # _aplicar_cambio_cliente_cc / _transferir_cargo_cuenta_corriente.
+        if movimiento_existente.empresa_id == pesaje.cliente_id:
+            movimiento_existente.monto = importe
+            nueva_fecha = pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha
+            movimiento_existente.fecha = nueva_fecha
+            movimiento_existente.descripcion = descripcion
+            if detalle is not None:
+                movimiento_existente.detalle = detalle
+            db.flush()
+            # Recalcular toda la cadena de saldos del cliente para que quede coherente.
+            from app.services.cuenta_corriente_service import recalcular_saldos_movimientos
+            recalcular_saldos_movimientos(db, movimiento_existente.empresa_id)
+            db.refresh(movimiento_existente)
+        return movimiento_existente
+
+    # No hay movimiento previo: crear uno nuevo
+    saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
+    saldo_posterior = saldo_anterior + importe
+
     movimiento = MovimientoCuentaCorriente(
         empresa_id=pesaje.cliente_id,
         tipo="cargo",
