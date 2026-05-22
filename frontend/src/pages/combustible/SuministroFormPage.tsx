@@ -64,11 +64,40 @@ export default function SuministroFormPage() {
   const litros = watch('litros')
   const cisternaId = watch('cisterna_id')
   const camionId = watch('camion_id')
+  const kilometrajeActual = watch('kilometraje_actual')
 
   const cisternaSeleccionada = cisternas.find(c => c.id === cisternaId)
   const camionSeleccionado = camiones.find(c => c.id === camionId)
   const nuevoNivel = (cisternaSeleccionada?.nivel_actual || 0) - (Number(litros) || 0)
   const insuficiente = nuevoNivel < 0
+
+  // Suministros previos del camión seleccionado (para consumo carga-a-carga)
+  const { data: suministrosCamion = [] } = useQuery({
+    queryKey: ['suministros-camion', camionId],
+    queryFn: () => combustibleService.getSuministrosPorCamion(camionId!),
+    enabled: !!camionId,
+  })
+
+  // Buscar el último suministro con kilometraje cargado (excluyendo el actual si estamos editando)
+  const ultimoSuministroConKm = [...suministrosCamion]
+    .filter(s => s.kilometraje_actual && s.kilometraje_actual > 0 && (!isEditing || s.id !== id))
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0]
+
+  // Calcular consumo entre carga anterior y esta carga
+  const kmIngresados = Number(kilometrajeActual) || 0
+  const litrosIngresados = Number(litros) || 0
+  const kmAnterior = ultimoSuministroConKm?.kilometraje_actual || 0
+  const kmRecorridos = kmIngresados - kmAnterior
+  const consumoCargaAcarga =
+    ultimoSuministroConKm && kmRecorridos > 0 && litrosIngresados > 0
+      ? {
+          kmRecorridos,
+          litrosPorKm: litrosIngresados / kmRecorridos,
+          kmPorLitro: kmRecorridos / litrosIngresados,
+          kmAnterior,
+          fechaAnterior: ultimoSuministroConKm.fecha,
+        }
+      : null
 
   // Pre-seleccionar cisterna o camión si viene del parámetro o cargar datos existentes
   useEffect(() => {
@@ -376,6 +405,36 @@ export default function SuministroFormPage() {
                       ✓ Suministro válido
                     </div>
                   )}
+
+                  {/* Consumo carga a carga */}
+                  {consumoCargaAcarga ? (
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <TrendingDown className="h-4 w-4 text-purple-600" />
+                        Consumo carga a carga
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Km recorridos:</span>
+                        <span className="font-medium">{formatNumber(consumoCargaAcarga.kmRecorridos)} km</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Litros/km:</span>
+                        <span className="font-medium">{consumoCargaAcarga.litrosPorKm.toFixed(3)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Km/litro:</span>
+                        <span className="font-bold text-purple-700">{consumoCargaAcarga.kmPorLitro.toFixed(2)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Desde {formatNumber(consumoCargaAcarga.kmAnterior)} km
+                        {' '}({new Date(consumoCargaAcarga.fechaAnterior).toLocaleDateString('es-AR')})
+                      </p>
+                    </div>
+                  ) : camionSeleccionado && (kilometrajeActual || litros) ? (
+                    <div className="border-t pt-3 text-xs text-muted-foreground">
+                      <p>Cargá litros y kilometraje actual mayor al anterior para ver el consumo desde la última carga.</p>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground text-sm">
