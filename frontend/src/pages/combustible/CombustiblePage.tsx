@@ -140,6 +140,7 @@ export default function CombustiblePage() {
     {
       id: 'camion',
       header: 'Camión/Máquina',
+      accessorFn: (row) => row.camion_patente || row.camion_nombre || row.camion_codigo_interno || '',
       cell: ({ row }) => {
         const suministro = row.original
         // Mostrar patente, o nombre, o código interno (lo que esté disponible)
