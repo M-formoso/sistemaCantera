@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle, Cog, Hammer, Plus, Package, Fuel, Gauge, Clock } from 'lucide-react'
+import { ArrowLeft, Truck, Wrench, Calendar, Trash2, CalendarClock, AlertTriangle, Cog, Hammer, Plus, Package, Fuel, Gauge, Clock, Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -401,13 +401,29 @@ export default function CamionDetailPage() {
           )}
 
           {consumo && consumo.cantidad_suministros > 0 && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="mt-4 pt-4 border-t space-y-2">
               <p className="text-sm text-muted-foreground">
                 Basado en <span className="font-semibold">{consumo.cantidad_suministros} suministros</span> registrados
                 {!esMaquina && consumo.total_km_recorridos && (
                   <> • <span className="font-semibold">{consumo.total_km_recorridos.toLocaleString('es-AR')} km</span> recorridos</>
                 )}
               </p>
+              {!esMaquina && !consumo.consumo_litros_por_km && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Para calcular <strong>Litros/km</strong> y <strong>Km/litro</strong> necesitamos al menos 2 suministros con kilometraje cargado y distinto. Cargá el kilometraje al registrar cada suministro.
+                  </span>
+                </div>
+              )}
+              {esMaquina && !consumo.consumo_litros_por_hora && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Para calcular <strong>Litros/hora</strong> necesitamos al menos 2 suministros con horómetro cargado y distinto. Cargá el horómetro al registrar cada suministro.
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
