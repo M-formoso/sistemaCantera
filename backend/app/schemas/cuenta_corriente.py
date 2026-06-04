@@ -70,6 +70,12 @@ class MovimientoCCSchema(BaseModel):
     # Datos relacionados
     empresa_nombre: Optional[str] = None
 
+    # Cantidades del pesaje asociado (solo para cargos generados por pesajes)
+    material: Optional[str] = None
+    toneladas: Optional[float] = None
+    metros_cubicos: Optional[float] = None
+    factor_conversion_m3: Optional[float] = None
+
     class Config:
         from_attributes = True
 

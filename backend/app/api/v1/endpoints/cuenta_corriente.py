@@ -61,12 +61,33 @@ async def listar_movimientos_cliente(
         db, empresa_id, fecha_desde, fecha_hasta, skip, limit
     )
 
-    # Enriquecer con nombre de empresa
+    # Resolver factor_conversion_m3 por material a partir de la lista de precios del cliente.
+    factores_por_material = {}
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if empresa and empresa.lista_precio_id and empresa.lista_precio:
+        for item in empresa.lista_precio.items:
+            if item.factor_conversion_m3:
+                factores_por_material[item.material.lower()] = float(item.factor_conversion_m3)
+
+    # Enriquecer con nombre de empresa + cantidades en tn / m³
     result = []
     for m in movimientos:
         data = MovimientoCCSchema.model_validate(m)
         if m.empresa:
             data.empresa_nombre = m.empresa.nombre
+
+        # Si el movimiento corresponde a un pesaje, derivar material/tn/m³.
+        if m.pesaje:
+            pesaje = m.pesaje
+            if pesaje.material:
+                data.material = pesaje.material
+            if pesaje.peso_neto:
+                tn = float(pesaje.peso_neto) / 1000.0
+                data.toneladas = round(tn, 3)
+                factor = factores_por_material.get((pesaje.material or "").lower())
+                if factor and factor > 0:
+                    data.factor_conversion_m3 = factor
+                    data.metros_cubicos = round(tn / factor, 3)
         result.append(data)
 
     return result

@@ -92,6 +92,18 @@ export default function CuentaCorrienteTab() {
     return movimientos.slice(start, start + movimientosPageSize)
   }, [movimientos, movimientosPage, movimientosPageSize])
 
+  // Totales en tn y m³ acumulados (solo cargos activos generados desde pesajes).
+  const { totalToneladas, totalMetrosCubicos } = useMemo(() => {
+    let tn = 0
+    let m3 = 0
+    for (const m of movimientos) {
+      if (m.anulado || m.tipo !== 'cargo') continue
+      if (m.toneladas) tn += m.toneladas
+      if (m.metros_cubicos) m3 += m.metros_cubicos
+    }
+    return { totalToneladas: tn, totalMetrosCubicos: m3 }
+  }, [movimientos])
+
   // Reset página cuando cambia búsqueda
   const handleBusquedaChange = (value: string) => {
     setBusqueda(value)
@@ -319,7 +331,7 @@ export default function CuentaCorrienteTab() {
             <div className="space-y-6">
               {/* Resumen */}
               {resumen && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="bg-red-50 p-4 rounded-lg">
                     <p className="text-xs text-red-600 font-medium">Total Cargos</p>
                     <p className="text-2xl font-bold text-red-700">
@@ -340,6 +352,15 @@ export default function CuentaCorrienteTab() {
                       ${formatNumber(resumen.saldo_actual, 2)}
                     </p>
                   </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <p className="text-xs text-purple-600 font-medium">Total Despachado</p>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {formatNumber(totalMetrosCubicos, 2)} m³
+                    </p>
+                    <p className="text-xs text-purple-500 mt-0.5">
+                      {formatNumber(totalToneladas, 2)} tn
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -354,6 +375,8 @@ export default function CuentaCorrienteTab() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tn</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">m³</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debe</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Haber</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
@@ -363,7 +386,7 @@ export default function CuentaCorrienteTab() {
                     <tbody className="divide-y divide-gray-200">
                       {movimientos.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                             No hay movimientos
                           </td>
                         </tr>
@@ -388,6 +411,15 @@ export default function CuentaCorrienteTab() {
                             </td>
                             <td className="px-4 py-3 text-sm">{mov.descripcion}</td>
                             <td className="px-4 py-3 text-sm text-gray-500">{mov.metodo_pago || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-700">
+                              {mov.toneladas ? formatNumber(mov.toneladas, 2) : '-'}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-sm text-right text-purple-700"
+                              title={mov.factor_conversion_m3 ? `Factor: ${mov.factor_conversion_m3}` : 'Sin factor de conversión cargado para este material'}
+                            >
+                              {mov.metros_cubicos ? formatNumber(mov.metros_cubicos, 2) : '-'}
+                            </td>
                             <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
                               {mov.tipo === 'cargo' ? `$${formatNumber(mov.monto, 2)}` : '-'}
                             </td>

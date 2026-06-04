@@ -21,6 +21,10 @@ export interface MovimientoCC {
   created_at: string
   notas?: string
   empresa_nombre?: string
+  material?: string
+  toneladas?: number
+  metros_cubicos?: number
+  factor_conversion_m3?: number
 }
 
 export interface ResumenCuentaCorriente {
