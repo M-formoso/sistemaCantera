@@ -6,7 +6,6 @@ Create Date: 2026-06-04
 
 """
 from alembic import op
-import sqlalchemy as sa
 
 
 revision = '20260604_iva_cc'
@@ -16,26 +15,25 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Empresas: alícuota de IVA por defecto del cliente (editable)
-    op.add_column(
-        'empresas',
-        sa.Column('alicuota_iva', sa.Numeric(5, 2), nullable=False, server_default='21.00'),
-    )
+    # Columnas: usamos ADD COLUMN IF NOT EXISTS para que la migration sea idempotente
+    # (importante si un intento previo aplicó parte y dejó la BD a medias).
+    op.execute("""
+        ALTER TABLE empresas
+            ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
+    """)
 
-    # Movimientos CC: alícuota usada, monto neto, monto IVA.
-    # El campo `monto` existente pasa a representar el TOTAL c/IVA.
-    op.add_column(
-        'movimientos_cuenta_corriente',
-        sa.Column('alicuota_iva', sa.Numeric(5, 2), nullable=False, server_default='21.00'),
-    )
-    op.add_column(
-        'movimientos_cuenta_corriente',
-        sa.Column('monto_neto', sa.Numeric(12, 2), nullable=True),
-    )
-    op.add_column(
-        'movimientos_cuenta_corriente',
-        sa.Column('monto_iva', sa.Numeric(12, 2), nullable=True),
-    )
+    op.execute("""
+        ALTER TABLE movimientos_cuenta_corriente
+            ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
+    """)
+    op.execute("""
+        ALTER TABLE movimientos_cuenta_corriente
+            ADD COLUMN IF NOT EXISTS monto_neto NUMERIC(12, 2);
+    """)
+    op.execute("""
+        ALTER TABLE movimientos_cuenta_corriente
+            ADD COLUMN IF NOT EXISTS monto_iva NUMERIC(12, 2);
+    """)
 
     # Backfill: para movimientos existentes asumimos que `monto` ya era neto
     # (porque hasta hoy no se discriminaba IVA en el sistema). Recalculamos
@@ -48,8 +46,9 @@ def upgrade() -> None:
         WHERE monto_neto IS NULL;
     """)
 
-    # Recalcular saldo_anterior/saldo_posterior de cada movimiento en orden
-    # cronológico por cliente para que la columna SALDO refleje los totales c/IVA.
+    # Recalcular saldo_anterior/saldo_posterior en orden cronológico por cliente.
+    # PostgreSQL no permite anidar funciones de ventana (LAG sobre SUM OVER), por eso
+    # separamos en tres CTEs: deltas, saldo acumulado y saldo previo via LAG.
     op.execute("""
         WITH ordered AS (
             SELECT id,
@@ -57,7 +56,7 @@ def upgrade() -> None:
                    CASE
                        WHEN tipo = 'cargo' THEN monto
                        WHEN tipo = 'pago' THEN -monto
-                       ELSE monto  -- ajuste: monto ya viene firmado
+                       ELSE monto
                    END AS delta,
                    ROW_NUMBER() OVER (
                        PARTITION BY empresa_id
@@ -66,29 +65,31 @@ def upgrade() -> None:
             FROM movimientos_cuenta_corriente
             WHERE anulado = false
         ),
-        running AS (
+        with_running AS (
             SELECT id,
                    empresa_id,
+                   rn,
                    SUM(delta) OVER (
                        PARTITION BY empresa_id
                        ORDER BY rn
                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                   ) AS saldo_post,
-                   LAG(SUM(delta) OVER (
-                       PARTITION BY empresa_id
-                       ORDER BY rn
-                       ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                   ), 1, 0) OVER (
-                       PARTITION BY empresa_id
-                       ORDER BY rn
-                   ) AS saldo_pre
+                   ) AS saldo_post
             FROM ordered
+        ),
+        with_pre AS (
+            SELECT id,
+                   saldo_post,
+                   COALESCE(
+                       LAG(saldo_post) OVER (PARTITION BY empresa_id ORDER BY rn),
+                       0
+                   ) AS saldo_pre
+            FROM with_running
         )
         UPDATE movimientos_cuenta_corriente m
-        SET saldo_anterior = r.saldo_pre,
-            saldo_posterior = r.saldo_post
-        FROM running r
-        WHERE m.id = r.id;
+        SET saldo_anterior = p.saldo_pre,
+            saldo_posterior = p.saldo_post
+        FROM with_pre p
+        WHERE m.id = p.id;
     """)
 
     # Actualizar saldo_cuenta_corriente de cada empresa al nuevo total con IVA.
@@ -114,7 +115,7 @@ def downgrade() -> None:
         SET monto = ROUND(monto / 1.21, 2)
         WHERE alicuota_iva = 21;
     """)
-    op.drop_column('movimientos_cuenta_corriente', 'monto_iva')
-    op.drop_column('movimientos_cuenta_corriente', 'monto_neto')
-    op.drop_column('movimientos_cuenta_corriente', 'alicuota_iva')
-    op.drop_column('empresas', 'alicuota_iva')
+    op.execute("ALTER TABLE movimientos_cuenta_corriente DROP COLUMN IF EXISTS monto_iva;")
+    op.execute("ALTER TABLE movimientos_cuenta_corriente DROP COLUMN IF EXISTS monto_neto;")
+    op.execute("ALTER TABLE movimientos_cuenta_corriente DROP COLUMN IF EXISTS alicuota_iva;")
+    op.execute("ALTER TABLE empresas DROP COLUMN IF EXISTS alicuota_iva;")
