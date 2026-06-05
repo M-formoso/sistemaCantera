@@ -218,6 +218,109 @@ def ensure_ordenes_entrega_table():
         print(f"Error verificando ordenes_entrega: {e}")
 
 
+def ensure_iva_columns():
+    """Asegurar que las columnas de IVA existan en empresas y movimientos_cuenta_corriente.
+
+    Salvaguarda: si la migration 20260604_iva_cc falló o no corrió, las columnas
+    se crean aquí de forma idempotente. Si ya existen, no hace nada.
+
+    También backfillea movimientos que no tengan monto_neto seteado.
+    """
+    print("Verificando columnas IVA en cuenta corriente...")
+
+    engine = create_engine(settings.DATABASE_URL)
+
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("""
+                ALTER TABLE empresas
+                ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
+            """))
+            conn.execute(text("""
+                ALTER TABLE movimientos_cuenta_corriente
+                ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
+            """))
+            conn.execute(text("""
+                ALTER TABLE movimientos_cuenta_corriente
+                ADD COLUMN IF NOT EXISTS monto_neto NUMERIC(12, 2);
+            """))
+            conn.execute(text("""
+                ALTER TABLE movimientos_cuenta_corriente
+                ADD COLUMN IF NOT EXISTS monto_iva NUMERIC(12, 2);
+            """))
+            conn.commit()
+            print("Columnas IVA verificadas/creadas")
+
+            # Backfill: si todavía no se desglosó IVA en movimientos existentes,
+            # asumir que `monto` era neto y recalcular total c/IVA al 21%.
+            result = conn.execute(text("""
+                UPDATE movimientos_cuenta_corriente
+                SET monto_neto = monto,
+                    monto_iva = ROUND(monto * 0.21, 2),
+                    monto = ROUND(monto * 1.21, 2)
+                WHERE monto_neto IS NULL;
+            """))
+            conn.commit()
+            if result.rowcount:
+                print(f"Backfill IVA aplicado a {result.rowcount} movimientos (asumiendo 21%)")
+
+                # Recalcular saldos acumulados ahora que el monto incluye IVA.
+                conn.execute(text("""
+                    WITH ordered AS (
+                        SELECT id, empresa_id,
+                               CASE WHEN tipo = 'cargo' THEN monto
+                                    WHEN tipo = 'pago' THEN -monto
+                                    ELSE monto END AS delta,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY empresa_id
+                                   ORDER BY fecha ASC, created_at ASC
+                               ) AS rn
+                        FROM movimientos_cuenta_corriente
+                        WHERE anulado = false
+                    ),
+                    with_running AS (
+                        SELECT id, empresa_id, rn,
+                               SUM(delta) OVER (
+                                   PARTITION BY empresa_id
+                                   ORDER BY rn
+                                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                               ) AS saldo_post
+                        FROM ordered
+                    ),
+                    with_pre AS (
+                        SELECT id, saldo_post,
+                               COALESCE(
+                                   LAG(saldo_post) OVER (PARTITION BY empresa_id ORDER BY rn),
+                                   0
+                               ) AS saldo_pre
+                        FROM with_running
+                    )
+                    UPDATE movimientos_cuenta_corriente m
+                    SET saldo_anterior = p.saldo_pre,
+                        saldo_posterior = p.saldo_post
+                    FROM with_pre p
+                    WHERE m.id = p.id;
+                """))
+                conn.execute(text("""
+                    UPDATE empresas e
+                    SET saldo_cuenta_corriente = COALESCE((
+                        SELECT SUM(CASE
+                                       WHEN tipo = 'cargo' THEN monto
+                                       WHEN tipo = 'pago' THEN -monto
+                                       ELSE monto
+                                   END)
+                        FROM movimientos_cuenta_corriente
+                        WHERE empresa_id = e.id AND anulado = false
+                    ), 0);
+                """))
+                conn.commit()
+                print("Saldos acumulados recalculados con IVA")
+
+    except Exception as e:
+        print(f"Error verificando columnas IVA: {e}")
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("Inicializando Sistema Cantera La Rufina")
@@ -234,6 +337,9 @@ if __name__ == "__main__":
 
     # Asegurar que la tabla ordenes_entrega existe
     ensure_ordenes_entrega_table()
+
+    # Asegurar que las columnas de IVA existan (salvaguarda por si la migration falló)
+    ensure_iva_columns()
 
     print("=" * 50)
     print("Inicialización completada!")
