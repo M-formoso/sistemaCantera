@@ -371,30 +371,33 @@ export default function CuentaCorrienteTab() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tn</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">m³</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debe</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Haber</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Método</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tn</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">m³</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debe (neto)</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">IVA %</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">IVA $</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total c/IVA</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Haber</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                        <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {movimientos.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={13} className="px-4 py-8 text-center text-gray-500">
                             No hay movimientos
                           </td>
                         </tr>
                       ) : (
                         movimientosPaginados.map((mov) => (
                           <tr key={mov.id} className={mov.anulado ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}>
-                            <td className="px-4 py-3 text-sm">{formatDate(mov.fecha)}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-3 py-3 text-sm">{formatDate(mov.fecha)}</td>
+                            <td className="px-3 py-3">
                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                 mov.tipo === 'cargo' ? 'bg-red-100 text-red-700' :
                                 mov.tipo === 'pago' ? 'bg-green-100 text-green-700' :
@@ -409,24 +412,33 @@ export default function CuentaCorrienteTab() {
                                 <span className="ml-2 text-xs text-orange-500">(Sin precio)</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-sm">{mov.descripcion}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">{mov.metodo_pago || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-right text-gray-700">
+                            <td className="px-3 py-3 text-sm">{mov.descripcion}</td>
+                            <td className="px-3 py-3 text-sm text-gray-500">{mov.metodo_pago || '-'}</td>
+                            <td className="px-3 py-3 text-sm text-right text-gray-700">
                               {mov.toneladas ? formatNumber(mov.toneladas, 2) : '-'}
                             </td>
                             <td
-                              className="px-4 py-3 text-sm text-right text-purple-700"
+                              className="px-3 py-3 text-sm text-right text-purple-700"
                               title={mov.factor_conversion_m3 ? `Factor: ${mov.factor_conversion_m3}` : 'Sin factor de conversión cargado para este material'}
                             >
                               {mov.metros_cubicos ? formatNumber(mov.metros_cubicos, 2) : '-'}
                             </td>
-                            <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
+                            <td className="px-3 py-3 text-sm text-right font-medium text-red-600">
+                              {mov.tipo === 'cargo' && mov.monto_neto != null ? `$${formatNumber(mov.monto_neto, 2)}` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-sm text-right text-gray-600">
+                              {mov.alicuota_iva != null ? `${formatNumber(mov.alicuota_iva, 2)}%` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-sm text-right text-gray-700">
+                              {mov.monto_iva != null ? `$${formatNumber(mov.monto_iva, 2)}` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-sm text-right font-medium text-red-700">
                               {mov.tipo === 'cargo' ? `$${formatNumber(mov.monto, 2)}` : '-'}
                             </td>
-                            <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
+                            <td className="px-3 py-3 text-sm text-right font-medium text-green-600">
                               {mov.tipo === 'pago' ? `$${formatNumber(mov.monto, 2)}` : '-'}
                             </td>
-                            <td className="px-4 py-3 text-sm text-right font-bold">
+                            <td className="px-3 py-3 text-sm text-right font-bold">
                               ${formatNumber(mov.saldo_posterior, 2)}
                             </td>
                             <td className="px-4 py-3">
@@ -547,6 +559,7 @@ export default function CuentaCorrienteTab() {
         <PagoModal
           empresaId={selectedCliente}
           empresaNombre={resumen?.empresa_nombre || ''}
+          alicuotaDefault={todosClientes.find(c => c.id === selectedCliente)?.alicuota_iva ?? 21}
           onClose={() => setShowPagoModal(false)}
           onSuccess={() => {
             setShowPagoModal(false)
@@ -769,24 +782,35 @@ function AnularMovimientoModal({
 function PagoModal({
   empresaId,
   empresaNombre,
+  alicuotaDefault,
   onClose,
   onSuccess
 }: {
   empresaId: string
   empresaNombre: string
+  alicuotaDefault: number
   onClose: () => void
   onSuccess: () => void
 }) {
   const [monto, setMonto] = useState('')
+  const [alicuota, setAlicuota] = useState(String(alicuotaDefault))
   const [fecha, setFecha] = useState(getTodayLocalDate())
   const [descripcion, setDescripcion] = useState('Pago recibido')
   const [metodoPago, setMetodoPago] = useState('efectivo')
   const [registrarIngreso, setRegistrarIngreso] = useState(true)
 
+  // Descomponer total c/IVA en neto + IVA para mostrarlo en vivo.
+  const montoNum = parseFloat(monto) || 0
+  const alicuotaNum = parseFloat(alicuota) || 0
+  const factor = 1 + alicuotaNum / 100
+  const neto = factor > 0 ? montoNum / factor : 0
+  const iva = montoNum - neto
+
   const mutation = useMutation({
     mutationFn: () => cuentaCorrienteService.registrarPago({
       empresa_id: empresaId,
       monto: parseFloat(monto),
+      alicuota_iva: parseFloat(alicuota),
       fecha,
       descripcion,
       metodo_pago: metodoPago,
@@ -821,16 +845,47 @@ function PagoModal({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Monto *</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                placeholder="0.00"
-              />
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium">Monto total c/IVA *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Alícuota IVA (%)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={alicuota}
+                  onChange={(e) => setAlicuota(e.target.value)}
+                  placeholder="21"
+                />
+              </div>
             </div>
+
+            {montoNum > 0 && (
+              <div className="bg-gray-50 border rounded-md p-3 text-xs text-gray-700 grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-gray-500">Neto</p>
+                  <p className="font-semibold">${formatNumber(neto, 2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">IVA</p>
+                  <p className="font-semibold">${formatNumber(iva, 2)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Total</p>
+                  <p className="font-semibold text-green-700">${formatNumber(montoNum, 2)}</p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Fecha *</label>
@@ -1042,16 +1097,28 @@ function EditarMontoModal({
 
   const pesoTn = extractPesoTn(movimiento.descripcion)
   const [precioUnitario, setPrecioUnitario] = useState('')
-  const [montoTotal, setMontoTotal] = useState(movimiento.monto.toString())
+  // El input "Monto Neto" empieza con el neto vigente (o si no existe, el monto total dividido por (1 + alic/100))
+  const alicuotaInicial = movimiento.alicuota_iva ?? 21
+  const netoInicial =
+    movimiento.monto_neto !== undefined && movimiento.monto_neto !== null
+      ? Number(movimiento.monto_neto)
+      : Number(movimiento.monto) / (1 + Number(alicuotaInicial) / 100)
+  const [montoNeto, setMontoNeto] = useState(netoInicial.toFixed(2))
+  const [alicuota, setAlicuota] = useState(String(alicuotaInicial))
 
-  // Calcular monto automáticamente cuando cambia precio unitario
+  const netoNum = parseFloat(montoNeto) || 0
+  const alicuotaNum = parseFloat(alicuota) || 0
+  const ivaCalculado = netoNum * alicuotaNum / 100
+  const totalCalculado = netoNum + ivaCalculado
+
+  // Calcular neto automáticamente cuando cambia precio unitario
   const handlePrecioChange = (value: string) => {
     setPrecioUnitario(value)
     if (pesoTn && value) {
       const precio = parseFloat(value)
       if (!isNaN(precio)) {
-        const total = pesoTn * precio
-        setMontoTotal(total.toFixed(2))
+        const neto = pesoTn * precio
+        setMontoNeto(neto.toFixed(2))
       }
     }
   }
@@ -1059,15 +1126,16 @@ function EditarMontoModal({
   const mutation = useMutation({
     mutationFn: () => cuentaCorrienteService.actualizarMontoCargo(
       movimiento.id,
-      parseFloat(montoTotal),
-      precioUnitario ? parseFloat(precioUnitario) : undefined
+      parseFloat(montoNeto),
+      precioUnitario ? parseFloat(precioUnitario) : undefined,
+      parseFloat(alicuota),
     ),
     onSuccess,
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!montoTotal || parseFloat(montoTotal) < 0) {
+    if (!montoNeto || parseFloat(montoNeto) < 0) {
       alert('Ingrese un monto válido')
       return
     }
@@ -1115,21 +1183,51 @@ function EditarMontoModal({
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Monto Total *</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={montoTotal}
-                onChange={(e) => setMontoTotal(e.target.value)}
-                placeholder="0.00"
-              />
-              {movimiento.monto > 0 && (
-                <p className="text-xs text-gray-500">
-                  Monto anterior: ${formatNumber(movimiento.monto, 2)}
-                </p>
-              )}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium">Monto Neto (sin IVA) *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={montoNeto}
+                  onChange={(e) => setMontoNeto(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Alícuota IVA (%)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={alicuota}
+                  onChange={(e) => setAlicuota(e.target.value)}
+                  placeholder="21"
+                />
+              </div>
             </div>
+
+            <div className="bg-gray-50 border rounded-md p-3 text-xs text-gray-700 grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-gray-500">Neto</p>
+                <p className="font-semibold">${formatNumber(netoNum, 2)}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">IVA</p>
+                <p className="font-semibold">${formatNumber(ivaCalculado, 2)}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Total c/IVA</p>
+                <p className="font-semibold text-red-700">${formatNumber(totalCalculado, 2)}</p>
+              </div>
+            </div>
+
+            {movimiento.monto > 0 && (
+              <p className="text-xs text-gray-500">
+                Anterior: ${formatNumber(movimiento.monto, 2)} (c/IVA)
+              </p>
+            )}
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={mutation.isPending} className="flex-1">

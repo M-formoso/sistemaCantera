@@ -59,8 +59,11 @@ class MovimientoCuentaCorriente(BaseModel):
     # Tipo de movimiento
     tipo = Column(String(20), nullable=False)  # cargo, pago, ajuste
 
-    # Montos
+    # Montos (a partir de 2026-06: monto es el TOTAL c/IVA, monto_neto + monto_iva = monto)
     monto = Column(Numeric(12, 2), nullable=False)
+    monto_neto = Column(Numeric(12, 2), nullable=True)
+    monto_iva = Column(Numeric(12, 2), nullable=True)
+    alicuota_iva = Column(Numeric(5, 2), nullable=False, default=21)
     saldo_anterior = Column(Numeric(12, 2), nullable=False, default=0)
     saldo_posterior = Column(Numeric(12, 2), nullable=False)
 

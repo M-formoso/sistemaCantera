@@ -399,12 +399,24 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
         MovimientoCuentaCorriente.tipo == "cargo",
     ).first()
 
+    # IVA: el "importe" del pesaje es NETO. Calculamos IVA con la alícuota del cliente.
+    from app.services.cuenta_corriente_service import _agregar_iva_a_neto
+    alicuota = empresa.alicuota_iva or Decimal("21")
+    monto_iva, monto_total = _agregar_iva_a_neto(importe, alicuota)
+
     if movimiento_existente:
         # Solo sincronizar si el movimiento pertenece al cliente correcto. Si está
         # en otro cliente, no tocamos nada: el cambio de cliente debe pasar por
         # _aplicar_cambio_cliente_cc / _transferir_cargo_cuenta_corriente.
         if movimiento_existente.empresa_id == pesaje.cliente_id:
-            movimiento_existente.monto = importe
+            # Recalculo IVA con la alícuota actual del movimiento (no la del cliente),
+            # para respetar ediciones manuales previas en este cargo.
+            alicuota_existente = movimiento_existente.alicuota_iva or alicuota
+            iva_existente, total_existente = _agregar_iva_a_neto(importe, alicuota_existente)
+            movimiento_existente.monto = total_existente
+            movimiento_existente.monto_neto = importe
+            movimiento_existente.monto_iva = iva_existente
+            movimiento_existente.alicuota_iva = alicuota_existente
             nueva_fecha = pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha
             movimiento_existente.fecha = nueva_fecha
             movimiento_existente.descripcion = descripcion
@@ -419,12 +431,15 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
 
     # No hay movimiento previo: crear uno nuevo
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
-    saldo_posterior = saldo_anterior + importe
+    saldo_posterior = saldo_anterior + monto_total
 
     movimiento = MovimientoCuentaCorriente(
         empresa_id=pesaje.cliente_id,
         tipo="cargo",
-        monto=importe,
+        monto=monto_total,
+        monto_neto=importe,
+        monto_iva=monto_iva,
+        alicuota_iva=alicuota,
         saldo_anterior=saldo_anterior,
         saldo_posterior=saldo_posterior,
         fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
@@ -440,6 +455,10 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     db.add(movimiento)
     db.commit()
     db.refresh(movimiento)
+
+    # Mantener saldo_pendiente del pesaje en el TOTAL c/IVA (acorde a saldo CC).
+    pesaje.saldo_pendiente = monto_total
+    db.commit()
 
     return movimiento
 

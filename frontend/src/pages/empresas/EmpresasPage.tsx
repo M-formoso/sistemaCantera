@@ -37,6 +37,7 @@ export default function EmpresasPage() {
     telefono: '',
     email: '',
     contacto: '',
+    alicuota_iva: 21,
   })
 
   // Estado para gestión de camiones de clientes
@@ -152,6 +153,7 @@ export default function EmpresasPage() {
       telefono: '',
       email: '',
       contacto: '',
+      alicuota_iva: 21,
     })
     setShowModal(true)
   }
@@ -166,6 +168,7 @@ export default function EmpresasPage() {
       telefono: empresa.telefono || '',
       email: empresa.email || '',
       contacto: empresa.contacto || '',
+      alicuota_iva: empresa.alicuota_iva ?? 21,
     })
     setShowModal(true)
   }
@@ -181,6 +184,7 @@ export default function EmpresasPage() {
       telefono: '',
       email: '',
       contacto: '',
+      alicuota_iva: 21,
     })
   }
 
@@ -820,6 +824,31 @@ export default function EmpresasPage() {
                     placeholder="Nombre del contacto"
                   />
                 </div>
+
+                {formData.tipo === 'cliente' && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Alícuota de IVA por defecto (%)
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.alicuota_iva ?? 21}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          alicuota_iva: e.target.value === '' ? 21 : Number(e.target.value),
+                        })
+                      }
+                      placeholder="21"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Se aplica automáticamente a nuevos cargos y pagos. Se puede editar por movimiento.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-2 justify-end pt-4">
                   <Button type="button" variant="outline" onClick={closeModal}>

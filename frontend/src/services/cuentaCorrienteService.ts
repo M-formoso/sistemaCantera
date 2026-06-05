@@ -4,7 +4,10 @@ export interface MovimientoCC {
   id: string
   empresa_id: string
   tipo: 'cargo' | 'pago' | 'ajuste'
-  monto: number
+  monto: number  // TOTAL c/IVA
+  monto_neto?: number
+  monto_iva?: number
+  alicuota_iva?: number
   saldo_anterior: number
   saldo_posterior: number
   fecha: string
@@ -45,7 +48,8 @@ export interface ClienteConDeuda {
 
 export interface PagoCreate {
   empresa_id: string
-  monto: number
+  monto: number  // TOTAL c/IVA
+  alicuota_iva?: number
   fecha: string
   descripcion: string
   metodo_pago?: string
@@ -63,6 +67,13 @@ export interface AjusteCreate {
   fecha: string
   descripcion: string
   notas?: string
+  alicuota_iva?: number
+}
+
+export interface ActualizarMontoCargo {
+  monto: number  // NETO
+  precio_unitario?: number
+  alicuota_iva?: number
 }
 
 // Obtener clientes con deuda
@@ -115,15 +126,17 @@ export const anularMovimiento = async (movimientoId: string, motivo: string): Pr
   return data
 }
 
-// Actualizar monto de un cargo
+// Actualizar monto de un cargo (monto = neto)
 export const actualizarMontoCargo = async (
   movimientoId: string,
   monto: number,
-  precioUnitario?: number
+  precioUnitario?: number,
+  alicuotaIva?: number,
 ): Promise<MovimientoCC> => {
   const { data } = await api.put<MovimientoCC>(`/cuenta-corriente/${movimientoId}/monto`, {
     monto,
-    precio_unitario: precioUnitario
+    precio_unitario: precioUnitario,
+    alicuota_iva: alicuotaIva,
   })
   return data
 }

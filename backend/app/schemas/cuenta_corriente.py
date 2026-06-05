@@ -18,13 +18,19 @@ class MovimientoCCBase(BaseModel):
 class CargoCreate(MovimientoCCBase):
     """Schema para crear un cargo manual"""
     empresa_id: UUID
-    monto: Decimal = Field(..., gt=0)
+    monto: Decimal = Field(..., gt=0, description="Monto NETO (sin IVA)")
+    alicuota_iva: Optional[Decimal] = Field(None, ge=0, le=100)
 
 
 class PagoCreate(BaseModel):
-    """Schema para registrar un pago"""
+    """Schema para registrar un pago.
+
+    monto = total c/IVA. El sistema lo descompone en neto + IVA usando alicuota_iva
+    (si no viene, toma la del cliente).
+    """
     empresa_id: UUID
-    monto: Decimal = Field(..., gt=0)
+    monto: Decimal = Field(..., gt=0, description="Monto TOTAL c/IVA recibido")
+    alicuota_iva: Optional[Decimal] = Field(None, ge=0, le=100)
     fecha: date
     descripcion: str = Field(..., max_length=500)
     metodo_pago: Optional[str] = Field(None, max_length=50)
@@ -43,6 +49,7 @@ class AjusteCreate(BaseModel):
     fecha: date
     descripcion: str = Field(..., max_length=500)
     notas: Optional[str] = None
+    alicuota_iva: Optional[Decimal] = Field(None, ge=0, le=100)
 
 
 class MovimientoCCSchema(BaseModel):
@@ -50,7 +57,10 @@ class MovimientoCCSchema(BaseModel):
     id: UUID
     empresa_id: UUID
     tipo: str
-    monto: Decimal
+    monto: Decimal  # TOTAL c/IVA
+    monto_neto: Optional[Decimal] = None
+    monto_iva: Optional[Decimal] = None
+    alicuota_iva: Optional[Decimal] = None
     saldo_anterior: Decimal
     saldo_posterior: Decimal
     fecha: date
@@ -104,9 +114,13 @@ class AnularMovimientoRequest(BaseModel):
 
 
 class ActualizarMontoRequest(BaseModel):
-    """Request para actualizar el monto de un cargo"""
-    monto: Decimal = Field(..., ge=0)
+    """Request para actualizar el monto NETO de un cargo y/o su alícuota de IVA.
+
+    Si se pasa alicuota_iva, recalcula monto_iva y monto total c/IVA.
+    """
+    monto: Decimal = Field(..., ge=0, description="Monto NETO (sin IVA)")
     precio_unitario: Optional[Decimal] = Field(None, ge=0)  # Precio por tonelada
+    alicuota_iva: Optional[Decimal] = Field(None, ge=0, le=100)
 
 
 class HistorialMovimientoCCSchema(BaseModel):

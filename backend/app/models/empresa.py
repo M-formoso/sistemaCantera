@@ -28,6 +28,9 @@ class Empresa(BaseModel):
     # Cuenta corriente
     saldo_cuenta_corriente = Column(Numeric(12, 2), default=0, nullable=False)
 
+    # Alícuota de IVA por defecto del cliente (21%, 10.5%, etc.). Editable por movimiento.
+    alicuota_iva = Column(Numeric(5, 2), default=21, nullable=False)
+
     # Lista de precios asignada
     lista_precio_id = Column(UUID(as_uuid=True), ForeignKey("listas_precios.id", ondelete="SET NULL"), nullable=True)
 

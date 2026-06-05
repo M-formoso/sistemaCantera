@@ -16,6 +16,27 @@ from app.models.usuario import Usuario
 from app.models.finanzas import MovimientoFinanciero, CategoriaFinanzas
 
 
+def _decomponer_total_con_iva(monto_total: Decimal, alicuota: Decimal) -> tuple:
+    """A partir de un monto total c/IVA y una alícuota, devuelve (neto, iva)."""
+    if alicuota is None:
+        alicuota = Decimal("21")
+    factor = Decimal("1") + (Decimal(alicuota) / Decimal("100"))
+    if factor == 0:
+        return monto_total, Decimal("0")
+    neto = (Decimal(monto_total) / factor).quantize(Decimal("0.01"))
+    iva = (Decimal(monto_total) - neto).quantize(Decimal("0.01"))
+    return neto, iva
+
+
+def _agregar_iva_a_neto(monto_neto: Decimal, alicuota: Decimal) -> tuple:
+    """A partir de un monto neto y una alícuota, devuelve (iva, total c/IVA)."""
+    if alicuota is None:
+        alicuota = Decimal("21")
+    iva = (Decimal(monto_neto) * Decimal(alicuota) / Decimal("100")).quantize(Decimal("0.01"))
+    total = (Decimal(monto_neto) + iva).quantize(Decimal("0.01"))
+    return iva, total
+
+
 def _registrar_historial(
     db: Session,
     movimiento_id: UUID,
@@ -184,8 +205,13 @@ def registrar_cargo_pesaje(
             detail="Cliente no encontrado"
         )
 
+    # IVA: pesaje.importe_total es el NETO; aplicamos alícuota del cliente.
+    alicuota = empresa.alicuota_iva or Decimal("21")
+    monto_neto = Decimal(pesaje.importe_total)
+    monto_iva, monto_total = _agregar_iva_a_neto(monto_neto, alicuota)
+
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
-    saldo_posterior = saldo_anterior + pesaje.importe_total
+    saldo_posterior = saldo_anterior + monto_total
 
     # Crear descripción
     peso_tn = pesaje.peso_neto / Decimal("1000")
@@ -198,7 +224,10 @@ def registrar_cargo_pesaje(
     movimiento = MovimientoCuentaCorriente(
         empresa_id=pesaje.cliente_id,
         tipo="cargo",
-        monto=pesaje.importe_total,
+        monto=monto_total,
+        monto_neto=monto_neto,
+        monto_iva=monto_iva,
+        alicuota_iva=alicuota,
         saldo_anterior=saldo_anterior,
         saldo_posterior=saldo_posterior,
         fecha=pesaje.fecha.date() if hasattr(pesaje.fecha, 'date') else pesaje.fecha,
@@ -213,7 +242,7 @@ def registrar_cargo_pesaje(
 
     # Inicializar saldo_pendiente del pesaje (para que aparezca correctamente
     # en la lista de "documentos pendientes" al hacer un cobro).
-    pesaje.saldo_pendiente = pesaje.importe_total
+    pesaje.saldo_pendiente = monto_total
 
     db.add(movimiento)
     db.flush()
@@ -242,13 +271,14 @@ def registrar_pago(
     referencia_pago: Optional[str] = None,
     banco: Optional[str] = None,
     notas: Optional[str] = None,
-    registrar_ingreso: bool = True
+    registrar_ingreso: bool = True,
+    alicuota_iva: Optional[Decimal] = None,
 ) -> MovimientoCuentaCorriente:
     """
-    Registra un pago de un cliente
+    Registra un pago de un cliente.
 
-    Args:
-        registrar_ingreso: Si True, crea también un movimiento financiero de ingreso
+    `monto` es el TOTAL c/IVA recibido. Se descompone en neto + IVA usando
+    la alícuota indicada (o la default del cliente).
     """
     # Obtener empresa y saldo actual
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
@@ -258,6 +288,10 @@ def registrar_pago(
             detail="Cliente no encontrado"
         )
 
+    if alicuota_iva is None:
+        alicuota_iva = empresa.alicuota_iva or Decimal("21")
+    monto_neto, monto_iva = _decomponer_total_con_iva(monto, alicuota_iva)
+
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
     saldo_posterior = saldo_anterior - monto  # Pago reduce el saldo (deuda)
 
@@ -266,6 +300,9 @@ def registrar_pago(
         empresa_id=empresa_id,
         tipo="pago",
         monto=monto,
+        monto_neto=monto_neto,
+        monto_iva=monto_iva,
+        alicuota_iva=alicuota_iva,
         saldo_anterior=saldo_anterior,
         saldo_posterior=saldo_posterior,
         fecha=fecha,
@@ -402,13 +439,13 @@ def actualizar_monto_cargo(
     movimiento_id: UUID,
     nuevo_monto: Decimal,
     precio_unitario: Optional[Decimal] = None,
-    usuario_id: UUID = None
+    usuario_id: UUID = None,
+    alicuota_iva: Optional[Decimal] = None,
 ) -> MovimientoCuentaCorriente:
     """
-    Actualiza el monto de un cargo en cuenta corriente.
-    Útil para agregar precio a pesajes que se registraron sin importe.
-
-    También actualiza el pesaje asociado si existe.
+    Actualiza el monto NETO de un cargo (y opcionalmente la alícuota de IVA).
+    Recalcula IVA, total c/IVA, saldo del movimiento y de la empresa, e
+    impacta al pesaje + remito asociados (saldo_pendiente, importe).
     """
     movimiento = db.query(MovimientoCuentaCorriente).filter(
         MovimientoCuentaCorriente.id == movimiento_id
@@ -440,22 +477,32 @@ def actualizar_monto_cargo(
             detail="Cliente no encontrado"
         )
 
-    # Calcular diferencia y actualizar saldo
-    diferencia = nuevo_monto - movimiento.monto
+    # Alícuota: la pedida, o la actual, o la del cliente, o 21.
+    alicuota_final = (
+        alicuota_iva
+        if alicuota_iva is not None
+        else (movimiento.alicuota_iva or empresa.alicuota_iva or Decimal("21"))
+    )
+    monto_iva, monto_total_nuevo = _agregar_iva_a_neto(nuevo_monto, alicuota_final)
+
+    # Calcular diferencia (sobre el TOTAL c/IVA) y ajustar saldos.
+    total_anterior = Decimal(movimiento.monto)
+    diferencia = monto_total_nuevo - total_anterior
     empresa.saldo_cuenta_corriente = (empresa.saldo_cuenta_corriente or Decimal("0")) + diferencia
 
-    # Actualizar monto del movimiento
-    monto_anterior = movimiento.monto
-    movimiento.monto = nuevo_monto
-    movimiento.saldo_posterior = movimiento.saldo_anterior + nuevo_monto
+    movimiento.monto = monto_total_nuevo
+    movimiento.monto_neto = nuevo_monto
+    movimiento.monto_iva = monto_iva
+    movimiento.alicuota_iva = alicuota_final
+    movimiento.saldo_posterior = movimiento.saldo_anterior + monto_total_nuevo
 
-    # Actualizar detalle
     if precio_unitario:
         movimiento.detalle = f"Precio/tn: ${precio_unitario:,.2f}"
     elif nuevo_monto > 0:
-        movimiento.detalle = f"Monto actualizado (anterior: ${monto_anterior:,.2f})"
+        movimiento.detalle = f"Monto actualizado (anterior: ${total_anterior:,.2f})"
 
-    # Si tiene pesaje asociado, actualizarlo también
+    # Pesaje y remito siguen llevando el NETO (importe sin IVA), pero el
+    # saldo_pendiente se mueve por la diferencia del TOTAL.
     if movimiento.pesaje_id:
         pesaje = db.query(Pesaje).filter(Pesaje.id == movimiento.pesaje_id).first()
         if pesaje:
@@ -463,12 +510,10 @@ def actualizar_monto_cargo(
             if precio_unitario:
                 pesaje.precio_unitario = precio_unitario
 
-            # Ajustar saldo_pendiente del pesaje por la diferencia, sin bajar de 0.
             saldo_actual = pesaje.saldo_pendiente or Decimal("0")
             nuevo_saldo = saldo_actual + diferencia
             pesaje.saldo_pendiente = nuevo_saldo if nuevo_saldo > 0 else Decimal("0")
 
-            # Si tiene remito vinculado, sincronizar su importe y saldo_pendiente.
             from app.models.remito import Remito
             remito = db.query(Remito).filter(Remito.pesaje_id == pesaje.id).first()
             if remito:
@@ -478,7 +523,10 @@ def actualizar_monto_cargo(
                 remito.saldo_pendiente = nuevo_saldo_remito if nuevo_saldo_remito > 0 else Decimal("0")
 
     if usuario_id:
-        detalle_hist = f"Monto: ${monto_anterior:,.2f} → ${nuevo_monto:,.2f}"
+        detalle_hist = (
+            f"Neto: ${(movimiento.monto_neto or 0):,.2f} → ${nuevo_monto:,.2f} "
+            f"| IVA {alicuota_final}% | Total c/IVA: ${monto_total_nuevo:,.2f}"
+        )
         if precio_unitario:
             detalle_hist += f" (precio/tn: ${precio_unitario:,.2f})"
         _registrar_historial(db, movimiento.id, usuario_id, "MODIFICACION", detalle_hist)

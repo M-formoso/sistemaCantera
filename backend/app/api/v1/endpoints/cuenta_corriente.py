@@ -117,7 +117,8 @@ async def registrar_pago(
         referencia_pago=pago.referencia_pago,
         banco=pago.banco,
         notas=pago.notas,
-        registrar_ingreso=pago.registrar_ingreso
+        registrar_ingreso=pago.registrar_ingreso,
+        alicuota_iva=pago.alicuota_iva,
     )
 
     result = MovimientoCCSchema.model_validate(movimiento)
@@ -219,7 +220,8 @@ async def actualizar_monto_cargo(
         movimiento_id=movimiento_id,
         nuevo_monto=request.monto,
         precio_unitario=request.precio_unitario,
-        usuario_id=current_user.id
+        usuario_id=current_user.id,
+        alicuota_iva=request.alicuota_iva,
     )
 
     result = MovimientoCCSchema.model_validate(movimiento)
