@@ -175,6 +175,31 @@ export default function CuentaCorrienteTab() {
     }
   }
 
+  // Aplicar / quitar IVA al saldo del cliente
+  const handleAplicarIva = async (ivaEnTotal: boolean) => {
+    if (!selectedCliente) return
+    const accion = ivaEnTotal ? 'sumar IVA al total y al saldo' : 'dejar el saldo en NETO (sin IVA)'
+    const ok = window.confirm(
+      `Esto va a recalcular TODOS los movimientos no anulados del cliente para ${accion}. ¿Continuar?`
+    )
+    if (!ok) return
+    try {
+      const res = await cuentaCorrienteService.aplicarIvaEnTotal(selectedCliente, ivaEnTotal)
+      queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-resumen'] })
+      queryClient.invalidateQueries({ queryKey: ['cuenta-corriente-movimientos'] })
+      queryClient.invalidateQueries({ queryKey: ['clientes-con-deuda'] })
+      queryClient.invalidateQueries({ queryKey: ['empresas'] })
+      alert(
+        `IVA en total: ${res.iva_en_total ? 'SI' : 'NO'}\n` +
+        `Movimientos actualizados: ${res.movimientos_actualizados}\n` +
+        `Saldo actual: $${res.saldo_actual.toFixed(2)}`
+      )
+    } catch (error: any) {
+      console.error(error)
+      alert(error.response?.data?.detail || 'Error al aplicar IVA')
+    }
+  }
+
   // Ver historial de un movimiento
   const handleVerHistorial = async (mov: any) => {
     setHistorialMovimiento(mov)
@@ -308,6 +333,23 @@ export default function CuentaCorrienteTab() {
                   <FileText className="h-4 w-4 mr-1" />
                   Ajuste
                 </Button>
+                {isAdmin && (() => {
+                  const clienteActual = todosClientes.find(c => c.id === selectedCliente)
+                  const ivaEnTotal = clienteActual?.iva_en_total ?? false
+                  return (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAplicarIva(!ivaEnTotal)}
+                      className={ivaEnTotal ? 'border-green-500 text-green-700' : ''}
+                      title={ivaEnTotal
+                        ? 'Quitar IVA del total/saldo (recalcula todos los movimientos a NETO)'
+                        : 'Sumar IVA al total/saldo (recalcula todos los movimientos sumando IVA)'}
+                    >
+                      {ivaEnTotal ? 'Quitar IVA del saldo' : 'Aplicar IVA al saldo'}
+                    </Button>
+                  )
+                })()}
                 {isAdmin && (
                   <Button
                     size="sm"

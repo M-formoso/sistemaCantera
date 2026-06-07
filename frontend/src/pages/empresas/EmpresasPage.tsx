@@ -154,6 +154,7 @@ export default function EmpresasPage() {
       email: '',
       contacto: '',
       alicuota_iva: 21,
+      iva_en_total: false,
     })
     setShowModal(true)
   }
@@ -169,6 +170,7 @@ export default function EmpresasPage() {
       email: empresa.email || '',
       contacto: empresa.contacto || '',
       alicuota_iva: empresa.alicuota_iva ?? 21,
+      iva_en_total: empresa.iva_en_total ?? false,
     })
     setShowModal(true)
   }
@@ -185,6 +187,7 @@ export default function EmpresasPage() {
       email: '',
       contacto: '',
       alicuota_iva: 21,
+      iva_en_total: false,
     })
   }
 
@@ -826,28 +829,48 @@ export default function EmpresasPage() {
                 </div>
 
                 {formData.tipo === 'cliente' && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Alícuota de IVA por defecto (%)
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={formData.alicuota_iva ?? 21}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          alicuota_iva: e.target.value === '' ? 21 : Number(e.target.value),
-                        })
-                      }
-                      placeholder="21"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Se aplica automáticamente a nuevos cargos y pagos. Se puede editar por movimiento.
-                    </p>
-                  </div>
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Alícuota de IVA por defecto (%)
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={formData.alicuota_iva ?? 21}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            alicuota_iva: e.target.value === '' ? 21 : Number(e.target.value),
+                          })
+                        }
+                        placeholder="21"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Se aplica automáticamente a nuevos cargos y pagos. Se puede editar por movimiento.
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="iva_en_total"
+                        className="mt-0.5 rounded"
+                        checked={formData.iva_en_total ?? false}
+                        onChange={(e) =>
+                          setFormData({ ...formData, iva_en_total: e.target.checked })
+                        }
+                      />
+                      <label htmlFor="iva_en_total" className="text-sm">
+                        <span className="font-medium">Sumar IVA al saldo de cuenta corriente</span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Si está marcado, el saldo crece con el total c/IVA (neto + IVA). Si no, queda solo en neto.
+                        </p>
+                      </label>
+                    </div>
+                  </>
                 )}
 
                 <div className="flex gap-2 justify-end pt-4">

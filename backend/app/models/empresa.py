@@ -30,6 +30,9 @@ class Empresa(BaseModel):
 
     # Alícuota de IVA por defecto del cliente (21%, 10.5%, etc.). Editable por movimiento.
     alicuota_iva = Column(Numeric(5, 2), default=21, nullable=False)
+    # Si True, el IVA se suma al total y al saldo de cuenta corriente.
+    # Si False, el IVA queda solo como dato informativo (saldo = neto).
+    iva_en_total = Column(Boolean, default=False, nullable=False)
 
     # Lista de precios asignada
     lista_precio_id = Column(UUID(as_uuid=True), ForeignKey("listas_precios.id", ondelete="SET NULL"), nullable=True)

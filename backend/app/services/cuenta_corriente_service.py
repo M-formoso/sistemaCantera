@@ -208,7 +208,10 @@ def registrar_cargo_pesaje(
     # IVA: pesaje.importe_total es el NETO; aplicamos alícuota del cliente.
     alicuota = empresa.alicuota_iva or Decimal("21")
     monto_neto = Decimal(pesaje.importe_total)
-    monto_iva, monto_total = _agregar_iva_a_neto(monto_neto, alicuota)
+    monto_iva, monto_total_iva = _agregar_iva_a_neto(monto_neto, alicuota)
+    # Si el cliente tiene iva_en_total = True, el saldo se mueve con el total
+    # c/IVA. Si no, queda en NETO (IVA solo informativo).
+    monto_total = monto_total_iva if empresa.iva_en_total else monto_neto
 
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
     saldo_posterior = saldo_anterior + monto_total
@@ -290,7 +293,14 @@ def registrar_pago(
 
     if alicuota_iva is None:
         alicuota_iva = empresa.alicuota_iva or Decimal("21")
-    monto_neto, monto_iva = _decomponer_total_con_iva(monto, alicuota_iva)
+    # Si el cliente tiene IVA en total, el `monto` que recibimos es total c/IVA
+    # → se desglosa en neto + IVA. Si no, el monto es directamente el NETO y el
+    # IVA queda como dato informativo (no se suma al saldo).
+    if empresa.iva_en_total:
+        monto_neto, monto_iva = _decomponer_total_con_iva(monto, alicuota_iva)
+    else:
+        monto_neto = Decimal(monto)
+        monto_iva = (Decimal(monto) * Decimal(alicuota_iva) / Decimal("100")).quantize(Decimal("0.01"))
 
     saldo_anterior = empresa.saldo_cuenta_corriente or Decimal("0")
     saldo_posterior = saldo_anterior - monto  # Pago reduce el saldo (deuda)
@@ -483,7 +493,10 @@ def actualizar_monto_cargo(
         if alicuota_iva is not None
         else (movimiento.alicuota_iva or empresa.alicuota_iva or Decimal("21"))
     )
-    monto_iva, monto_total_nuevo = _agregar_iva_a_neto(nuevo_monto, alicuota_final)
+    monto_iva, monto_total_iva = _agregar_iva_a_neto(nuevo_monto, alicuota_final)
+    # Respetar la configuración del cliente: si tiene IVA en total, el saldo
+    # toma el total c/IVA. Si no, queda en NETO.
+    monto_total_nuevo = monto_total_iva if empresa.iva_en_total else Decimal(nuevo_monto)
 
     # Calcular diferencia (sobre el TOTAL c/IVA) y ajustar saldos.
     total_anterior = Decimal(movimiento.monto)
@@ -535,6 +548,71 @@ def actualizar_monto_cargo(
     db.refresh(movimiento)
 
     return movimiento
+
+
+def aplicar_iva_en_total_cliente(
+    db: Session,
+    empresa_id: UUID,
+    iva_en_total: bool,
+    usuario_id: UUID,
+) -> dict:
+    """Aplica (o quita) el IVA al total de todos los movimientos no anulados del cliente.
+
+    Cambia el flag `iva_en_total` del cliente y recalcula cada movimiento:
+    - Si iva_en_total = True: monto = monto_neto * (1 + alicuota_iva / 100)
+    - Si iva_en_total = False: monto = monto_neto
+    En ambos casos: actualiza monto_iva y recalcula la cadena de saldos.
+    """
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado",
+        )
+
+    empresa.iva_en_total = iva_en_total
+
+    movimientos = db.query(MovimientoCuentaCorriente).filter(
+        MovimientoCuentaCorriente.empresa_id == empresa_id,
+        MovimientoCuentaCorriente.anulado == False,
+    ).all()
+
+    actualizados = 0
+    for mov in movimientos:
+        # Si no hay monto_neto, lo derivamos del monto actual asumiendo que era el neto.
+        neto = mov.monto_neto if mov.monto_neto is not None else Decimal(mov.monto)
+        if neto is None:
+            continue
+        alicuota = mov.alicuota_iva or empresa.alicuota_iva or Decimal("21")
+        iva, total_iva = _agregar_iva_a_neto(neto, alicuota)
+        nuevo_monto = total_iva if iva_en_total else Decimal(neto)
+        if (mov.monto_neto != neto) or (mov.monto != nuevo_monto) or (mov.monto_iva != iva):
+            mov.monto_neto = neto
+            mov.monto_iva = iva
+            mov.monto = nuevo_monto
+            actualizados += 1
+
+    db.flush()
+
+    # Recalcular saldos acumulados con los nuevos montos.
+    recalcular_saldos_movimientos(db, empresa_id)
+
+    _registrar_historial(
+        db,
+        movimiento_id=movimientos[0].id if movimientos else None,
+        usuario_id=usuario_id,
+        accion="MODIFICACION",
+        detalle=f"Cliente: IVA en total = {iva_en_total}",
+    ) if movimientos else None
+
+    db.commit()
+
+    return {
+        "empresa_id": str(empresa_id),
+        "iva_en_total": iva_en_total,
+        "movimientos_actualizados": actualizados,
+        "saldo_actual": float(empresa.saldo_cuenta_corriente or 0),
+    }
 
 
 def recalcular_saldos_movimientos(db: Session, empresa_id: UUID) -> dict:

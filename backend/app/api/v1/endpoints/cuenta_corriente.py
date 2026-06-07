@@ -202,6 +202,28 @@ async def recalcular_saldos_cliente(
     return cuenta_corriente_service.recalcular_saldos_movimientos(db, empresa_id)
 
 
+@router.post("/cliente/{empresa_id}/aplicar-iva")
+async def aplicar_iva_cliente(
+    empresa_id: UUID,
+    iva_en_total: bool = Query(..., description="True para sumar IVA al total y saldo, False para dejarlos en neto"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin_or_operador),
+):
+    """Activa o desactiva el cobro con IVA en el total/saldo del cliente.
+
+    Cambia el flag `iva_en_total` del cliente y recalcula todos sus movimientos
+    no anulados:
+    - True: monto = monto_neto + IVA (saldo crece con total c/IVA).
+    - False: monto = monto_neto (IVA solo informativo).
+    """
+    return cuenta_corriente_service.aplicar_iva_en_total_cliente(
+        db=db,
+        empresa_id=empresa_id,
+        iva_en_total=iva_en_total,
+        usuario_id=current_user.id,
+    )
+
+
 @router.put("/{movimiento_id}/monto", response_model=MovimientoCCSchema)
 async def actualizar_monto_cargo(
     movimiento_id: UUID,

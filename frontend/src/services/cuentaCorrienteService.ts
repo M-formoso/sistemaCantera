@@ -173,6 +173,26 @@ export const recalcularSaldosCliente = async (empresaId: string): Promise<Recalc
   return data
 }
 
+export interface AplicarIvaResultado {
+  empresa_id: string
+  iva_en_total: boolean
+  movimientos_actualizados: number
+  saldo_actual: number
+}
+
+// Activar/desactivar IVA en el total/saldo del cliente y recalcular movimientos
+export const aplicarIvaEnTotal = async (
+  empresaId: string,
+  ivaEnTotal: boolean,
+): Promise<AplicarIvaResultado> => {
+  const { data } = await api.post<AplicarIvaResultado>(
+    `/cuenta-corriente/cliente/${empresaId}/aplicar-iva`,
+    null,
+    { params: { iva_en_total: ivaEnTotal } },
+  )
+  return data
+}
+
 // Descargar comprobante PDF de un movimiento
 export const descargarComprobantePDF = async (movimientoId: string, filename?: string): Promise<void> => {
   const response = await api.get<Blob>(`/cuenta-corriente/movimientos/${movimientoId}/comprobante-pdf`, {
@@ -201,6 +221,7 @@ export const cuentaCorrienteService = {
   getHistorialMovimiento,
   descargarComprobantePDF,
   recalcularSaldosCliente,
+  aplicarIvaEnTotal,
 }
 
 export default cuentaCorrienteService

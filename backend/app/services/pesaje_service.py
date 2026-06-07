@@ -402,7 +402,11 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
     # IVA: el "importe" del pesaje es NETO. Calculamos IVA con la alícuota del cliente.
     from app.services.cuenta_corriente_service import _agregar_iva_a_neto
     alicuota = empresa.alicuota_iva or Decimal("21")
-    monto_iva, monto_total = _agregar_iva_a_neto(importe, alicuota)
+    monto_iva, monto_total_iva = _agregar_iva_a_neto(importe, alicuota)
+    # Si el cliente está configurado con IVA incluido en saldo, el "monto" del
+    # movimiento (que mueve el saldo) es el total c/IVA. Si no, queda en NETO
+    # y el IVA es solo informativo.
+    monto_total = monto_total_iva if empresa.iva_en_total else importe
 
     if movimiento_existente:
         # Solo sincronizar si el movimiento pertenece al cliente correcto. Si está
@@ -412,7 +416,8 @@ def _registrar_en_cuenta_corriente(db: Session, pesaje: Pesaje, usuario_id: UUID
             # Recalculo IVA con la alícuota actual del movimiento (no la del cliente),
             # para respetar ediciones manuales previas en este cargo.
             alicuota_existente = movimiento_existente.alicuota_iva or alicuota
-            iva_existente, total_existente = _agregar_iva_a_neto(importe, alicuota_existente)
+            iva_existente, total_iva_existente = _agregar_iva_a_neto(importe, alicuota_existente)
+            total_existente = total_iva_existente if empresa.iva_en_total else importe
             movimiento_existente.monto = total_existente
             movimiento_existente.monto_neto = importe
             movimiento_existente.monto_iva = iva_existente

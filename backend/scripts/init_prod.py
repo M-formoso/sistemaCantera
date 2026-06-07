@@ -238,6 +238,10 @@ def ensure_iva_columns():
                 ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
             """))
             conn.execute(text("""
+                ALTER TABLE empresas
+                ADD COLUMN IF NOT EXISTS iva_en_total BOOLEAN NOT NULL DEFAULT FALSE;
+            """))
+            conn.execute(text("""
                 ALTER TABLE movimientos_cuenta_corriente
                 ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
             """))
@@ -321,6 +325,66 @@ def ensure_iva_columns():
         print(f"Error verificando columnas IVA: {e}")
 
 
+def ensure_mateo_admin():
+    """Crear/actualizar el usuario superadmin de Mateo si no existe.
+
+    Idempotente: si el usuario ya existe, no toca su password (para no
+    pisarlo). Si no existe, lo crea con todos los permisos en True.
+    """
+    print("Verificando usuario Mateo Programador...")
+
+    engine = create_engine(settings.DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    db = SessionLocal()
+
+    EMAIL = "mateoformoso@larufina.com"
+    PASSWORD = "mateo123"
+
+    try:
+        mateo = db.query(Usuario).filter(Usuario.email == EMAIL).first()
+        if mateo:
+            print(f"Usuario {EMAIL} ya existe — sólo aseguro permisos y rol")
+            mateo.rol = "administrador"
+            mateo.activo = True
+            mateo.nombre = "Mateo Programador"
+            # Resetear password también para que el usuario pueda entrar sí o sí.
+            mateo.password_hash = get_password_hash(PASSWORD)
+            for permiso in [
+                "permiso_dashboard", "permiso_camiones", "permiso_empresas",
+                "permiso_repuestos", "permiso_pesajes", "permiso_combustible",
+                "permiso_finanzas", "permiso_usuarios", "permiso_reportes",
+            ]:
+                if hasattr(mateo, permiso):
+                    setattr(mateo, permiso, True)
+            db.commit()
+            print(f"Usuario {EMAIL} actualizado a superadmin")
+        else:
+            mateo = Usuario(
+                email=EMAIL,
+                nombre="Mateo Programador",
+                rol="administrador",
+                password_hash=get_password_hash(PASSWORD),
+                activo=True,
+                permiso_dashboard=True,
+                permiso_camiones=True,
+                permiso_empresas=True,
+                permiso_repuestos=True,
+                permiso_pesajes=True,
+                permiso_combustible=True,
+                permiso_finanzas=True,
+                permiso_usuarios=True,
+                permiso_reportes=True,
+            )
+            db.add(mateo)
+            db.commit()
+            print(f"Usuario {EMAIL} creado como superadmin")
+    except Exception as e:
+        print(f"Error creando/actualizando usuario Mateo: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     print("=" * 50)
     print("Inicializando Sistema Cantera La Rufina")
@@ -340,6 +404,9 @@ if __name__ == "__main__":
 
     # Asegurar que las columnas de IVA existan (salvaguarda por si la migration falló)
     ensure_iva_columns()
+
+    # Crear/asegurar usuario superadmin Mateo Programador
+    ensure_mateo_admin()
 
     print("=" * 50)
     print("Inicialización completada!")

@@ -294,6 +294,7 @@ export interface Empresa {
   activo: boolean
   saldo_cuenta_corriente?: number
   alicuota_iva?: number
+  iva_en_total?: boolean
   lista_precio_id?: string
   lista_precio_nombre?: string
   created_at: string
@@ -309,6 +310,7 @@ export interface EmpresaCreate {
   email?: string
   contacto?: string
   alicuota_iva?: number
+  iva_en_total?: boolean
 }
 
 // ==================== PESAJE ====================
