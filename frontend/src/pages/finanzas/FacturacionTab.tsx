@@ -44,7 +44,7 @@ export default function FacturacionTab() {
   })
 
   // Estadísticas
-  const totalPendiente = facturasPendientes.reduce((sum, f) => sum + f.saldo_pendiente, 0)
+  const totalPendiente = facturasPendientes.reduce((sum, f) => sum + Number(f.saldo_pendiente || 0), 0)
   const cantidadPendientes = facturasPendientes.length
 
   // Paginación de facturas
@@ -371,10 +371,12 @@ function CrearFacturaModal({
     }
     setRemitosSeleccionados(nuevosSeleccionados)
 
-    // Recalcular totales
+    // Recalcular totales. r.importe puede venir como string (Decimal del
+    // backend), por eso forzamos Number() — si no, `0 + "282220.40"`
+    // concatena y termina dando NaN en el total.
     const nuevoSubtotal = remitosPendientes
       .filter(r => nuevosSeleccionados.includes(r.id))
-      .reduce((sum, r) => sum + (r.importe || 0), 0)
+      .reduce((sum, r) => sum + Number(r.importe || 0), 0)
 
     setSubtotal(nuevoSubtotal)
     const nuevoIva = tipoComprobante.includes('_a') ? nuevoSubtotal * 0.21 : 0
