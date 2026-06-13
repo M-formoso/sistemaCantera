@@ -153,6 +153,7 @@ export default function EmpresasPage() {
       telefono: '',
       email: '',
       contacto: '',
+      notas: '',
       alicuota_iva: 21,
       iva_en_total: false,
     })
@@ -169,6 +170,7 @@ export default function EmpresasPage() {
       telefono: empresa.telefono || '',
       email: empresa.email || '',
       contacto: empresa.contacto || '',
+      notas: empresa.notas || '',
       alicuota_iva: empresa.alicuota_iva ?? 21,
       iva_en_total: empresa.iva_en_total ?? false,
     })
@@ -186,6 +188,7 @@ export default function EmpresasPage() {
       telefono: '',
       email: '',
       contacto: '',
+      notas: '',
       alicuota_iva: 21,
       iva_en_total: false,
     })
@@ -872,6 +875,24 @@ export default function EmpresasPage() {
                     </div>
                   </>
                 )}
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Notas
+                  </label>
+                  <textarea
+                    value={formData.notas || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, notas: e.target.value })
+                    }
+                    rows={4}
+                    placeholder="Información adicional, recordatorios, condiciones particulares, etc."
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Notas internas. Solo visibles para usuarios del sistema.
+                  </p>
+                </div>
 
                 <div className="flex gap-2 justify-end pt-4">
                   <Button type="button" variant="outline" onClick={closeModal}>

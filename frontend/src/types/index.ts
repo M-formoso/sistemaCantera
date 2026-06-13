@@ -291,6 +291,7 @@ export interface Empresa {
   telefono?: string
   email?: string
   contacto?: string
+  notas?: string
   activo: boolean
   saldo_cuenta_corriente?: number
   alicuota_iva?: number
@@ -309,6 +310,7 @@ export interface EmpresaCreate {
   telefono?: string
   email?: string
   contacto?: string
+  notas?: string
   alicuota_iva?: number
   iva_en_total?: boolean
 }

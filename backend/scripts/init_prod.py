@@ -242,6 +242,10 @@ def ensure_iva_columns():
                 ADD COLUMN IF NOT EXISTS iva_en_total BOOLEAN NOT NULL DEFAULT FALSE;
             """))
             conn.execute(text("""
+                ALTER TABLE empresas
+                ADD COLUMN IF NOT EXISTS notas TEXT;
+            """))
+            conn.execute(text("""
                 ALTER TABLE movimientos_cuenta_corriente
                 ADD COLUMN IF NOT EXISTS alicuota_iva NUMERIC(5, 2) NOT NULL DEFAULT 21.00;
             """))

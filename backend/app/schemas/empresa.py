@@ -48,6 +48,7 @@ class EmpresaBase(BaseModel):
     telefono: Optional[str] = Field(None, max_length=50)
     email: Optional[str] = Field(None, max_length=100)
     contacto: Optional[str] = Field(None, max_length=100)
+    notas: Optional[str] = None
 
 
 class EmpresaCreate(EmpresaBase):
@@ -65,6 +66,7 @@ class EmpresaUpdate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=50)
     email: Optional[str] = Field(None, max_length=100)
     contacto: Optional[str] = Field(None, max_length=100)
+    notas: Optional[str] = None
     activo: Optional[bool] = None
     lista_precio_id: Optional[UUID] = None
     alicuota_iva: Optional[float] = Field(None, ge=0, le=100)

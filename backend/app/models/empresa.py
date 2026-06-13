@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Enum, Numeric, ForeignKey
+from sqlalchemy import Column, String, Boolean, Enum, Numeric, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
@@ -23,6 +23,7 @@ class Empresa(BaseModel):
     telefono = Column(String(50))
     email = Column(String(100))
     contacto = Column(String(100))  # Persona de contacto
+    notas = Column(Text)  # Notas internas sobre el cliente
     activo = Column(Boolean, default=True, nullable=False)
 
     # Cuenta corriente
