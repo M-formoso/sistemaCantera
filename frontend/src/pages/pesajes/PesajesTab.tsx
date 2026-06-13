@@ -160,6 +160,40 @@ export default function PesajesTab() {
     }
   }
 
+  // Descargar Excel real (.xlsx) de movimientos
+  const [descargandoExcel, setDescargandoExcel] = useState(false)
+  const handleDescargarExcel = async () => {
+    setDescargandoExcel(true)
+    try {
+      const hoy = new Date().toISOString().split('T')[0]
+      const fechaDesde = filtroFechaDesde || hoy
+      const fechaHasta = filtroFechaHasta || hoy
+      await reportesService.exportarMovimientosXLSX(fechaDesde, fechaHasta)
+    } catch (error) {
+      console.error('Error al descargar Excel:', error)
+      alert('Error al descargar el Excel')
+    } finally {
+      setDescargandoExcel(false)
+    }
+  }
+
+  // Descargar CSV (legacy)
+  const [descargandoCSV, setDescargandoCSV] = useState(false)
+  const handleDescargarCSV = async () => {
+    setDescargandoCSV(true)
+    try {
+      const hoy = new Date().toISOString().split('T')[0]
+      const fechaDesde = filtroFechaDesde || hoy
+      const fechaHasta = filtroFechaHasta || hoy
+      await reportesService.exportarMovimientosExcel(fechaDesde, fechaHasta)
+    } catch (error) {
+      console.error('Error al descargar CSV:', error)
+      alert('Error al descargar el CSV')
+    } finally {
+      setDescargandoCSV(false)
+    }
+  }
+
   // Mutation para eliminar
   const deleteMutation = useMutation({
     mutationFn: (id: string) => pesajesService.delete(id),
@@ -411,11 +445,10 @@ export default function PesajesTab() {
     )
   }
 
-  const totalToneladas = pesajes.reduce((sum, p) => sum + (p.peso_neto || 0) / 1000, 0)
+  const totalToneladas = pesajes.reduce((sum, p) => sum + (Number(p.peso_neto) || 0) / 1000, 0)
   const promedioToneladas = pesajes.length > 0 ? totalToneladas / pesajes.length : 0
-
-  // Obtener el número de pesaje más alto como indicador del total real de pesajes
-  const ultimoNumeroPesaje = pesajesRaw.reduce((max, p) => Math.max(max, p.numero_pesaje || 0), 0)
+  // Cantidad de pesajes según los filtros activos.
+  const cantidadFiltrada = pesajes.length
 
   return (
     <div className="space-y-6">
@@ -443,6 +476,24 @@ export default function PesajesTab() {
           >
             <FileDown className="h-4 w-4 mr-2" />
             {descargandoPDF ? 'Descargando...' : 'Descargar PDF'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDescargarExcel}
+            disabled={descargandoExcel}
+            title="Descargar listado de pesajes en Excel (.xlsx)"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {descargandoExcel ? 'Descargando...' : 'Descargar Excel'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDescargarCSV}
+            disabled={descargandoCSV}
+            title="Descargar listado de pesajes en CSV (texto plano)"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {descargandoCSV ? 'Descargando...' : 'Descargar CSV'}
           </Button>
         </div>
         <Button onClick={() => navigate('/pesajes-remitos/nuevo')}>
@@ -568,8 +619,15 @@ export default function PesajesTab() {
       <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Total Pesajes</div>
-            <div className="text-2xl font-bold">{ultimoNumeroPesaje}</div>
+            <div className="text-sm text-muted-foreground">
+              {hayFiltrosActivos ? 'Pesajes filtrados' : 'Total Pesajes'}
+            </div>
+            <div className="text-2xl font-bold">{cantidadFiltrada}</div>
+            {hayFiltrosActivos && (
+              <div className="text-xs text-gray-500 mt-1">
+                de {pesajesRaw.length} cargados
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>

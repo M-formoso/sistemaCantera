@@ -214,6 +214,93 @@ def exportar_movimientos_excel(
     )
 
 
+@router.get("/movimientos/exportar-xlsx")
+def exportar_movimientos_xlsx(
+    fecha_desde: Optional[date] = Query(None, description="Fecha inicio del período"),
+    fecha_hasta: Optional[date] = Query(None, description="Fecha fin del período"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Exporta los movimientos/pesajes a Excel real (.xlsx) con openpyxl."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from io import BytesIO
+
+    reporte = reportes_service.obtener_movimientos(db, fecha_desde, fecha_hasta)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Movimientos"
+
+    headers = [
+        "N° Pesaje", "Fecha", "Hora", "Cliente", "Material",
+        "Peso Neto (kg)", "Precio/Tn", "Flete", "Importe Total",
+        "Patente", "Chofer", "Tipo Entrega", "Estado", "Observaciones",
+    ]
+    ws.append(headers)
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    for col in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    for m in reporte.movimientos:
+        ws.append([
+            m.numero_pesaje,
+            m.fecha,
+            m.hora,
+            m.cliente_nombre or "",
+            m.material or "",
+            float(m.peso_neto) if m.peso_neto else None,
+            float(m.precio_unitario) if m.precio_unitario else None,
+            float(m.flete) if m.flete else None,
+            float(m.importe_total) if m.importe_total else None,
+            m.patente or "",
+            m.chofer or "",
+            m.tipo_entrega or "",
+            m.estado,
+            m.observaciones or "",
+        ])
+
+    ws.append([])
+    totales_row = [
+        "TOTALES", "", "", "", "",
+        float(reporte.total_kg) if reporte.total_kg else 0,
+        "", "",
+        float(reporte.total_importe) if reporte.total_importe else 0,
+        "", "", "", "", "",
+    ]
+    ws.append(totales_row)
+    for col in range(1, len(totales_row) + 1):
+        cell = ws.cell(row=ws.max_row, column=col)
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+
+    ws.append([f"Cantidad de pesajes: {reporte.cantidad_pesajes}"])
+    ws.append([f"Total toneladas: {float(reporte.total_toneladas):.2f}"])
+
+    # Anchos automáticos básicos.
+    for col_idx in range(1, len(headers) + 1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max(
+            14, len(str(headers[col_idx - 1])) + 2
+        )
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    fecha_str = f"{reporte.fecha_desde.strftime('%Y%m%d')}_{reporte.fecha_hasta.strftime('%Y%m%d')}"
+    filename = f"movimientos_{fecha_str}.xlsx"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @router.get("/exportar-pdf")
 def exportar_reporte_pdf(
     tipo: str = Query(..., description="Tipo de reporte: resumen, ventas-material, ventas-semanal, gastos, maquinaria, top-clientes, movimientos"),

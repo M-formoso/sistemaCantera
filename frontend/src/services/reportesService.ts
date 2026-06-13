@@ -225,7 +225,7 @@ export const reportesService = {
     return response.data
   },
 
-  // Exportar movimientos a Excel/CSV
+  // Exportar movimientos a CSV (legacy)
   async exportarMovimientosExcel(fechaDesde?: string, fechaHasta?: string): Promise<void> {
     const params: Record<string, string> = {}
     if (fechaDesde) params.fecha_desde = fechaDesde
@@ -245,6 +245,31 @@ export const reportesService = {
       ? `${fechaDesde.replace(/-/g, '')}_${fechaHasta.replace(/-/g, '')}`
       : new Date().toISOString().split('T')[0].replace(/-/g, '')
     link.setAttribute('download', `movimientos_${fechaStr}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
+  // Exportar movimientos a Excel real (.xlsx)
+  async exportarMovimientosXLSX(fechaDesde?: string, fechaHasta?: string): Promise<void> {
+    const params: Record<string, string> = {}
+    if (fechaDesde) params.fecha_desde = fechaDesde
+    if (fechaHasta) params.fecha_hasta = fechaHasta
+
+    const response = await api.get('/reportes/movimientos/exportar-xlsx', {
+      params,
+      responseType: 'blob',
+    })
+
+    const blob = response.data as Blob
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const fechaStr = fechaDesde && fechaHasta
+      ? `${fechaDesde.replace(/-/g, '')}_${fechaHasta.replace(/-/g, '')}`
+      : new Date().toISOString().split('T')[0].replace(/-/g, '')
+    link.setAttribute('download', `movimientos_${fechaStr}.xlsx`)
     document.body.appendChild(link)
     link.click()
     link.remove()
