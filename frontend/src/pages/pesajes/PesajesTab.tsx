@@ -12,7 +12,6 @@ import { empresasService } from '@/services/empresasService'
 import { reportesService } from '@/services/reportesService'
 import { Pesaje, Empresa } from '@/types'
 import { formatDate, formatNumber } from '@/lib/utils'
-import { useIsAdmin } from '@/hooks/useIsAdmin'
 
 // Lista de materiales disponibles
 const MATERIALES_DISPONIBLES = [
@@ -39,7 +38,6 @@ interface HistorialItem {
 export default function PesajesTab() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const isAdmin = useIsAdmin()
 
   // Estados para filtros
   const [filtroEstado, setFiltroEstado] = useState<string>('')
@@ -347,17 +345,15 @@ export default function PesajesTab() {
               <Pencil className="h-4 w-4" />
             </Button>
 
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDelete(pesaje.id, pesaje.numero_pesaje)}
-                disabled={deleteMutation.isPending}
-                title="Eliminar"
-              >
-                <Trash2 className="h-4 w-4 text-red-600" />
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDelete(pesaje.id, pesaje.numero_pesaje)}
+              disabled={deleteMutation.isPending}
+              title="Eliminar"
+            >
+              <Trash2 className="h-4 w-4 text-red-600" />
+            </Button>
 
             {/* Menú de tres puntitos */}
             <div className="relative">

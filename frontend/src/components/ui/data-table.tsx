@@ -118,26 +118,33 @@ export function DataTable<TData, TValue>({
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b bg-gray-50">
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-4 py-3 text-left text-sm font-medium text-gray-700 whitespace-nowrap"
-                    style={{
-                      cursor: header.column.getCanSort() ? 'pointer' : 'default',
-                    }}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <div className="flex items-center gap-1">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                      {{
-                        asc: ' ↑',
-                        desc: ' ↓',
-                      }[header.column.getIsSorted() as string] ?? null}
-                    </div>
-                  </th>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  // Detectar columna de acciones para pinearla a la derecha y que
+                  // siempre quede visible sin necesidad de scrollear.
+                  const isAcciones = ['actions', 'acciones'].includes(header.column.id.toLowerCase())
+                  return (
+                    <th
+                      key={header.id}
+                      className={`px-4 py-3 text-left text-sm font-medium text-gray-700 whitespace-nowrap ${
+                        isAcciones ? 'sticky right-0 bg-gray-50 shadow-[-4px_0_6px_-3px_rgba(0,0,0,0.1)] z-10' : ''
+                      }`}
+                      style={{
+                        cursor: header.column.getCanSort() ? 'pointer' : 'default',
+                      }}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      <div className="flex items-center gap-1">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: ' ↑',
+                          desc: ' ↓',
+                        }[header.column.getIsSorted() as string] ?? null}
+                      </div>
+                    </th>
+                  )
+                })}
               </tr>
             ))}
           </thead>
@@ -146,13 +153,23 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b hover:bg-gray-50 transition-colors"
+                  className="border-b hover:bg-gray-50 transition-colors group"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const isAcciones = ['actions', 'acciones'].includes(cell.column.id.toLowerCase())
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`px-4 py-3 text-sm ${
+                          isAcciones
+                            ? 'sticky right-0 bg-white group-hover:bg-gray-50 shadow-[-4px_0_6px_-3px_rgba(0,0,0,0.1)] z-10'
+                            : ''
+                        }`}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))
             ) : (
