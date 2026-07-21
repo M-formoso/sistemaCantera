@@ -887,43 +887,13 @@ def actualizar(db: Session, pesaje_id: UUID, pesaje_data: PesajeUpdate, usuario 
             usuario_id=usuario.id if usuario else None,
         )
 
-    # ========== SINCRONIZAR FECHA Y MONTO EN CUENTA CORRIENTE ==========
+    # ========== SINCRONIZAR CUENTA CORRIENTE ==========
+    # Delegamos a _registrar_en_cuenta_corriente para que respete empresa.iva_en_total
+    # al recalcular monto/monto_neto/monto_iva y para que reajuste la cadena de saldos.
     if db_pesaje.cliente_id:
-        movimiento = db.query(MovimientoCuentaCorriente).filter(
-            MovimientoCuentaCorriente.pesaje_id == db_pesaje.id
-        ).first()
-
-        if movimiento:
-            # Actualizar fecha del movimiento si se modificó la fecha del pesaje
-            if fecha_actualizada:
-                movimiento.fecha = db_pesaje.fecha.date() if hasattr(db_pesaje.fecha, 'date') else db_pesaje.fecha
-
-            # Actualizar monto si cambió el importe_total
-            if 'importe_total' in update_data or campos_precio.intersection(update_data.keys()):
-                nuevo_monto = db_pesaje.importe_total or Decimal("0")
-                diferencia = nuevo_monto - (movimiento.monto or Decimal("0"))
-
-                if diferencia != 0:
-                    # Actualizar el monto del movimiento
-                    movimiento.monto = nuevo_monto
-
-                    # Actualizar saldo del cliente
-                    cliente = db.query(Empresa).filter(Empresa.id == db_pesaje.cliente_id).first()
-                    if cliente:
-                        saldo_actual = cliente.saldo_cuenta_corriente or Decimal("0")
-                        cliente.saldo_cuenta_corriente = saldo_actual + diferencia
-
-                    # Actualizar saldo_posterior del movimiento
-                    movimiento.saldo_posterior = (movimiento.saldo_anterior or Decimal("0")) + nuevo_monto
-
-            # Actualizar descripción si cambió el material o peso
-            if 'material' in update_data or 'peso_neto' in update_data:
-                peso_tn = db_pesaje.peso_neto / Decimal("1000") if db_pesaje.peso_neto else Decimal("0")
-                descripcion = f"Pesaje #{db_pesaje.numero_pesaje}"
-                if db_pesaje.material:
-                    descripcion += f" - {db_pesaje.material}"
-                descripcion += f" ({peso_tn:.2f} tn)"
-                movimiento.descripcion = descripcion
+        campos_afectan_cc = campos_precio | {'importe_total', 'material', 'peso_neto', 'peso_bruto', 'peso_tara'}
+        if fecha_actualizada or campos_afectan_cc.intersection(update_data.keys()):
+            _registrar_en_cuenta_corriente(db, db_pesaje, usuario.id if usuario else None)
 
     # Registrar en historial si hubo cambios
     if update_data and usuario:
@@ -986,14 +956,18 @@ def cancelar_pesaje(
             cliente = db.query(Empresa).filter(Empresa.id == db_pesaje.cliente_id).first()
             saldo_anterior = cliente.saldo_cuenta_corriente if cliente else Decimal("0")
 
+            # Revertir el monto real del cargo (incluye IVA si iva_en_total=True).
+            # Usar importe_total sería el NETO y dejaría el saldo desfasado por el IVA.
+            monto_a_revertir = movimiento_original.monto or Decimal("0")
+
             # Crear movimiento de reversión (crédito)
             movimiento_cancelacion = MovimientoCuentaCorriente(
                 empresa_id=db_pesaje.cliente_id,
                 tipo="ajuste",
                 concepto=f"CANCELACIÓN Pesaje #{db_pesaje.numero_pesaje} - {datos_cancelacion.motivo}",
-                monto=-db_pesaje.importe_total,  # Negativo para revertir
+                monto=-monto_a_revertir,
                 saldo_anterior=saldo_anterior,
-                saldo_posterior=saldo_anterior - db_pesaje.importe_total,
+                saldo_posterior=saldo_anterior - monto_a_revertir,
                 fecha=ahora,
                 pesaje_id=pesaje_id,
                 created_by=usuario_id
@@ -1002,7 +976,7 @@ def cancelar_pesaje(
 
             # Actualizar saldo del cliente
             if cliente:
-                cliente.saldo_cuenta_corriente = saldo_anterior - db_pesaje.importe_total
+                cliente.saldo_cuenta_corriente = saldo_anterior - monto_a_revertir
 
     # Si tiene orden de entrega asociada, revertir la carga
     if db_pesaje.orden_entrega_id and db_pesaje.peso_neto:
